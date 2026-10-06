@@ -1,0 +1,11 @@
+**/.vs
+**/.idea
+**/bin
+**/obj
+**/TestResults
+**/*.user
+**/*.md
+.git
+.gitignore
+.dockerignore
+Dockerfile

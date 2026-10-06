@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0015" author="lifefit-architecture">
+        <comment>Ticket: LF-0015. Membership plans, gym memberships, and membership history. Gym membership is the paid plan record, not TenantMembers. Index review: PK on each Id; UX plan name and membership number are unique per tenant; IX_GymMemberships_TenantId_Status_EndDate supports dashboard expiry; IX_GymMemberships_MemberProfileId supports a member's history; IX_MembershipHistory_GymMembershipId is the timeline read. Price uses DECIMAL(19,4). Performance note: list indexes lead with TenantId so a gym never scans another gym's memberships.</comment>
+        <sql splitStatements="false">
+            CREATE TABLE app.MembershipPlans
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                Name NVARCHAR(200) NOT NULL,
+                Description NVARCHAR(1000) NULL,
+                DurationDays INT NOT NULL,
+                MembershipType NVARCHAR(32) NOT NULL,
+                MaxVisits INT NULL,
+                Price DECIMAL(19, 4) NOT NULL,
+                Currency NVARCHAR(3) NOT NULL,
+                IsActive BIT NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_MembershipPlans PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_MembershipPlans_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT CK_MembershipPlans_DurationDays CHECK (DurationDays &gt; 0),
+                CONSTRAINT CK_MembershipPlans_Price CHECK (Price &gt;= 0),
+                CONSTRAINT CK_MembershipPlans_Type CHECK (MembershipType IN (N'Monthly', N'Quarterly', N'HalfYearly', N'Yearly', N'Custom'))
+            );
+            CREATE UNIQUE INDEX UX_MembershipPlans_TenantId_Name
+                ON app.MembershipPlans (TenantId, Name) WHERE DeletedAt IS NULL;
+            CREATE INDEX IX_MembershipPlans_TenantId
+                ON app.MembershipPlans (TenantId, IsActive) WHERE DeletedAt IS NULL;
+
+            CREATE TABLE app.GymMemberships
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                MemberProfileId UNIQUEIDENTIFIER NOT NULL,
+                BranchId UNIQUEIDENTIFIER NOT NULL,
+                MembershipPlanId UNIQUEIDENTIFIER NOT NULL,
+                MembershipNumber NVARCHAR(32) NOT NULL,
+                StartDate DATE NOT NULL,
+                EndDate DATE NOT NULL,
+                Status NVARCHAR(32) NOT NULL,
+                AutoRenew BIT NOT NULL,
+                Notes NVARCHAR(1000) NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_GymMemberships PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_GymMemberships_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_GymMemberships_MemberProfiles FOREIGN KEY (MemberProfileId) REFERENCES app.MemberProfiles (Id),
+                CONSTRAINT FK_GymMemberships_Branches FOREIGN KEY (BranchId) REFERENCES app.Branches (Id),
+                CONSTRAINT FK_GymMemberships_MembershipPlans FOREIGN KEY (MembershipPlanId) REFERENCES app.MembershipPlans (Id),
+                CONSTRAINT CK_GymMemberships_Dates CHECK (EndDate &gt;= StartDate),
+                CONSTRAINT CK_GymMemberships_Status CHECK (Status IN (N'Pending', N'Active', N'Expired', N'Frozen', N'Cancelled', N'Suspended'))
+            );
+            CREATE UNIQUE INDEX UX_GymMemberships_TenantId_MembershipNumber
+                ON app.GymMemberships (TenantId, MembershipNumber) WHERE DeletedAt IS NULL;
+            CREATE INDEX IX_GymMemberships_TenantId_Status_EndDate
+                ON app.GymMemberships (TenantId, Status, EndDate) WHERE DeletedAt IS NULL;
+            CREATE INDEX IX_GymMemberships_MemberProfileId
+                ON app.GymMemberships (MemberProfileId, StartDate) WHERE DeletedAt IS NULL;
+
+            CREATE TABLE app.MembershipHistory
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                GymMembershipId UNIQUEIDENTIFIER NOT NULL,
+                Action NVARCHAR(32) NOT NULL,
+                PreviousStatus NVARCHAR(32) NULL,
+                NewStatus NVARCHAR(32) NOT NULL,
+                EffectiveDate DATE NOT NULL,
+                Reason NVARCHAR(500) NULL,
+                PerformedByUserId UNIQUEIDENTIFIER NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                CONSTRAINT PK_MembershipHistory PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_MembershipHistory_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_MembershipHistory_GymMemberships FOREIGN KEY (GymMembershipId) REFERENCES app.GymMemberships (Id),
+                CONSTRAINT FK_MembershipHistory_Users FOREIGN KEY (PerformedByUserId) REFERENCES app.Users (Id)
+            );
+            CREATE INDEX IX_MembershipHistory_GymMembershipId
+                ON app.MembershipHistory (GymMembershipId, CreatedAt);
+            CREATE INDEX IX_MembershipHistory_TenantId_CreatedAt
+                ON app.MembershipHistory (TenantId, CreatedAt);
+        </sql>
+        <rollback>
+            <sql splitStatements="false">
+                DROP TABLE app.MembershipHistory;
+                DROP TABLE app.GymMemberships;
+                DROP TABLE app.MembershipPlans;
+            </sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

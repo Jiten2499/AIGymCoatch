@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0002" author="lifefit-architecture">
+        <comment>Ticket: LF-0002. Foundation marker. No business tables are created in Part 1. Index review: not applicable, because no table is introduced. Performance note: SELECT 1 does not read user pages, allocate extents, or take schema locks beyond the statement.</comment>
+        <sql>SELECT 1;</sql>
+        <rollback>
+            <sql>SELECT 1;</sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

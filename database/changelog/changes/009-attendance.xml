@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0016" author="lifefit-architecture">
+        <comment>Ticket: LF-0016. Attendance history and single-use QR check-in tokens. Attendance is not soft-deleted. Index review: PK on Id; UX_Attendance_OpenVisit allows one open visit per member so a second check-in is rejected by the database; IX_Attendance_TenantId_CheckInTime, IX_Attendance_BranchId_CheckInTime, and IX_Attendance_MemberProfileId_CheckInTime match dashboard, branch, and member history reads. GymMembershipId is not indexed separately because member history already starts from MemberProfileId and the open-visit index covers the active row. UX_QrCheckInTokens_TokenHash is the scan lookup. IX_QrCheckInTokens_MemberProfileId lists unused tokens. Performance note: the open-visit index is filtered to rows still inside the gym.</comment>
+        <sql splitStatements="false">
+            CREATE TABLE app.Attendance
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                BranchId UNIQUEIDENTIFIER NOT NULL,
+                MemberProfileId UNIQUEIDENTIFIER NOT NULL,
+                GymMembershipId UNIQUEIDENTIFIER NOT NULL,
+                CheckInTime DATETIME2 NOT NULL,
+                CheckOutTime DATETIME2 NULL,
+                CheckInMethod NVARCHAR(32) NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_Attendance PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_Attendance_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_Attendance_Branches FOREIGN KEY (BranchId) REFERENCES app.Branches (Id),
+                CONSTRAINT FK_Attendance_MemberProfiles FOREIGN KEY (MemberProfileId) REFERENCES app.MemberProfiles (Id),
+                CONSTRAINT FK_Attendance_GymMemberships FOREIGN KEY (GymMembershipId) REFERENCES app.GymMemberships (Id),
+                CONSTRAINT CK_Attendance_Method CHECK (CheckInMethod IN (N'QR', N'Reception', N'Manual', N'Other')),
+                CONSTRAINT CK_Attendance_Checkout CHECK (CheckOutTime IS NULL OR CheckOutTime &gt;= CheckInTime)
+            );
+            CREATE UNIQUE INDEX UX_Attendance_OpenVisit
+                ON app.Attendance (MemberProfileId) WHERE CheckOutTime IS NULL;
+            CREATE INDEX IX_Attendance_TenantId_CheckInTime
+                ON app.Attendance (TenantId, CheckInTime);
+            CREATE INDEX IX_Attendance_BranchId_CheckInTime
+                ON app.Attendance (BranchId, CheckInTime);
+            CREATE INDEX IX_Attendance_MemberProfileId_CheckInTime
+                ON app.Attendance (MemberProfileId, CheckInTime);
+
+            CREATE TABLE app.QrCheckInTokens
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                MemberProfileId UNIQUEIDENTIFIER NOT NULL,
+                TokenHash NVARCHAR(128) NOT NULL,
+                ExpiresAt DATETIME2 NOT NULL,
+                UsedAt DATETIME2 NULL,
+                RevokedAt DATETIME2 NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                CreatedByUserId UNIQUEIDENTIFIER NULL,
+                CONSTRAINT PK_QrCheckInTokens PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_QrCheckInTokens_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_QrCheckInTokens_MemberProfiles FOREIGN KEY (MemberProfileId) REFERENCES app.MemberProfiles (Id),
+                CONSTRAINT FK_QrCheckInTokens_Users FOREIGN KEY (CreatedByUserId) REFERENCES app.Users (Id)
+            );
+            CREATE UNIQUE INDEX UX_QrCheckInTokens_TokenHash ON app.QrCheckInTokens (TokenHash);
+            CREATE INDEX IX_QrCheckInTokens_MemberProfileId
+                ON app.QrCheckInTokens (MemberProfileId, ExpiresAt) WHERE UsedAt IS NULL AND RevokedAt IS NULL;
+        </sql>
+        <rollback>
+            <sql splitStatements="false">
+                DROP TABLE app.QrCheckInTokens;
+                DROP TABLE app.Attendance;
+            </sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

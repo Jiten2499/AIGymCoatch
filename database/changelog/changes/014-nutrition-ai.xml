@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0021" author="lifefit-architecture">
+        <comment>Ticket: LF-0021. Nutrition profile and daily food logs, plus AI conversations, messages, and usage. Nutrition and conversations are user-owned inside one tenant. Messages are reached from the conversation. Usage supports a database quota count. Index review: unique nutrition profile per user and tenant; IX_NutritionLogs_User_Date for the daily summary; IX_AiConversations_User_Updated and IX_AiMessages_Conversation_Created; IX_AiUsageRecords_User_Created for quota windows. Performance note: the daily summary sums one user and one date, and the quota counts one user from a date forward.</comment>
+        <sql splitStatements="false"><![CDATA[
+            CREATE TABLE app.NutritionProfiles
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                UserId UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                DailyCalorieTarget DECIMAL(8,2) NOT NULL,
+                ProteinTarget DECIMAL(8,2) NOT NULL,
+                CarbTarget DECIMAL(8,2) NOT NULL,
+                FatTarget DECIMAL(8,2) NOT NULL,
+                DietaryPreference NVARCHAR(32) NOT NULL,
+                MealFrequency INT NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_NutritionProfiles PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_NutritionProfiles_Users FOREIGN KEY (UserId) REFERENCES app.Users (Id),
+                CONSTRAINT FK_NutritionProfiles_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT CK_NutritionProfiles_Diet CHECK (DietaryPreference IN (N'Vegetarian', N'Vegan', N'NonVegetarian', N'Custom')),
+                CONSTRAINT CK_NutritionProfiles_Meals CHECK (MealFrequency BETWEEN 1 AND 8),
+                CONSTRAINT CK_NutritionProfiles_Targets CHECK (DailyCalorieTarget BETWEEN 800 AND 6000 AND ProteinTarget >= 0 AND CarbTarget >= 0 AND FatTarget >= 0)
+            );
+            CREATE UNIQUE INDEX UX_NutritionProfiles_User_Tenant ON app.NutritionProfiles (UserId, TenantId) WHERE DeletedAt IS NULL;
+
+            CREATE TABLE app.NutritionLogs
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                UserId UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                LogDate DATE NOT NULL,
+                MealType NVARCHAR(32) NOT NULL,
+                FoodName NVARCHAR(200) NOT NULL,
+                Quantity DECIMAL(8,2) NOT NULL,
+                Unit NVARCHAR(32) NOT NULL,
+                Calories DECIMAL(8,2) NOT NULL,
+                Protein DECIMAL(8,2) NOT NULL,
+                Carbohydrates DECIMAL(8,2) NOT NULL,
+                Fat DECIMAL(8,2) NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                CONSTRAINT PK_NutritionLogs PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_NutritionLogs_Users FOREIGN KEY (UserId) REFERENCES app.Users (Id),
+                CONSTRAINT FK_NutritionLogs_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT CK_NutritionLogs_Meal CHECK (MealType IN (N'Breakfast', N'Lunch', N'Dinner', N'Snack')),
+                CONSTRAINT CK_NutritionLogs_Values CHECK (Quantity > 0 AND Calories >= 0 AND Protein >= 0 AND Carbohydrates >= 0 AND Fat >= 0)
+            );
+            CREATE INDEX IX_NutritionLogs_User_Date ON app.NutritionLogs (UserId, TenantId, LogDate);
+
+            CREATE TABLE app.AiConversations
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                UserId UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                Title NVARCHAR(200) NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_AiConversations PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_AiConversations_Users FOREIGN KEY (UserId) REFERENCES app.Users (Id),
+                CONSTRAINT FK_AiConversations_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id)
+            );
+            CREATE INDEX IX_AiConversations_User_Updated ON app.AiConversations (UserId, TenantId, UpdatedAt) WHERE DeletedAt IS NULL;
+
+            CREATE TABLE app.AiMessages
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                ConversationId UNIQUEIDENTIFIER NOT NULL,
+                Role NVARCHAR(16) NOT NULL,
+                Content NVARCHAR(4000) NOT NULL,
+                TokenUsage INT NULL,
+                Provider NVARCHAR(64) NULL,
+                Model NVARCHAR(100) NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                CONSTRAINT PK_AiMessages PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_AiMessages_Conversations FOREIGN KEY (ConversationId) REFERENCES app.AiConversations (Id),
+                CONSTRAINT CK_AiMessages_Role CHECK (Role IN (N'User', N'Assistant'))
+            );
+            CREATE INDEX IX_AiMessages_Conversation_Created ON app.AiMessages (ConversationId, CreatedAt);
+
+            CREATE TABLE app.AiUsageRecords
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                UserId UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                Provider NVARCHAR(64) NOT NULL,
+                Model NVARCHAR(100) NOT NULL,
+                RequestType NVARCHAR(32) NOT NULL,
+                InputTokens INT NOT NULL,
+                OutputTokens INT NOT NULL,
+                TotalTokens INT NOT NULL,
+                EstimatedCost DECIMAL(12,6) NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                CONSTRAINT PK_AiUsageRecords PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_AiUsageRecords_Users FOREIGN KEY (UserId) REFERENCES app.Users (Id),
+                CONSTRAINT FK_AiUsageRecords_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT CK_AiUsageRecords_Type CHECK (RequestType IN (N'Coach', N'WorkoutGeneration', N'NutritionAdvice', N'ProgressInsight')),
+                CONSTRAINT CK_AiUsageRecords_Tokens CHECK (InputTokens >= 0 AND OutputTokens >= 0 AND TotalTokens >= 0 AND EstimatedCost >= 0)
+            );
+            CREATE INDEX IX_AiUsageRecords_User_Created ON app.AiUsageRecords (UserId, TenantId, CreatedAt);
+        ]]></sql>
+        <rollback>
+            <sql>DROP TABLE app.AiUsageRecords; DROP TABLE app.AiMessages; DROP TABLE app.AiConversations; DROP TABLE app.NutritionLogs; DROP TABLE app.NutritionProfiles;</sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

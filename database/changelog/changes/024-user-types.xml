@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0032" author="lifefit-architecture">
+        <comment>Ticket: LF-0032. Add the user-type catalog for platform, personal, business, and fitness-staff kinds. A user type names a kind of person and optionally points at the existing role that authorizes them. It does not create a second account. Index review: PK_UserTypes identifies a type; FK_UserTypes_Roles and IX_UserTypes_RoleId support the optional role link, filtered to rows that have a role; UX_UserTypes_Code identifies an active type by its stable code. Performance note: the catalog stays small, and both secondary indexes are filtered.</comment>
+        <sql splitStatements="false"><![CDATA[
+            CREATE TABLE app.UserTypes
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                Code NVARCHAR(64) NOT NULL,
+                Name NVARCHAR(128) NOT NULL,
+                Description NVARCHAR(256) NULL,
+                Category NVARCHAR(32) NOT NULL,
+                RoleId UNIQUEIDENTIFIER NULL,
+                SortOrder INT NOT NULL,
+                IsActive BIT NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_UserTypes PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_UserTypes_Roles FOREIGN KEY (RoleId) REFERENCES app.Roles (Id),
+                CONSTRAINT CK_UserTypes_Category CHECK (Category IN (N'Platform', N'Personal', N'Business', N'Staff'))
+            );
+            CREATE UNIQUE INDEX UX_UserTypes_Code ON app.UserTypes (Code) WHERE DeletedAt IS NULL;
+            CREATE INDEX IX_UserTypes_RoleId ON app.UserTypes (RoleId) WHERE RoleId IS NOT NULL;
+
+            INSERT INTO app.UserTypes (Id, Code, Name, Description, Category, RoleId, SortOrder, IsActive, CreatedAt, UpdatedAt)
+            SELECT CONVERT(UNIQUEIDENTIFIER, v.Id), v.Code, v.Name, v.Description, v.Category, r.Id, v.SortOrder, 1, SYSUTCDATETIME(), SYSUTCDATETIME()
+            FROM (VALUES
+                ('55555555-5555-4555-8555-555555555001', N'NORMAL_USER', N'Normal user', N'A person who registered on the platform.', N'Personal', N'PersonalMember', 10),
+                ('55555555-5555-4555-8555-555555555002', N'SUPER_ADMIN', N'Super admin', N'Platform operator. Not assigned during normal registration.', N'Platform', N'SuperAdmin', 20),
+                ('55555555-5555-4555-8555-555555555003', N'BUSINESS_OWNER', N'Business tenant', N'The person who owns a gym or other fitness business.', N'Business', N'GymOwner', 30),
+                ('55555555-5555-4555-8555-555555555004', N'BUSINESS_USER', N'Business tenant user', N'A member added to a business workspace.', N'Business', N'Member', 40),
+                ('55555555-5555-4555-8555-555555555005', N'COACH', N'Coach', N'Leads workouts and training sessions.', N'Staff', N'Trainer', 50),
+                ('55555555-5555-4555-8555-555555555006', N'RECEPTIONIST', N'Receptionist', N'Handles the front desk, check-in, and membership desk.', N'Staff', N'Receptionist', 60),
+                ('55555555-5555-4555-8555-555555555007', N'MANAGER', N'Manager', N'Runs day-to-day business operations.', N'Staff', N'GymManager', 70),
+                ('55555555-5555-4555-8555-555555555008', N'GROUP_INSTRUCTOR', N'Group instructor', N'Leads group classes such as yoga, pilates, or studio sessions.', N'Staff', NULL, 80),
+                ('55555555-5555-4555-8555-555555555009', N'NUTRITIONIST', N'Nutritionist', N'Guides nutrition for members.', N'Staff', NULL, 90),
+                ('55555555-5555-4555-8555-55555555500A', N'PHYSIOTHERAPIST', N'Physiotherapist', N'Supports recovery and movement in a physio or fitness business.', N'Staff', NULL, 100),
+                ('55555555-5555-4555-8555-55555555500B', N'MEMBERSHIP_ADVISOR', N'Membership advisor', N'Sells and renews memberships.', N'Staff', NULL, 110),
+                ('55555555-5555-4555-8555-55555555500C', N'HOUSEKEEPING', N'Housekeeping', N'Keeps the facility clean.', N'Staff', NULL, 120),
+                ('55555555-5555-4555-8555-55555555500D', N'MAINTENANCE', N'Maintenance', N'Maintains equipment and the facility.', N'Staff', NULL, 130)
+            ) AS v(Id, Code, Name, Description, Category, RoleName, SortOrder)
+            LEFT JOIN app.Roles r ON r.Name = v.RoleName AND r.DeletedAt IS NULL
+            WHERE NOT EXISTS (SELECT 1 FROM app.UserTypes existing WHERE existing.Code = v.Code AND existing.DeletedAt IS NULL);
+        ]]></sql>
+        <rollback>
+            <sql>DROP TABLE app.UserTypes;</sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

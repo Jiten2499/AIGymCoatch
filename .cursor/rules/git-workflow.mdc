@@ -1,0 +1,21 @@
+---
+description: Conventional commits and the required pre-commit checks
+alwaysApply: true
+---
+
+# Git workflow
+
+- Use Conventional Commits: `feat:`, `fix:`, `chore:`, `refactor:`, `test:`, `docs:`, `ci:`.
+- Subject line is imperative, under 72 characters, and says why the change exists.
+- Before committing backend changes, run:
+
+```powershell
+dotnet build backend/LifeFitAI.sln --configuration Release
+dotnet test backend/LifeFitAI.sln --configuration Release --no-build
+```
+
+- Before committing database changes, run `docker build -t lifefit-liquibase ./database`. When a local Liquibase CLI is configured, also run `liquibase validate` from `database/`.
+- Before committing web changes, run `npm run lint` and `npm run build` in `web/`.
+- Before committing mobile changes, run `npm run typecheck` in `mobile/`.
+- Do not commit secrets, `.env`, user secrets, or real signing keys.
+- Do not push, force-push, or amend unless the user asks.

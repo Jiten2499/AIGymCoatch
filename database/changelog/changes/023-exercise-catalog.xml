@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0031" author="lifefit-architecture">
+        <comment>Ticket: LF-0031. Restore the system exercise catalog. Workout generation rejects every plan when no active exercise exists, which is why the coach returned ai.invalid_output. These are the same system rows from LF-0018, inserted only when the id is missing. Index review: PK_Exercises, UX_Exercises_SystemName, and IX_Exercises_Catalog already cover these rows. Performance note: twelve catalog inserts, each guarded by the primary key.</comment>
+        <sql splitStatements="false"><![CDATA[
+            INSERT INTO app.Exercises (Id, TenantId, Name, Description, Instructions, MuscleGroup, Equipment, ExerciseType, Difficulty, IsActive, CreatedAt, UpdatedAt)
+            SELECT v.Id, NULL, v.Name, v.Description, v.Instructions, v.MuscleGroup, v.Equipment, v.ExerciseType, v.Difficulty, 1, SYSUTCDATETIME(), SYSUTCDATETIME()
+            FROM (VALUES
+                ('33333333-3333-4333-8333-333333333001', N'Barbell Bench Press', N'Horizontal press.', N'Lower the bar to the chest and press up.', N'Chest', N'Barbell', N'Strength', N'Beginner'),
+                ('33333333-3333-4333-8333-333333333002', N'Bent Over Row', N'Horizontal pull.', N'Pull the bar to the lower ribs.', N'Back', N'Barbell', N'Strength', N'Beginner'),
+                ('33333333-3333-4333-8333-333333333003', N'Overhead Press', N'Vertical press.', N'Press the bar overhead from the shoulders.', N'Shoulders', N'Barbell', N'Strength', N'Beginner'),
+                ('33333333-3333-4333-8333-333333333004', N'Dumbbell Curl', N'Elbow flexion.', N'Curl the dumbbells without swinging.', N'Biceps', N'Dumbbell', N'Strength', N'Beginner'),
+                ('33333333-3333-4333-8333-333333333005', N'Tricep Pushdown', N'Elbow extension.', N'Push the cable down and control the return.', N'Triceps', N'Cable', N'Strength', N'Beginner'),
+                ('33333333-3333-4333-8333-333333333006', N'Back Squat', N'Knee-dominant squat.', N'Squat to a comfortable depth and stand.', N'Legs', N'Barbell', N'Strength', N'Intermediate'),
+                ('33333333-3333-4333-8333-333333333007', N'Romanian Deadlift', N'Hip hinge.', N'Hinge until the hamstrings load, then stand.', N'Glutes', N'Barbell', N'Strength', N'Intermediate'),
+                ('33333333-3333-4333-8333-333333333008', N'Plank', N'Core hold.', N'Hold a straight line from head to heels.', N'Core', N'None', N'Bodyweight', N'Beginner'),
+                ('33333333-3333-4333-8333-333333333009', N'Burpee', N'Full-body conditioning.', N'Move from a squat to a plank and stand.', N'FullBody', N'None', N'Bodyweight', N'Intermediate'),
+                ('33333333-3333-4333-8333-333333333010', N'Treadmill Run', N'Steady cardio.', N'Run or walk at a steady pace.', N'Cardio', N'Treadmill', N'Cardio', N'Beginner'),
+                ('33333333-3333-4333-8333-333333333011', N'Hip Flexor Stretch', N'Mobility hold.', N'Hold a gentle hip-flexor stretch.', N'Mobility', N'None', N'Stretching', N'Beginner'),
+                ('33333333-3333-4333-8333-333333333012', N'Bodyweight Squat', N'Unloaded squat.', N'Sit down and stand without added weight.', N'Legs', N'None', N'Bodyweight', N'Beginner')
+            ) AS v(Id, Name, Description, Instructions, MuscleGroup, Equipment, ExerciseType, Difficulty)
+            WHERE NOT EXISTS (SELECT 1 FROM app.Exercises existing WHERE existing.Id = v.Id);
+        ]]></sql>
+        <rollback>
+            <sql>DELETE FROM app.Exercises WHERE Id IN ('33333333-3333-4333-8333-333333333001','33333333-3333-4333-8333-333333333002','33333333-3333-4333-8333-333333333003','33333333-3333-4333-8333-333333333004','33333333-3333-4333-8333-333333333005','33333333-3333-4333-8333-333333333006','33333333-3333-4333-8333-333333333007','33333333-3333-4333-8333-333333333008','33333333-3333-4333-8333-333333333009','33333333-3333-4333-8333-333333333010','33333333-3333-4333-8333-333333333011','33333333-3333-4333-8333-333333333012');</sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

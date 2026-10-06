@@ -1,0 +1,21 @@
+---
+description: xUnit testing standards for the LifeFit AI backend
+globs: backend/tests/**/*.cs
+alwaysApply: false
+---
+
+# Testing
+
+- Use xUnit, FluentAssertions, and NSubstitute.
+- Test one behavior per fact. Name tests as `{Method}_{Condition}_{ExpectedResult}`.
+- Mock ports and validators at the boundary. Do not mock the type under test.
+- Prefer pure unit tests. Use the database only for persistence tests.
+- Assert the outcome, not the private implementation.
+- Run `dotnet test backend/LifeFitAI.sln` before a commit that changes the backend.
+
+```csharp
+validator.ValidateAsync(Arg.Any<ValidationContext<SampleCommand>>(), Arg.Any<CancellationToken>())
+    .Returns(new ValidationResult([failure]));
+
+await act.Should().ThrowAsync<ValidationException>();
+```

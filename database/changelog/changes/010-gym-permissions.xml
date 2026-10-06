@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0017" author="lifefit-architecture">
+        <comment>Ticket: LF-0017. Seed Part 3 permissions and grant them through existing roles. No user is inserted. Index review: no new indexes; inserts use UX_Permissions_Code and PK_RolePermissions. Performance note: the catalog insert is a few dozen rows.</comment>
+        <sql splitStatements="false"><![CDATA[
+            DECLARE @Now DATETIME2 = SYSUTCDATETIME();
+
+            INSERT INTO app.Permissions (Id, Code, Name, Description, CreatedAt, UpdatedAt)
+            VALUES
+                ('22222222-2222-4222-8222-222222222015', N'BUSINESS_PROFILE_READ', N'Read business profile', N'Read the business profile.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222016', N'BUSINESS_PROFILE_UPDATE', N'Update business profile', N'Update the business profile.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222017', N'BRANCH_READ', N'Read branches', N'Read branches in the current workspace.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222018', N'BRANCH_CREATE', N'Create branches', N'Create a branch.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222019', N'BRANCH_UPDATE', N'Update branches', N'Update a branch.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222020', N'BRANCH_DELETE', N'Deactivate branches', N'Deactivate a branch.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222021', N'MEMBER_READ', N'Read members', N'Read business member profiles.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222022', N'MEMBER_CREATE', N'Create members', N'Onboard a business member.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222023', N'MEMBER_UPDATE', N'Update members', N'Update a business member profile.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222024', N'MEMBER_DELETE', N'Deactivate members', N'Deactivate a business member profile.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222025', N'STAFF_READ', N'Read staff', N'Read staff profiles.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222026', N'STAFF_CREATE', N'Add staff', N'Add staff to the workspace.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222027', N'STAFF_UPDATE', N'Update staff', N'Update a staff profile.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222028', N'STAFF_REMOVE', N'Remove staff', N'Remove staff from the workspace.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222029', N'TRAINER_READ', N'Read trainers', N'Read trainer profiles.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222030', N'TRAINER_UPDATE', N'Update trainers', N'Update a trainer profile.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222031', N'MEMBERSHIP_PLAN_READ', N'Read plans', N'Read membership plans.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222032', N'MEMBERSHIP_PLAN_MANAGE', N'Manage plans', N'Create, update, or deactivate membership plans.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222033', N'MEMBERSHIP_READ', N'Read memberships', N'Read gym memberships.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222034', N'MEMBERSHIP_CREATE', N'Create memberships', N'Create a gym membership.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222035', N'MEMBERSHIP_RENEW', N'Renew memberships', N'Renew a gym membership.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222036', N'MEMBERSHIP_FREEZE', N'Freeze memberships', N'Freeze or unfreeze a gym membership.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222037', N'MEMBERSHIP_CANCEL', N'Cancel memberships', N'Cancel a gym membership.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222038', N'ATTENDANCE_READ', N'Read attendance', N'Read attendance history.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222039', N'ATTENDANCE_CHECKIN', N'Check in', N'Check a member in.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222040', N'ATTENDANCE_CHECKOUT', N'Check out', N'Check a member out.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222041', N'REPORT_READ', N'Read reports', N'Read the business dashboard.', @Now, @Now);
+
+            INSERT INTO app.RolePermissions (RoleId, PermissionId)
+            SELECT r.Id, p.Id
+            FROM app.Roles r
+            CROSS JOIN app.Permissions p
+            WHERE r.Name = N'SuperAdmin'
+              AND p.Code IN (
+                    N'BUSINESS_PROFILE_READ', N'BUSINESS_PROFILE_UPDATE',
+                    N'BRANCH_READ', N'BRANCH_CREATE', N'BRANCH_UPDATE', N'BRANCH_DELETE',
+                    N'MEMBER_READ', N'MEMBER_CREATE', N'MEMBER_UPDATE', N'MEMBER_DELETE',
+                    N'STAFF_READ', N'STAFF_CREATE', N'STAFF_UPDATE', N'STAFF_REMOVE',
+                    N'TRAINER_READ', N'TRAINER_UPDATE',
+                    N'MEMBERSHIP_PLAN_READ', N'MEMBERSHIP_PLAN_MANAGE',
+                    N'MEMBERSHIP_READ', N'MEMBERSHIP_CREATE', N'MEMBERSHIP_RENEW', N'MEMBERSHIP_FREEZE', N'MEMBERSHIP_CANCEL',
+                    N'ATTENDANCE_READ', N'ATTENDANCE_CHECKIN', N'ATTENDANCE_CHECKOUT', N'REPORT_READ');
+
+            INSERT INTO app.RolePermissions (RoleId, PermissionId)
+            SELECT r.Id, p.Id FROM app.Roles r JOIN app.Permissions p ON p.Code IN (
+                    N'BUSINESS_PROFILE_READ', N'BUSINESS_PROFILE_UPDATE',
+                    N'BRANCH_READ', N'BRANCH_CREATE', N'BRANCH_UPDATE', N'BRANCH_DELETE',
+                    N'MEMBER_READ', N'MEMBER_CREATE', N'MEMBER_UPDATE', N'MEMBER_DELETE',
+                    N'STAFF_READ', N'STAFF_CREATE', N'STAFF_UPDATE', N'STAFF_REMOVE',
+                    N'TRAINER_READ', N'TRAINER_UPDATE',
+                    N'MEMBERSHIP_PLAN_READ', N'MEMBERSHIP_PLAN_MANAGE',
+                    N'MEMBERSHIP_READ', N'MEMBERSHIP_CREATE', N'MEMBERSHIP_RENEW', N'MEMBERSHIP_FREEZE', N'MEMBERSHIP_CANCEL',
+                    N'ATTENDANCE_READ', N'ATTENDANCE_CHECKIN', N'ATTENDANCE_CHECKOUT', N'REPORT_READ')
+            WHERE r.Name = N'GymOwner';
+
+            INSERT INTO app.RolePermissions (RoleId, PermissionId)
+            SELECT r.Id, p.Id FROM app.Roles r JOIN app.Permissions p ON p.Code IN (
+                    N'BUSINESS_PROFILE_READ', N'BUSINESS_PROFILE_UPDATE',
+                    N'BRANCH_READ', N'BRANCH_CREATE', N'BRANCH_UPDATE',
+                    N'MEMBER_READ', N'MEMBER_CREATE', N'MEMBER_UPDATE',
+                    N'STAFF_READ', N'STAFF_CREATE', N'STAFF_UPDATE', N'STAFF_REMOVE',
+                    N'TRAINER_READ', N'TRAINER_UPDATE',
+                    N'MEMBERSHIP_PLAN_READ', N'MEMBERSHIP_PLAN_MANAGE',
+                    N'MEMBERSHIP_READ', N'MEMBERSHIP_CREATE', N'MEMBERSHIP_RENEW', N'MEMBERSHIP_FREEZE', N'MEMBERSHIP_CANCEL',
+                    N'ATTENDANCE_READ', N'ATTENDANCE_CHECKIN', N'ATTENDANCE_CHECKOUT', N'REPORT_READ')
+            WHERE r.Name = N'GymManager';
+
+            INSERT INTO app.RolePermissions (RoleId, PermissionId)
+            SELECT r.Id, p.Id FROM app.Roles r JOIN app.Permissions p ON p.Code IN (
+                    N'BRANCH_READ', N'MEMBER_READ', N'MEMBER_CREATE', N'MEMBER_UPDATE',
+                    N'MEMBERSHIP_READ', N'MEMBERSHIP_CREATE',
+                    N'ATTENDANCE_READ', N'ATTENDANCE_CHECKIN', N'ATTENDANCE_CHECKOUT')
+            WHERE r.Name = N'Receptionist';
+
+            INSERT INTO app.RolePermissions (RoleId, PermissionId)
+            SELECT r.Id, p.Id FROM app.Roles r JOIN app.Permissions p ON p.Code IN (
+                    N'BRANCH_READ', N'MEMBER_READ', N'TRAINER_READ', N'ATTENDANCE_READ')
+            WHERE r.Name = N'Trainer';
+
+            INSERT INTO app.RolePermissions (RoleId, PermissionId)
+            SELECT r.Id, p.Id FROM app.Roles r JOIN app.Permissions p ON p.Code IN (
+                    N'MEMBERSHIP_READ', N'ATTENDANCE_CHECKIN', N'ATTENDANCE_CHECKOUT')
+            WHERE r.Name = N'Member';
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false">
+                DELETE FROM app.RolePermissions WHERE PermissionId IN (SELECT Id FROM app.Permissions WHERE Code LIKE N'BUSINESS_%' OR Code LIKE N'BRANCH_%' OR Code LIKE N'MEMBER_%' OR Code LIKE N'STAFF_%' OR Code LIKE N'TRAINER_%' OR Code LIKE N'MEMBERSHIP_%' OR Code LIKE N'ATTENDANCE_%' OR Code = N'REPORT_READ');
+                DELETE FROM app.Permissions WHERE Code IN (
+                    N'BUSINESS_PROFILE_READ', N'BUSINESS_PROFILE_UPDATE',
+                    N'BRANCH_READ', N'BRANCH_CREATE', N'BRANCH_UPDATE', N'BRANCH_DELETE',
+                    N'MEMBER_READ', N'MEMBER_CREATE', N'MEMBER_UPDATE', N'MEMBER_DELETE',
+                    N'STAFF_READ', N'STAFF_CREATE', N'STAFF_UPDATE', N'STAFF_REMOVE',
+                    N'TRAINER_READ', N'TRAINER_UPDATE',
+                    N'MEMBERSHIP_PLAN_READ', N'MEMBERSHIP_PLAN_MANAGE',
+                    N'MEMBERSHIP_READ', N'MEMBERSHIP_CREATE', N'MEMBERSHIP_RENEW', N'MEMBERSHIP_FREEZE', N'MEMBERSHIP_CANCEL',
+                    N'ATTENDANCE_READ', N'ATTENDANCE_CHECKIN', N'ATTENDANCE_CHECKOUT', N'REPORT_READ');
+            </sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

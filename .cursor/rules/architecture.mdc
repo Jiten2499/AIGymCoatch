@@ -1,0 +1,44 @@
+---
+description: Clean Architecture, vertical slices, and composition rules for LifeFit AI
+alwaysApply: true
+---
+
+# Architecture
+
+LifeFit AI uses Clean Architecture, vertical slices, and CQRS.
+
+Dependency direction:
+
+- `Api` composes the host and maps HTTP to MediatR.
+- `Modules` will own one business area each. They are empty until a feature is requested.
+- `Application` owns pipeline behaviors and ports.
+- `Infrastructure` implements SQL Server persistence.
+- `Domain` owns future entities. `SharedKernel` owns primitives.
+
+## Rules
+
+- Minimal API endpoints contain no business rules, queries, or persistence calls. They send one MediatR request and return the result.
+- Put each future use case in `backend/src/Modules/{Module}/` with a command or query, handler, validator, endpoint, and mapping.
+- Pass a new module assembly into `AddApplication` when that module becomes a project.
+- Depend inward. Domain does not reference EF Core, ASP.NET Core, or Infrastructure.
+- Use constructor injection. Use `async`/`await` for I/O and pass `CancellationToken`.
+- Keep files under 300 lines.
+- Liquibase is the sole source of truth for database schema changes. Never create EF Core migrations. Never modify the database schema from application startup. Database changes belong exclusively under `/database`. .NET projects may define EF Core entities and mappings but must not own schema migrations.
+- Never bypass tenant authorization. Never trust a client-provided tenant id without membership validation.
+- Never store raw refresh tokens. Never log passwords, password hashes, salts, refresh tokens, reset tokens, or signing keys.
+- Never assign SuperAdmin during normal registration.
+- Do not expose EF entities directly from APIs.
+- Do not duplicate authorization or licensing logic across endpoints.
+- When a feature changes the database: identify the schema change, add the Liquibase changeset under `/database`, review indexes and constraints, update EF Core mappings if required, add or update application tests, and confirm Liquibase remains the schema source of truth.
+- Do not add product behavior until it is explicitly requested.
+- A trainer or member is one user, one tenant membership, a role, and a business profile. Do not create a second identity.
+- `TenantMember` and `GymMembership` are different concepts.
+- Gym handlers call `IOperationGuard` for permission and feature checks. They load records by the current tenant id.
+- Do not implement payment collection. Part 5 operational controls are already in place. Do not start Part 6.
+- Fitness handlers call `IOperationGuard`, then load records by the current user and tenant.
+- AI calls go through `IAiProvider`. Do not send raw database rows or secrets to a provider.
+
+```csharp
+// Controller sends a command. It does not decide the outcome.
+return Results.Ok(await sender.Send(new CheckInCommand(branchId), cancellationToken));
+```

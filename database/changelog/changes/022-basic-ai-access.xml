@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0030" author="lifefit-architecture">
+        <comment>Ticket: LF-0030. Let a Basic gym member and a trainer use the mobile AI coach. BASIC already carries the member operations features; this turns on the four AI features the coach screen calls. Trainer already reads fitness data; this adds the same manage and AI_USE grants the Member role uses for that screen. Index review: no new indexes. UX_PlanFeatures_PlanId_FeatureCode seeks the plan feature rows, and RolePermissions is keyed by role and permission. Performance note: both writes touch a handful of catalog rows.</comment>
+        <sql splitStatements="false"><![CDATA[
+            UPDATE pf
+            SET pf.[Enabled] = 1, pf.UpdatedAt = SYSUTCDATETIME()
+            FROM app.PlanFeatures pf
+            INNER JOIN app.Plans p ON p.Id = pf.PlanId
+            WHERE p.Code = N'BASIC'
+              AND pf.FeatureCode IN (N'AI_COACH', N'AI_NUTRITION', N'AI_WORKOUT_GENERATION', N'AI_PROGRESS_INSIGHTS');
+
+            INSERT INTO app.RolePermissions (RoleId, PermissionId)
+            SELECT r.Id, p.Id
+            FROM app.Roles r
+            INNER JOIN app.Permissions p ON p.Code IN (
+                N'FITNESS_MANAGE', N'WORKOUT_MANAGE', N'NUTRITION_READ', N'NUTRITION_MANAGE', N'AI_USE')
+            WHERE r.Name = N'Trainer'
+              AND NOT EXISTS (
+                  SELECT 1 FROM app.RolePermissions existing
+                  WHERE existing.RoleId = r.Id AND existing.PermissionId = p.Id);
+        ]]></sql>
+        <rollback>
+            <sql>
+                UPDATE pf SET pf.[Enabled] = 0
+                FROM app.PlanFeatures pf
+                INNER JOIN app.Plans p ON p.Id = pf.PlanId
+                WHERE p.Code = N'BASIC'
+                  AND pf.FeatureCode IN (N'AI_COACH', N'AI_NUTRITION', N'AI_WORKOUT_GENERATION', N'AI_PROGRESS_INSIGHTS');
+                DELETE rp FROM app.RolePermissions rp
+                INNER JOIN app.Roles r ON r.Id = rp.RoleId AND r.Name = N'Trainer'
+                INNER JOIN app.Permissions p ON p.Id = rp.PermissionId
+                WHERE p.Code IN (N'FITNESS_MANAGE', N'WORKOUT_MANAGE', N'NUTRITION_READ', N'NUTRITION_MANAGE', N'AI_USE');
+            </sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

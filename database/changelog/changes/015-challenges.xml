@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0022" author="lifefit-architecture">
+        <comment>Ticket: LF-0022. Challenges and an in-app notification inbox. A null challenge tenant is a system challenge. Participants are unique per challenge and user. Notifications are stored only; delivery is later. Index review: IX_Challenges_Tenant_Status for workspace lists; UX_ChallengeParticipants_Challenge_User; IX_Notifications_User_Unread for the inbox. Start and end dates are filters on an already tenant-scoped list, so they are not a separate index. Performance note: inbox reads unread rows for one user.</comment>
+        <sql splitStatements="false"><![CDATA[
+            CREATE TABLE app.Challenges
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NULL,
+                Name NVARCHAR(200) NOT NULL,
+                Description NVARCHAR(1000) NULL,
+                ChallengeType NVARCHAR(32) NOT NULL,
+                StartDate DATE NOT NULL,
+                EndDate DATE NOT NULL,
+                TargetValue DECIMAL(12,2) NOT NULL,
+                Status NVARCHAR(32) NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_Challenges PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_Challenges_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT CK_Challenges_Type CHECK (ChallengeType IN (N'WorkoutCount', N'ConsistencyDays', N'Custom')),
+                CONSTRAINT CK_Challenges_Status CHECK (Status IN (N'Draft', N'Active', N'Completed', N'Cancelled')),
+                CONSTRAINT CK_Challenges_Dates CHECK (EndDate >= StartDate AND TargetValue > 0)
+            );
+            CREATE INDEX IX_Challenges_Tenant_Status ON app.Challenges (TenantId, Status, StartDate) WHERE DeletedAt IS NULL;
+
+            CREATE TABLE app.ChallengeParticipants
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                ChallengeId UNIQUEIDENTIFIER NOT NULL,
+                UserId UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                CurrentValue DECIMAL(12,2) NOT NULL,
+                JoinedAt DATETIME2 NOT NULL,
+                CompletedAt DATETIME2 NULL,
+                CONSTRAINT PK_ChallengeParticipants PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_ChallengeParticipants_Challenges FOREIGN KEY (ChallengeId) REFERENCES app.Challenges (Id),
+                CONSTRAINT FK_ChallengeParticipants_Users FOREIGN KEY (UserId) REFERENCES app.Users (Id),
+                CONSTRAINT FK_ChallengeParticipants_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT CK_ChallengeParticipants_Value CHECK (CurrentValue >= 0)
+            );
+            CREATE UNIQUE INDEX UX_ChallengeParticipants_Challenge_User ON app.ChallengeParticipants (ChallengeId, UserId);
+
+            CREATE TABLE app.Notifications
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                UserId UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                Type NVARCHAR(32) NOT NULL,
+                Title NVARCHAR(200) NOT NULL,
+                Message NVARCHAR(1000) NOT NULL,
+                IsRead BIT NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                ReadAt DATETIME2 NULL,
+                CONSTRAINT PK_Notifications PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_Notifications_Users FOREIGN KEY (UserId) REFERENCES app.Users (Id),
+                CONSTRAINT FK_Notifications_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT CK_Notifications_Type CHECK (Type IN (N'WorkoutReminder', N'MembershipReminder', N'ChallengeReminder', N'AiRecommendation', N'WorkoutCompleted'))
+            );
+            CREATE INDEX IX_Notifications_User_Unread ON app.Notifications (UserId, TenantId, IsRead, CreatedAt);
+        ]]></sql>
+        <rollback>
+            <sql>DROP TABLE app.Notifications; DROP TABLE app.ChallengeParticipants; DROP TABLE app.Challenges;</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="LF-0023" author="lifefit-architecture">
+        <comment>Ticket: LF-0023. Seed Part 4 permissions and grant them through existing roles. PersonalOwner and Member can manage their own fitness data. Handlers still load rows by the current user and tenant. Index review: no new indexes. Performance note: the insert is a small catalog write.</comment>
+        <sql splitStatements="false"><![CDATA[
+            DECLARE @Now DATETIME2 = SYSUTCDATETIME();
+            INSERT INTO app.Permissions (Id, Code, Name, Description, CreatedAt, UpdatedAt)
+            VALUES
+                ('22222222-2222-4222-8222-222222222042', N'FITNESS_READ', N'Read fitness', N'Read the current user fitness profile, goals, and measurements.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222043', N'FITNESS_MANAGE', N'Manage fitness', N'Update the current user fitness profile, goals, and measurements.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222044', N'EXERCISE_READ', N'Read exercises', N'Read the exercise library.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222045', N'EXERCISE_MANAGE', N'Manage exercises', N'Create a custom exercise in the current workspace.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222046', N'WORKOUT_READ', N'Read workouts', N'Read workout programs and the current user history.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222047', N'WORKOUT_MANAGE', N'Manage workouts', N'Create programs and record the current user sessions.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222048', N'NUTRITION_READ', N'Read nutrition', N'Read the current user nutrition profile and logs.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222049', N'NUTRITION_MANAGE', N'Manage nutrition', N'Update nutrition targets and log food.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222050', N'AI_USE', N'Use AI', N'Use the AI coach and structured AI features.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222051', N'CHALLENGE_READ', N'Read challenges', N'Read and join visible challenges.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222052', N'CHALLENGE_MANAGE', N'Manage challenges', N'Create a workspace challenge.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222053', N'NOTIFICATION_READ', N'Read notifications', N'Read the current user notification inbox.', @Now, @Now);
+
+            INSERT INTO app.RolePermissions (RoleId, PermissionId)
+            SELECT r.Id, p.Id
+            FROM app.Roles r
+            JOIN app.Permissions p ON p.Code IN (
+                N'FITNESS_READ', N'FITNESS_MANAGE', N'EXERCISE_READ', N'EXERCISE_MANAGE',
+                N'WORKOUT_READ', N'WORKOUT_MANAGE', N'NUTRITION_READ', N'NUTRITION_MANAGE',
+                N'AI_USE', N'CHALLENGE_READ', N'CHALLENGE_MANAGE', N'NOTIFICATION_READ')
+            WHERE r.Name IN (N'SuperAdmin', N'GymOwner', N'GymManager', N'PersonalOwner');
+
+            INSERT INTO app.RolePermissions (RoleId, PermissionId)
+            SELECT r.Id, p.Id
+            FROM app.Roles r
+            JOIN app.Permissions p ON p.Code IN (
+                N'FITNESS_READ', N'FITNESS_MANAGE', N'EXERCISE_READ', N'WORKOUT_READ', N'WORKOUT_MANAGE',
+                N'NUTRITION_READ', N'NUTRITION_MANAGE', N'AI_USE', N'CHALLENGE_READ', N'NOTIFICATION_READ')
+            WHERE r.Name = N'Member';
+
+            INSERT INTO app.RolePermissions (RoleId, PermissionId)
+            SELECT r.Id, p.Id
+            FROM app.Roles r
+            JOIN app.Permissions p ON p.Code IN (N'FITNESS_READ', N'EXERCISE_READ', N'WORKOUT_READ', N'CHALLENGE_READ', N'NOTIFICATION_READ')
+            WHERE r.Name = N'Trainer';
+
+            INSERT INTO app.RolePermissions (RoleId, PermissionId)
+            SELECT r.Id, p.Id
+            FROM app.Roles r
+            JOIN app.Permissions p ON p.Code IN (N'CHALLENGE_READ', N'NOTIFICATION_READ')
+            WHERE r.Name = N'Receptionist';
+        ]]></sql>
+        <rollback>
+            <sql>DELETE FROM app.RolePermissions WHERE PermissionId IN (SELECT Id FROM app.Permissions WHERE Code IN (N'FITNESS_READ', N'FITNESS_MANAGE', N'EXERCISE_READ', N'EXERCISE_MANAGE', N'WORKOUT_READ', N'WORKOUT_MANAGE', N'NUTRITION_READ', N'NUTRITION_MANAGE', N'AI_USE', N'CHALLENGE_READ', N'CHALLENGE_MANAGE', N'NOTIFICATION_READ')); DELETE FROM app.Permissions WHERE Code IN (N'FITNESS_READ', N'FITNESS_MANAGE', N'EXERCISE_READ', N'EXERCISE_MANAGE', N'WORKOUT_READ', N'WORKOUT_MANAGE', N'NUTRITION_READ', N'NUTRITION_MANAGE', N'AI_USE', N'CHALLENGE_READ', N'CHALLENGE_MANAGE', N'NOTIFICATION_READ');</sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

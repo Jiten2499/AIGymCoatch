@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0026" author="lifefit-architecture">
+        <comment>Ticket: LF-0026. Store OpenAI-compatible LLM connections and their models. The API key column holds protected ciphertext, never a plaintext key. Index review: UX_LlmConnections_IsDefault allows one active default; IX_LlmModels_ConnectionId lists models for a connection; UX_LlmModels_Connection_Default allows one default model per connection. Performance note: the runtime reads the single default row, and model lists are bounded by one connection.</comment>
+        <sql splitStatements="false"><![CDATA[
+            CREATE TABLE app.LlmConnections
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                Name NVARCHAR(200) NOT NULL,
+                Provider NVARCHAR(64) NOT NULL,
+                BaseUrl NVARCHAR(500) NOT NULL,
+                ProtectedApiKey NVARCHAR(4000) NOT NULL,
+                DefaultModel NVARCHAR(200) NULL,
+                IsActive BIT NOT NULL,
+                IsDefault BIT NOT NULL,
+                TimeoutSeconds INT NOT NULL,
+                LastTestedAt DATETIME2 NULL,
+                HealthStatus NVARCHAR(32) NOT NULL,
+                LastLatencyMs INT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_LlmConnections PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT CK_LlmConnections_Provider CHECK (Provider = N'OpenAiCompatible'),
+                CONSTRAINT CK_LlmConnections_Health CHECK (HealthStatus IN (N'NotTested', N'Healthy', N'Failed')),
+                CONSTRAINT CK_LlmConnections_Timeout CHECK (TimeoutSeconds BETWEEN 1 AND 60)
+            );
+            CREATE UNIQUE INDEX UX_LlmConnections_IsDefault ON app.LlmConnections (IsDefault) WHERE IsDefault = 1 AND DeletedAt IS NULL;
+            CREATE INDEX IX_LlmConnections_Name ON app.LlmConnections (Name) WHERE DeletedAt IS NULL;
+
+            CREATE TABLE app.LlmModels
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                ConnectionId UNIQUEIDENTIFIER NOT NULL,
+                ModelIdentifier NVARCHAR(200) NOT NULL,
+                DisplayName NVARCHAR(200) NOT NULL,
+                IsActive BIT NOT NULL,
+                IsDefault BIT NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_LlmModels PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_LlmModels_LlmConnections FOREIGN KEY (ConnectionId) REFERENCES app.LlmConnections (Id)
+            );
+            CREATE INDEX IX_LlmModels_ConnectionId ON app.LlmModels (ConnectionId) WHERE DeletedAt IS NULL;
+            CREATE UNIQUE INDEX UX_LlmModels_Connection_Default ON app.LlmModels (ConnectionId) WHERE IsDefault = 1 AND DeletedAt IS NULL;
+            CREATE UNIQUE INDEX UX_LlmModels_Connection_Identifier ON app.LlmModels (ConnectionId, ModelIdentifier) WHERE DeletedAt IS NULL;
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DROP TABLE app.LlmModels;
+                DROP TABLE app.LlmConnections;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

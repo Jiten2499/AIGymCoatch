@@ -1,0 +1,912 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<coverage generated="1790938514598" clover="3.2.0">
+  <project timestamp="1790938514598" name="All files">
+    <metrics statements="657" coveredstatements="492" conditionals="491" coveredconditionals="360" methods="271" coveredmethods="184" elements="1419" coveredelements="1036" complexity="0" loc="657" ncloc="657" packages="27" files="56" classes="56"/>
+    <package name="app.providers">
+      <metrics statements="18" coveredstatements="16" conditionals="6" coveredconditionals="4" methods="8" coveredmethods="7"/>
+      <file name="ThemeProvider.tsx" path="F:\Projects\AIGymCoatch\mobile\src\app\providers\ThemeProvider.tsx">
+        <metrics statements="17" coveredstatements="15" conditionals="6" coveredconditionals="4" methods="8" coveredmethods="7"/>
+        <line num="6" count="13" type="stmt"/>
+        <line num="9" count="75" type="stmt"/>
+        <line num="10" count="75" type="stmt"/>
+        <line num="11" count="25" type="stmt"/>
+        <line num="12" count="25" type="stmt"/>
+        <line num="14" count="25" type="stmt"/>
+        <line num="15" count="21" type="stmt"/>
+        <line num="16" count="21" type="stmt"/>
+        <line num="17" count="21" type="stmt"/>
+        <line num="20" count="25" type="cond" truecount="3" falsecount="1"/>
+        <line num="21" count="25" type="stmt"/>
+        <line num="23" count="25" type="stmt"/>
+        <line num="27" count="1336" type="stmt"/>
+        <line num="28" count="1336" type="cond" truecount="1" falsecount="1"/>
+        <line num="29" count="0" type="stmt"/>
+        <line num="31" count="1336" type="stmt"/>
+        <line num="35" count="0" type="stmt"/>
+      </file>
+      <file name="queryClient.ts" path="F:\Projects\AIGymCoatch\mobile\src\app\providers\queryClient.ts">
+        <metrics statements="1" coveredstatements="1" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+        <line num="3" count="1" type="stmt"/>
+      </file>
+    </package>
+    <package name="components.access">
+      <metrics statements="4" coveredstatements="3" conditionals="2" coveredconditionals="1" methods="1" coveredmethods="1"/>
+      <file name="RequireAccess.tsx" path="F:\Projects\AIGymCoatch\mobile\src\components\access\RequireAccess.tsx">
+        <metrics statements="4" coveredstatements="3" conditionals="2" coveredconditionals="1" methods="1" coveredmethods="1"/>
+        <line num="6" count="1" type="stmt"/>
+        <line num="7" count="1" type="cond" truecount="1" falsecount="1"/>
+        <line num="8" count="1" type="stmt"/>
+        <line num="10" count="0" type="stmt"/>
+      </file>
+    </package>
+    <package name="components.feedback">
+      <metrics statements="9" coveredstatements="9" conditionals="12" coveredconditionals="9" methods="1" coveredmethods="1"/>
+      <file name="ScreenState.tsx" path="F:\Projects\AIGymCoatch\mobile\src\components\feedback\ScreenState.tsx">
+        <metrics statements="9" coveredstatements="9" conditionals="12" coveredconditionals="9" methods="1" coveredmethods="1"/>
+        <line num="19" count="53" type="stmt"/>
+        <line num="20" count="53" type="stmt"/>
+        <line num="21" count="53" type="cond" truecount="2" falsecount="0"/>
+        <line num="22" count="17" type="stmt"/>
+        <line num="29" count="36" type="cond" truecount="2" falsecount="0"/>
+        <line num="30" count="1" type="stmt"/>
+        <line num="38" count="35" type="cond" truecount="2" falsecount="0"/>
+        <line num="39" count="2" type="stmt"/>
+        <line num="46" count="33" type="stmt"/>
+      </file>
+    </package>
+    <package name="components.forms">
+      <metrics statements="7" coveredstatements="6" conditionals="10" coveredconditionals="9" methods="4" coveredmethods="3"/>
+      <file name="ChoiceGroup.tsx" path="F:\Projects\AIGymCoatch\mobile\src\components\forms\ChoiceGroup.tsx">
+        <metrics statements="5" coveredstatements="4" conditionals="6" coveredconditionals="6" methods="3" coveredmethods="2"/>
+        <line num="13" count="40" type="stmt"/>
+        <line num="14" count="40" type="stmt"/>
+        <line num="19" count="170" type="stmt"/>
+        <line num="20" count="170" type="stmt"/>
+        <line num="25" count="0" type="stmt"/>
+      </file>
+      <file name="FormField.tsx" path="F:\Projects\AIGymCoatch\mobile\src\components\forms\FormField.tsx">
+        <metrics statements="2" coveredstatements="2" conditionals="4" coveredconditionals="3" methods="1" coveredmethods="1"/>
+        <line num="14" count="126" type="stmt"/>
+        <line num="15" count="126" type="stmt"/>
+      </file>
+    </package>
+    <package name="components.ui">
+      <metrics statements="27" coveredstatements="23" conditionals="33" coveredconditionals="27" methods="8" coveredmethods="6"/>
+      <file name="AppButton.tsx" path="F:\Projects\AIGymCoatch\mobile\src\components\ui\AppButton.tsx">
+        <metrics statements="7" coveredstatements="7" conditionals="14" coveredconditionals="13" methods="2" coveredmethods="2"/>
+        <line num="12" count="76" type="stmt"/>
+        <line num="13" count="76" type="cond" truecount="2" falsecount="0"/>
+        <line num="14" count="76" type="cond" truecount="2" falsecount="0"/>
+        <line num="15" count="76" type="cond" truecount="2" falsecount="0"/>
+        <line num="16" count="76" type="stmt"/>
+        <line num="22" count="76" type="stmt"/>
+        <line num="34" count="10" type="stmt"/>
+      </file>
+      <file name="AppCard.tsx" path="F:\Projects\AIGymCoatch\mobile\src\components\ui\AppCard.tsx">
+        <metrics statements="2" coveredstatements="2" conditionals="0" coveredconditionals="0" methods="1" coveredmethods="1"/>
+        <line num="6" count="26" type="stmt"/>
+        <line num="7" count="26" type="stmt"/>
+      </file>
+      <file name="AppText.tsx" path="F:\Projects\AIGymCoatch\mobile\src\components\ui\AppText.tsx">
+        <metrics statements="5" coveredstatements="5" conditionals="8" coveredconditionals="8" methods="1" coveredmethods="1"/>
+        <line num="11" count="793" type="stmt"/>
+        <line num="12" count="793" type="cond" truecount="6" falsecount="0"/>
+        <line num="13" count="793" type="stmt"/>
+        <line num="14" count="793" type="stmt"/>
+        <line num="15" count="793" type="stmt"/>
+      </file>
+      <file name="AppTextInput.tsx" path="F:\Projects\AIGymCoatch\mobile\src\components\ui\AppTextInput.tsx">
+        <metrics statements="3" coveredstatements="3" conditionals="3" coveredconditionals="3" methods="1" coveredmethods="1"/>
+        <line num="9" count="126" type="stmt"/>
+        <line num="10" count="126" type="stmt"/>
+        <line num="30" count="4" type="stmt"/>
+      </file>
+      <file name="TenantLogo.tsx" path="F:\Projects\AIGymCoatch\mobile\src\components\ui\TenantLogo.tsx">
+        <metrics statements="10" coveredstatements="6" conditionals="8" coveredconditionals="3" methods="3" coveredmethods="1"/>
+        <line num="7" count="2" type="stmt"/>
+        <line num="8" count="2" type="stmt"/>
+        <line num="9" count="2" type="cond" truecount="1" falsecount="1"/>
+        <line num="10" count="2" type="stmt"/>
+        <line num="11" count="2" type="cond" truecount="2" falsecount="2"/>
+        <line num="12" count="2" type="stmt"/>
+        <line num="18" count="0" type="stmt"/>
+        <line num="24" count="0" type="stmt"/>
+        <line num="25" count="0" type="stmt"/>
+        <line num="27" count="0" type="stmt"/>
+      </file>
+    </package>
+    <package name="constants">
+      <metrics statements="5" coveredstatements="5" conditionals="2" coveredconditionals="2" methods="4" coveredmethods="4"/>
+      <file name="access.ts" path="F:\Projects\AIGymCoatch\mobile\src\constants\access.ts">
+        <metrics statements="5" coveredstatements="5" conditionals="2" coveredconditionals="2" methods="4" coveredmethods="4"/>
+        <line num="1" count="1" type="stmt"/>
+        <line num="3" count="1" type="stmt"/>
+        <line num="12" count="2" type="stmt"/>
+        <line num="16" count="3" type="cond" truecount="2" falsecount="0"/>
+        <line num="20" count="2" type="stmt"/>
+      </file>
+    </package>
+    <package name="features.aiCoach.screens">
+      <metrics statements="27" coveredstatements="17" conditionals="26" coveredconditionals="16" methods="11" coveredmethods="3"/>
+      <file name="AiCoachScreen.tsx" path="F:\Projects\AIGymCoatch\mobile\src\features\aiCoach\screens\AiCoachScreen.tsx">
+        <metrics statements="27" coveredstatements="17" conditionals="26" coveredconditionals="16" methods="11" coveredmethods="3"/>
+        <line num="21" count="6" type="stmt"/>
+        <line num="22" count="6" type="stmt"/>
+        <line num="23" count="6" type="stmt"/>
+        <line num="24" count="6" type="stmt"/>
+        <line num="25" count="6" type="stmt"/>
+        <line num="26" count="6" type="stmt"/>
+        <line num="27" count="6" type="stmt"/>
+        <line num="28" count="6" type="stmt"/>
+        <line num="29" count="6" type="stmt"/>
+        <line num="30" count="6" type="cond" truecount="1" falsecount="1"/>
+        <line num="31" count="6" type="stmt"/>
+        <line num="32" count="1" type="cond" truecount="2" falsecount="0"/>
+        <line num="34" count="0" type="stmt"/>
+        <line num="35" count="0" type="stmt"/>
+        <line num="36" count="0" type="stmt"/>
+        <line num="39" count="6" type="stmt"/>
+        <line num="40" count="0" type="stmt"/>
+        <line num="42" count="0" type="stmt"/>
+        <line num="43" count="0" type="stmt"/>
+        <line num="46" count="6" type="stmt"/>
+        <line num="47" count="6" type="cond" truecount="2" falsecount="2"/>
+        <line num="49" count="6" type="stmt"/>
+        <line num="50" count="0" type="stmt"/>
+        <line num="58" count="0" type="stmt"/>
+        <line num="73" count="1" type="stmt"/>
+        <line num="81" count="0" type="stmt"/>
+        <line num="84" count="0" type="stmt"/>
+      </file>
+    </package>
+    <package name="features.auth">
+      <metrics statements="4" coveredstatements="4" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+      <file name="schemas.ts" path="F:\Projects\AIGymCoatch\mobile\src\features\auth\schemas.ts">
+        <metrics statements="4" coveredstatements="4" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+        <line num="3" count="1" type="stmt"/>
+        <line num="5" count="1" type="stmt"/>
+        <line num="10" count="1" type="stmt"/>
+        <line num="24" count="1" type="stmt"/>
+      </file>
+    </package>
+    <package name="features.auth.api">
+      <metrics statements="14" coveredstatements="0" conditionals="0" coveredconditionals="0" methods="7" coveredmethods="0"/>
+      <file name="auth.api.ts" path="F:\Projects\AIGymCoatch\mobile\src\features\auth\api\auth.api.ts">
+        <metrics statements="14" coveredstatements="0" conditionals="0" coveredconditionals="0" methods="7" coveredmethods="0"/>
+        <line num="10" count="0" type="stmt"/>
+        <line num="11" count="0" type="stmt"/>
+        <line num="15" count="0" type="stmt"/>
+        <line num="16" count="0" type="stmt"/>
+        <line num="20" count="0" type="stmt"/>
+        <line num="24" count="0" type="stmt"/>
+        <line num="28" count="0" type="stmt"/>
+        <line num="29" count="0" type="stmt"/>
+        <line num="34" count="0" type="stmt"/>
+        <line num="36" count="0" type="stmt"/>
+        <line num="41" count="0" type="stmt"/>
+        <line num="42" count="0" type="stmt"/>
+        <line num="46" count="0" type="stmt"/>
+        <line num="47" count="0" type="stmt"/>
+      </file>
+    </package>
+    <package name="features.auth.screens">
+      <metrics statements="14" coveredstatements="12" conditionals="2" coveredconditionals="1" methods="6" coveredmethods="5"/>
+      <file name="LoginScreen.tsx" path="F:\Projects\AIGymCoatch\mobile\src\features\auth\screens\LoginScreen.tsx">
+        <metrics statements="14" coveredstatements="12" conditionals="2" coveredconditionals="1" methods="6" coveredmethods="5"/>
+        <line num="20" count="8" type="stmt"/>
+        <line num="21" count="8" type="stmt"/>
+        <line num="22" count="8" type="stmt"/>
+        <line num="23" count="8" type="stmt"/>
+        <line num="28" count="8" type="stmt"/>
+        <line num="29" count="1" type="stmt"/>
+        <line num="30" count="1" type="stmt"/>
+        <line num="31" count="1" type="stmt"/>
+        <line num="33" count="0" type="stmt"/>
+        <line num="37" count="8" type="stmt"/>
+        <line num="45" count="8" type="stmt"/>
+        <line num="54" count="8" type="stmt"/>
+        <line num="61" count="0" type="stmt"/>
+        <line num="64" count="1" type="stmt"/>
+      </file>
+    </package>
+    <package name="features.dashboard.screens">
+      <metrics statements="19" coveredstatements="12" conditionals="28" coveredconditionals="23" methods="10" coveredmethods="2"/>
+      <file name="DashboardScreen.tsx" path="F:\Projects\AIGymCoatch\mobile\src\features\dashboard\screens\DashboardScreen.tsx">
+        <metrics statements="19" coveredstatements="12" conditionals="28" coveredconditionals="23" methods="10" coveredmethods="2"/>
+        <line num="19" count="8" type="stmt"/>
+        <line num="20" count="8" type="stmt"/>
+        <line num="21" count="8" type="stmt"/>
+        <line num="22" count="25" type="stmt"/>
+        <line num="23" count="8" type="stmt"/>
+        <line num="24" count="8" type="stmt"/>
+        <line num="25" count="8" type="stmt"/>
+        <line num="26" count="8" type="cond" truecount="2" falsecount="0"/>
+        <line num="27" count="8" type="cond" truecount="2" falsecount="0"/>
+        <line num="28" count="8" type="cond" truecount="2" falsecount="0"/>
+        <line num="29" count="8" type="cond" truecount="2" falsecount="0"/>
+        <line num="31" count="8" type="stmt"/>
+        <line num="32" count="0" type="stmt"/>
+        <line num="38" count="0" type="stmt"/>
+        <line num="42" count="0" type="stmt"/>
+        <line num="48" count="0" type="cond" truecount="2" falsecount="0"/>
+        <line num="58" count="0" type="stmt"/>
+        <line num="60" count="0" type="stmt"/>
+        <line num="64" count="0" type="stmt"/>
+      </file>
+    </package>
+    <package name="features.fitness">
+      <metrics statements="3" coveredstatements="3" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+      <file name="types.ts" path="F:\Projects\AIGymCoatch\mobile\src\features\fitness\types.ts">
+        <metrics statements="3" coveredstatements="3" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+        <line num="166" count="1" type="stmt"/>
+        <line num="167" count="1" type="stmt"/>
+        <line num="168" count="1" type="stmt"/>
+      </file>
+    </package>
+    <package name="features.fitness.api">
+      <metrics statements="60" coveredstatements="57" conditionals="10" coveredconditionals="8" methods="37" coveredmethods="36"/>
+      <file name="keys.ts" path="F:\Projects\AIGymCoatch\mobile\src\features\fitness\api\keys.ts">
+        <metrics statements="1" coveredstatements="1" conditionals="0" coveredconditionals="0" methods="1" coveredmethods="1"/>
+        <line num="2" count="130" type="stmt"/>
+      </file>
+      <file name="queries.ts" path="F:\Projects\AIGymCoatch\mobile\src\features\fitness\api\queries.ts">
+        <metrics statements="59" coveredstatements="56" conditionals="10" coveredconditionals="8" methods="36" coveredmethods="35"/>
+        <line num="9" count="537" type="cond" truecount="1" falsecount="1"/>
+        <line num="13" count="6" type="cond" truecount="1" falsecount="1"/>
+        <line num="17" count="28" type="stmt"/>
+        <line num="18" count="28" type="stmt"/>
+        <line num="22" count="8" type="stmt"/>
+        <line num="27" count="14" type="stmt"/>
+        <line num="28" count="14" type="stmt"/>
+        <line num="29" count="14" type="stmt"/>
+        <line num="30" count="2" type="stmt"/>
+        <line num="32" count="1" type="stmt"/>
+        <line num="33" count="1" type="stmt"/>
+        <line num="39" count="14" type="stmt"/>
+        <line num="40" count="14" type="stmt"/>
+        <line num="43" count="3" type="stmt"/>
+        <line num="48" count="14" type="stmt"/>
+        <line num="49" count="14" type="stmt"/>
+        <line num="50" count="14" type="stmt"/>
+        <line num="51" count="1" type="stmt"/>
+        <line num="53" count="1" type="stmt"/>
+        <line num="54" count="1" type="stmt"/>
+        <line num="60" count="12" type="stmt"/>
+        <line num="61" count="12" type="stmt"/>
+        <line num="64" count="6" type="stmt"/>
+        <line num="69" count="10" type="stmt"/>
+        <line num="70" count="10" type="stmt"/>
+        <line num="73" count="5" type="stmt"/>
+        <line num="78" count="15" type="stmt"/>
+        <line num="79" count="15" type="stmt"/>
+        <line num="82" count="2" type="stmt"/>
+        <line num="87" count="18" type="stmt"/>
+        <line num="88" count="18" type="stmt"/>
+        <line num="91" count="3" type="stmt"/>
+        <line num="96" count="14" type="stmt"/>
+        <line num="97" count="14" type="stmt"/>
+        <line num="100" count="3" type="stmt"/>
+        <line num="105" count="5" type="stmt"/>
+        <line num="106" count="5" type="stmt"/>
+        <line num="107" count="5" type="stmt"/>
+        <line num="108" count="1" type="stmt"/>
+        <line num="110" count="1" type="stmt"/>
+        <line num="111" count="1" type="stmt"/>
+        <line num="117" count="10" type="stmt"/>
+        <line num="118" count="10" type="stmt"/>
+        <line num="119" count="10" type="stmt"/>
+        <line num="120" count="1" type="stmt"/>
+        <line num="122" count="1" type="stmt"/>
+        <line num="128" count="10" type="stmt"/>
+        <line num="129" count="10" type="stmt"/>
+        <line num="130" count="10" type="stmt"/>
+        <line num="131" count="1" type="stmt"/>
+        <line num="133" count="0" type="stmt"/>
+        <line num="134" count="0" type="stmt"/>
+        <line num="135" count="0" type="stmt"/>
+        <line num="141" count="4" type="stmt"/>
+        <line num="142" count="4" type="stmt"/>
+        <line num="145" count="2" type="stmt"/>
+        <line num="150" count="4" type="stmt"/>
+        <line num="151" count="4" type="stmt"/>
+        <line num="154" count="2" type="stmt"/>
+      </file>
+    </package>
+    <package name="features.fitness.screens">
+      <metrics statements="51" coveredstatements="47" conditionals="57" coveredconditionals="47" methods="24" coveredmethods="17"/>
+      <file name="FitnessScreen.tsx" path="F:\Projects\AIGymCoatch\mobile\src\features\fitness\screens\FitnessScreen.tsx">
+        <metrics statements="51" coveredstatements="47" conditionals="57" coveredconditionals="47" methods="24" coveredmethods="17"/>
+        <line num="19" count="1" type="stmt"/>
+        <line num="34" count="1" type="stmt"/>
+        <line num="48" count="14" type="stmt"/>
+        <line num="49" count="14" type="stmt"/>
+        <line num="50" count="14" type="stmt"/>
+        <line num="51" count="14" type="stmt"/>
+        <line num="52" count="14" type="stmt"/>
+        <line num="53" count="14" type="stmt"/>
+        <line num="54" count="14" type="stmt"/>
+        <line num="55" count="14" type="stmt"/>
+        <line num="56" count="14" type="stmt"/>
+        <line num="57" count="14" type="cond" truecount="2" falsecount="0"/>
+        <line num="58" count="14" type="stmt"/>
+        <line num="60" count="14" type="stmt"/>
+        <line num="61" count="3" type="cond" truecount="2" falsecount="0"/>
+        <line num="62" count="1" type="stmt"/>
+        <line num="74" count="1" type="stmt"/>
+        <line num="77" count="14" type="stmt"/>
+        <line num="78" count="2" type="stmt"/>
+        <line num="79" count="2" type="stmt"/>
+        <line num="80" count="2" type="stmt"/>
+        <line num="81" count="2" type="stmt"/>
+        <line num="82" count="2" type="cond" truecount="7" falsecount="1"/>
+        <line num="83" count="0" type="stmt"/>
+        <line num="85" count="2" type="stmt"/>
+        <line num="86" count="2" type="stmt"/>
+        <line num="97" count="1" type="stmt"/>
+        <line num="100" count="14" type="cond" truecount="2" falsecount="0"/>
+        <line num="101" count="14" type="cond" truecount="3" falsecount="1"/>
+        <line num="103" count="14" type="stmt"/>
+        <line num="104" count="0" type="stmt"/>
+        <line num="110" count="0" type="stmt"/>
+        <line num="112" count="10" type="stmt"/>
+        <line num="117" count="10" type="stmt"/>
+        <line num="121" count="42" type="stmt"/>
+        <line num="122" count="70" type="stmt"/>
+        <line num="123" count="98" type="stmt"/>
+        <line num="125" count="10" type="stmt"/>
+        <line num="130" count="10" type="stmt"/>
+        <line num="135" count="10" type="stmt"/>
+        <line num="140" count="10" type="stmt"/>
+        <line num="151" count="98" type="stmt"/>
+        <line num="161" count="1" type="stmt"/>
+        <line num="162" count="1" type="cond" truecount="1" falsecount="1"/>
+        <line num="163" count="1" type="stmt"/>
+        <line num="165" count="0" type="cond" truecount="1" falsecount="1"/>
+        <line num="173" count="9" type="stmt"/>
+        <line num="174" count="9" type="cond" truecount="2" falsecount="0"/>
+        <line num="175" count="4" type="stmt"/>
+        <line num="176" count="4" type="cond" truecount="4" falsecount="1"/>
+        <line num="177" count="4" type="stmt"/>
+      </file>
+    </package>
+    <package name="features.progress.screens">
+      <metrics statements="17" coveredstatements="16" conditionals="38" coveredconditionals="32" methods="8" coveredmethods="7"/>
+      <file name="ProgressScreen.tsx" path="F:\Projects\AIGymCoatch\mobile\src\features\progress\screens\ProgressScreen.tsx">
+        <metrics statements="17" coveredstatements="16" conditionals="38" coveredconditionals="32" methods="8" coveredmethods="7"/>
+        <line num="11" count="4" type="stmt"/>
+        <line num="12" count="4" type="stmt"/>
+        <line num="13" count="4" type="stmt"/>
+        <line num="14" count="4" type="stmt"/>
+        <line num="15" count="4" type="stmt"/>
+        <line num="16" count="4" type="cond" truecount="2" falsecount="0"/>
+        <line num="17" count="4" type="cond" truecount="3" falsecount="0"/>
+        <line num="18" count="4" type="cond" truecount="3" falsecount="0"/>
+        <line num="19" count="4" type="cond" truecount="7" falsecount="1"/>
+        <line num="21" count="4" type="stmt"/>
+        <line num="22" count="0" type="cond" truecount="1" falsecount="1"/>
+        <line num="34" count="2" type="cond" truecount="3" falsecount="1"/>
+        <line num="39" count="1" type="cond" truecount="2" falsecount="2"/>
+        <line num="48" count="1" type="stmt"/>
+        <line num="49" count="2" type="stmt"/>
+        <line num="50" count="1" type="stmt"/>
+        <line num="53" count="2" type="stmt"/>
+      </file>
+    </package>
+    <package name="features.settings.screens">
+      <metrics statements="16" coveredstatements="16" conditionals="4" coveredconditionals="4" methods="14" coveredmethods="13"/>
+      <file name="SettingsScreen.tsx" path="F:\Projects\AIGymCoatch\mobile\src\features\settings\screens\SettingsScreen.tsx">
+        <metrics statements="16" coveredstatements="16" conditionals="4" coveredconditionals="4" methods="14" coveredmethods="13"/>
+        <line num="10" count="1" type="stmt"/>
+        <line num="13" count="4" type="stmt"/>
+        <line num="14" count="4" type="stmt"/>
+        <line num="15" count="14" type="stmt"/>
+        <line num="16" count="14" type="stmt"/>
+        <line num="17" count="14" type="stmt"/>
+        <line num="18" count="14" type="stmt"/>
+        <line num="19" count="14" type="stmt"/>
+        <line num="20" count="14" type="stmt"/>
+        <line num="22" count="4" type="stmt"/>
+        <line num="27" count="12" type="stmt"/>
+        <line num="34" count="20" type="stmt"/>
+        <line num="39" count="1" type="stmt"/>
+        <line num="48" count="12" type="stmt"/>
+        <line num="56" count="24" type="stmt"/>
+        <line num="57" count="24" type="stmt"/>
+      </file>
+    </package>
+    <package name="features.tenant">
+      <metrics statements="11" coveredstatements="11" conditionals="4" coveredconditionals="4" methods="7" coveredmethods="7"/>
+      <file name="WorkspaceSwitcher.tsx" path="F:\Projects\AIGymCoatch\mobile\src\features\tenant\WorkspaceSwitcher.tsx">
+        <metrics statements="11" coveredstatements="11" conditionals="4" coveredconditionals="4" methods="7" coveredmethods="7"/>
+        <line num="13" count="4" type="stmt"/>
+        <line num="14" count="4" type="stmt"/>
+        <line num="15" count="13" type="stmt"/>
+        <line num="16" count="12" type="stmt"/>
+        <line num="17" count="12" type="stmt"/>
+        <line num="18" count="12" type="stmt"/>
+        <line num="19" count="4" type="stmt"/>
+        <line num="23" count="2" type="stmt"/>
+        <line num="30" count="2" type="stmt"/>
+        <line num="31" count="2" type="stmt"/>
+        <line num="37" count="1" type="stmt"/>
+      </file>
+    </package>
+    <package name="features.workouts.screens">
+      <metrics statements="89" coveredstatements="77" conditionals="123" coveredconditionals="100" methods="36" coveredmethods="25"/>
+      <file name="WorkoutPlanScreen.tsx" path="F:\Projects\AIGymCoatch\mobile\src\features\workouts\screens\WorkoutPlanScreen.tsx">
+        <metrics statements="15" coveredstatements="14" conditionals="30" coveredconditionals="22" methods="8" coveredmethods="7"/>
+        <line num="18" count="5" type="stmt"/>
+        <line num="19" count="5" type="stmt"/>
+        <line num="20" count="5" type="stmt"/>
+        <line num="21" count="5" type="stmt"/>
+        <line num="22" count="5" type="stmt"/>
+        <line num="23" count="5" type="stmt"/>
+        <line num="25" count="5" type="stmt"/>
+        <line num="26" count="0" type="cond" truecount="1" falsecount="1"/>
+        <line num="36" count="4" type="stmt"/>
+        <line num="37" count="1" type="cond" truecount="1" falsecount="1"/>
+        <line num="41" count="3" type="cond" truecount="4" falsecount="0"/>
+        <line num="44" count="1" type="stmt"/>
+        <line num="55" count="4" type="stmt"/>
+        <line num="56" count="4" type="stmt"/>
+        <line num="57" count="4" type="stmt"/>
+      </file>
+      <file name="WorkoutSessionScreen.tsx" path="F:\Projects\AIGymCoatch\mobile\src\features\workouts\screens\WorkoutSessionScreen.tsx">
+        <metrics statements="51" coveredstatements="44" conditionals="69" coveredconditionals="57" methods="16" coveredmethods="11"/>
+        <line num="18" count="1" type="stmt"/>
+        <line num="30" count="10" type="stmt"/>
+        <line num="31" count="10" type="stmt"/>
+        <line num="32" count="10" type="stmt"/>
+        <line num="33" count="10" type="cond" truecount="2" falsecount="0"/>
+        <line num="34" count="10" type="stmt"/>
+        <line num="35" count="10" type="stmt"/>
+        <line num="36" count="10" type="stmt"/>
+        <line num="37" count="10" type="stmt"/>
+        <line num="38" count="10" type="stmt"/>
+        <line num="39" count="10" type="cond" truecount="2" falsecount="0"/>
+        <line num="40" count="10" type="cond" truecount="2" falsecount="0"/>
+        <line num="41" count="10" type="stmt"/>
+        <line num="42" count="3" type="stmt"/>
+        <line num="43" count="3" type="cond" truecount="2" falsecount="0"/>
+        <line num="45" count="10" type="cond" truecount="2" falsecount="0"/>
+        <line num="46" count="10" type="cond" truecount="2" falsecount="0"/>
+        <line num="48" count="10" type="stmt"/>
+        <line num="49" count="2" type="cond" truecount="1" falsecount="1"/>
+        <line num="50" count="2" type="stmt"/>
+        <line num="51" count="2" type="stmt"/>
+        <line num="52" count="2" type="stmt"/>
+        <line num="53" count="2" type="stmt"/>
+        <line num="54" count="2" type="cond" truecount="5" falsecount="1"/>
+        <line num="55" count="0" type="stmt"/>
+        <line num="56" count="0" type="stmt"/>
+        <line num="58" count="2" type="cond" truecount="6" falsecount="0"/>
+        <line num="59" count="1" type="stmt"/>
+        <line num="60" count="1" type="stmt"/>
+        <line num="62" count="1" type="stmt"/>
+        <line num="63" count="1" type="stmt"/>
+        <line num="68" count="1" type="stmt"/>
+        <line num="69" count="1" type="cond" truecount="3" falsecount="4"/>
+        <line num="70" count="0" type="stmt"/>
+        <line num="76" count="10" type="stmt"/>
+        <line num="77" count="0" type="cond" truecount="1" falsecount="1"/>
+        <line num="86" count="1" type="stmt"/>
+        <line num="89" count="1" type="stmt"/>
+        <line num="92" count="0" type="stmt"/>
+        <line num="95" count="0" type="stmt"/>
+        <line num="102" count="0" type="stmt"/>
+        <line num="106" count="1" type="stmt"/>
+        <line num="117" count="4" type="stmt"/>
+        <line num="118" count="4" type="cond" truecount="2" falsecount="0"/>
+        <line num="119" count="1" type="cond" truecount="1" falsecount="1"/>
+        <line num="120" count="1" type="stmt"/>
+        <line num="124" count="4" type="stmt"/>
+        <line num="125" count="4" type="cond" truecount="2" falsecount="0"/>
+        <line num="126" count="1" type="stmt"/>
+        <line num="127" count="1" type="cond" truecount="3" falsecount="1"/>
+        <line num="128" count="1" type="stmt"/>
+      </file>
+      <file name="WorkoutSummaryScreen.tsx" path="F:\Projects\AIGymCoatch\mobile\src\features\workouts\screens\WorkoutSummaryScreen.tsx">
+        <metrics statements="15" coveredstatements="13" conditionals="18" coveredconditionals="16" methods="8" coveredmethods="6"/>
+        <line num="18" count="4" type="stmt"/>
+        <line num="19" count="4" type="stmt"/>
+        <line num="20" count="4" type="stmt"/>
+        <line num="21" count="4" type="stmt"/>
+        <line num="22" count="4" type="stmt"/>
+        <line num="23" count="4" type="cond" truecount="2" falsecount="0"/>
+        <line num="24" count="4" type="cond" truecount="2" falsecount="0"/>
+        <line num="26" count="4" type="stmt"/>
+        <line num="27" count="0" type="cond" truecount="3" falsecount="1"/>
+        <line num="35" count="3" type="stmt"/>
+        <line num="40" count="1" type="stmt"/>
+        <line num="41" count="0" type="stmt"/>
+        <line num="49" count="4" type="stmt"/>
+        <line num="50" count="4" type="stmt"/>
+        <line num="51" count="4" type="cond" truecount="2" falsecount="0"/>
+      </file>
+      <file name="WorkoutsScreen.tsx" path="F:\Projects\AIGymCoatch\mobile\src\features\workouts\screens\WorkoutsScreen.tsx">
+        <metrics statements="8" coveredstatements="6" conditionals="6" coveredconditionals="5" methods="4" coveredmethods="1"/>
+        <line num="14" count="2" type="stmt"/>
+        <line num="15" count="2" type="stmt"/>
+        <line num="16" count="2" type="stmt"/>
+        <line num="17" count="2" type="stmt"/>
+        <line num="18" count="2" type="cond" truecount="2" falsecount="0"/>
+        <line num="20" count="2" type="stmt"/>
+        <line num="21" count="0" type="cond" truecount="3" falsecount="1"/>
+        <line num="25" count="0" type="stmt"/>
+      </file>
+    </package>
+    <package name="services.api">
+      <metrics statements="88" coveredstatements="58" conditionals="62" coveredconditionals="41" methods="23" coveredmethods="14"/>
+      <file name="authBridge.ts" path="F:\Projects\AIGymCoatch\mobile\src\services\api\authBridge.ts">
+        <metrics statements="7" coveredstatements="2" conditionals="0" coveredconditionals="0" methods="5" coveredmethods="0"/>
+        <line num="7" count="1" type="stmt"/>
+        <line num="8" count="0" type="stmt"/>
+        <line num="9" count="0" type="stmt"/>
+        <line num="10" count="0" type="stmt"/>
+        <line num="13" count="1" type="stmt"/>
+        <line num="16" count="0" type="stmt"/>
+        <line num="20" count="0" type="stmt"/>
+      </file>
+      <file name="client.ts" path="F:\Projects\AIGymCoatch\mobile\src\services\api\client.ts">
+        <metrics statements="22" coveredstatements="4" conditionals="12" coveredconditionals="0" methods="3" coveredmethods="0"/>
+        <line num="9" count="1" type="stmt"/>
+        <line num="15" count="1" type="stmt"/>
+        <line num="21" count="1" type="stmt"/>
+        <line num="22" count="0" type="stmt"/>
+        <line num="23" count="0" type="stmt"/>
+        <line num="24" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="25" count="0" type="stmt"/>
+        <line num="27" count="0" type="stmt"/>
+        <line num="30" count="1" type="stmt"/>
+        <line num="31" count="0" type="stmt"/>
+        <line num="33" count="0" type="stmt"/>
+        <line num="34" count="0" type="stmt"/>
+        <line num="35" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="36" count="0" type="stmt"/>
+        <line num="37" count="0" type="cond" truecount="0" falsecount="6"/>
+        <line num="38" count="0" type="stmt"/>
+        <line num="39" count="0" type="stmt"/>
+        <line num="40" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="41" count="0" type="stmt"/>
+        <line num="42" count="0" type="stmt"/>
+        <line num="44" count="0" type="stmt"/>
+        <line num="46" count="0" type="stmt"/>
+      </file>
+      <file name="config.ts" path="F:\Projects\AIGymCoatch\mobile\src\services\api\config.ts">
+        <metrics statements="24" coveredstatements="22" conditionals="17" coveredconditionals="16" methods="5" coveredmethods="5"/>
+        <line num="3" count="2" type="stmt"/>
+        <line num="6" count="4" type="cond" truecount="2" falsecount="0"/>
+        <line num="7" count="2" type="stmt"/>
+        <line num="10" count="2" type="stmt"/>
+        <line num="11" count="2" type="stmt"/>
+        <line num="12" count="2" type="cond" truecount="4" falsecount="0"/>
+        <line num="13" count="1" type="stmt"/>
+        <line num="16" count="1" type="stmt"/>
+        <line num="20" count="6" type="cond" truecount="2" falsecount="0"/>
+        <line num="21" count="6" type="cond" truecount="4" falsecount="0"/>
+        <line num="22" count="5" type="stmt"/>
+        <line num="25" count="1" type="stmt"/>
+        <line num="26" count="1" type="stmt"/>
+        <line num="27" count="1" type="stmt"/>
+        <line num="31" count="4" type="cond" truecount="3" falsecount="0"/>
+        <line num="35" count="2" type="stmt"/>
+        <line num="36" count="2" type="stmt"/>
+        <line num="38" count="0" type="stmt"/>
+        <line num="43" count="2" type="stmt"/>
+        <line num="44" count="2" type="stmt"/>
+        <line num="45" count="2" type="cond" truecount="1" falsecount="1"/>
+        <line num="47" count="0" type="stmt"/>
+        <line num="51" count="2" type="stmt"/>
+        <line num="53" count="2" type="stmt"/>
+      </file>
+      <file name="correlation.ts" path="F:\Projects\AIGymCoatch\mobile\src\services\api\correlation.ts">
+        <metrics statements="3" coveredstatements="0" conditionals="0" coveredconditionals="0" methods="1" coveredmethods="0"/>
+        <line num="2" count="0" type="stmt"/>
+        <line num="3" count="0" type="stmt"/>
+        <line num="4" count="0" type="stmt"/>
+      </file>
+      <file name="paging.ts" path="F:\Projects\AIGymCoatch\mobile\src\services\api\paging.ts">
+        <metrics statements="9" coveredstatements="9" conditionals="10" coveredconditionals="10" methods="2" coveredmethods="2"/>
+        <line num="4" count="3" type="cond" truecount="2" falsecount="0"/>
+        <line num="5" count="3" type="cond" truecount="4" falsecount="0"/>
+        <line num="6" count="3" type="stmt"/>
+        <line num="7" count="3" type="cond" truecount="2" falsecount="0"/>
+        <line num="8" count="1" type="stmt"/>
+        <line num="10" count="3" type="cond" truecount="2" falsecount="0"/>
+        <line num="11" count="1" type="stmt"/>
+        <line num="13" count="3" type="stmt"/>
+        <line num="17" count="2" type="stmt"/>
+      </file>
+      <file name="problem.ts" path="F:\Projects\AIGymCoatch\mobile\src\services\api\problem.ts">
+        <metrics statements="23" coveredstatements="21" conditionals="23" coveredconditionals="15" methods="7" coveredmethods="7"/>
+        <line num="10" count="11" type="stmt"/>
+        <line num="11" count="11" type="stmt"/>
+        <line num="12" count="11" type="stmt"/>
+        <line num="13" count="11" type="stmt"/>
+        <line num="14" count="11" type="stmt"/>
+        <line num="19" count="24" type="cond" truecount="2" falsecount="0"/>
+        <line num="20" count="22" type="stmt"/>
+        <line num="23" count="2" type="cond" truecount="1" falsecount="1"/>
+        <line num="24" count="0" type="stmt"/>
+        <line num="27" count="2" type="cond" truecount="2" falsecount="0"/>
+        <line num="28" count="1" type="stmt"/>
+        <line num="31" count="1" type="stmt"/>
+        <line num="32" count="1" type="cond" truecount="1" falsecount="1"/>
+        <line num="33" count="1" type="cond" truecount="1" falsecount="2"/>
+        <line num="34" count="1" type="stmt"/>
+        <line num="38" count="18" type="stmt"/>
+        <line num="42" count="4" type="stmt"/>
+        <line num="43" count="4" type="cond" truecount="2" falsecount="0"/>
+        <line num="47" count="1" type="cond" truecount="1" falsecount="1"/>
+        <line num="48" count="0" type="stmt"/>
+        <line num="51" count="1" type="stmt"/>
+        <line num="52" count="1" type="cond" truecount="1" falsecount="1"/>
+        <line num="57" count="1" type="cond" truecount="3" falsecount="2"/>
+      </file>
+    </package>
+    <package name="services.auth">
+      <metrics statements="79" coveredstatements="37" conditionals="30" coveredconditionals="14" methods="17" coveredmethods="6"/>
+      <file name="session.ts" path="F:\Projects\AIGymCoatch\mobile\src\services\auth\session.ts">
+        <metrics statements="42" coveredstatements="1" conditionals="14" coveredconditionals="0" methods="11" coveredmethods="0"/>
+        <line num="9" count="1" type="stmt"/>
+        <line num="12" count="0" type="stmt"/>
+        <line num="13" count="0" type="stmt"/>
+        <line num="16" count="0" type="stmt"/>
+        <line num="22" count="0" type="stmt"/>
+        <line num="26" count="0" type="stmt"/>
+        <line num="30" count="0" type="stmt"/>
+        <line num="31" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="32" count="0" type="stmt"/>
+        <line num="33" count="0" type="stmt"/>
+        <line num="35" count="0" type="stmt"/>
+        <line num="40" count="0" type="stmt"/>
+        <line num="41" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="42" count="0" type="stmt"/>
+        <line num="47" count="0" type="stmt"/>
+        <line num="48" count="0" type="stmt"/>
+        <line num="49" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="50" count="0" type="stmt"/>
+        <line num="55" count="0" type="stmt"/>
+        <line num="56" count="0" type="stmt"/>
+        <line num="57" count="0" type="stmt"/>
+        <line num="58" count="0" type="stmt"/>
+        <line num="62" count="0" type="stmt"/>
+        <line num="63" count="0" type="stmt"/>
+        <line num="65" count="0" type="stmt"/>
+        <line num="69" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="70" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="71" count="0" type="stmt"/>
+        <line num="73" count="0" type="stmt"/>
+        <line num="74" count="0" type="stmt"/>
+        <line num="75" count="0" type="stmt"/>
+        <line num="76" count="0" type="stmt"/>
+        <line num="78" count="0" type="stmt"/>
+        <line num="79" count="0" type="stmt"/>
+        <line num="80" count="0" type="stmt"/>
+        <line num="81" count="0" type="stmt"/>
+        <line num="86" count="0" type="stmt"/>
+        <line num="87" count="0" type="stmt"/>
+        <line num="92" count="0" type="cond" truecount="0" falsecount="4"/>
+        <line num="93" count="0" type="stmt"/>
+        <line num="94" count="0" type="stmt"/>
+        <line num="96" count="0" type="stmt"/>
+      </file>
+      <file name="tokenStorage.ts" path="F:\Projects\AIGymCoatch\mobile\src\services\auth\tokenStorage.ts">
+        <metrics statements="37" coveredstatements="36" conditionals="16" coveredconditionals="14" methods="6" coveredmethods="6"/>
+        <line num="3" count="2" type="stmt"/>
+        <line num="12" count="1" type="stmt"/>
+        <line num="13" count="1" type="stmt"/>
+        <line num="14" count="1" type="stmt"/>
+        <line num="18" count="2" type="stmt"/>
+        <line num="19" count="2" type="stmt"/>
+        <line num="20" count="2" type="stmt"/>
+        <line num="21" count="2" type="cond" truecount="5" falsecount="0"/>
+        <line num="22" count="1" type="stmt"/>
+        <line num="24" count="1" type="stmt"/>
+        <line num="28" count="1" type="stmt"/>
+        <line num="29" count="1" type="stmt"/>
+        <line num="30" count="1" type="stmt"/>
+        <line num="34" count="2" type="stmt"/>
+        <line num="35" count="2" type="stmt"/>
+        <line num="36" count="2" type="stmt"/>
+        <line num="37" count="2" type="stmt"/>
+        <line num="38" count="4" type="stmt"/>
+        <line num="43" count="4" type="stmt"/>
+        <line num="44" count="4" type="stmt"/>
+        <line num="45" count="4" type="stmt"/>
+        <line num="46" count="4" type="cond" truecount="5" falsecount="0"/>
+        <line num="47" count="2" type="stmt"/>
+        <line num="49" count="2" type="stmt"/>
+        <line num="50" count="2" type="stmt"/>
+        <line num="51" count="4" type="stmt"/>
+        <line num="52" count="4" type="cond" truecount="1" falsecount="1"/>
+        <line num="53" count="0" type="stmt"/>
+        <line num="55" count="4" type="stmt"/>
+        <line num="57" count="2" type="stmt"/>
+        <line num="61" count="2" type="stmt"/>
+        <line num="62" count="2" type="stmt"/>
+        <line num="63" count="2" type="stmt"/>
+        <line num="64" count="2" type="cond" truecount="3" falsecount="1"/>
+        <line num="65" count="2" type="stmt"/>
+        <line num="66" count="4" type="stmt"/>
+        <line num="69" count="2" type="stmt"/>
+      </file>
+    </package>
+    <package name="services.branding">
+      <metrics statements="3" coveredstatements="3" conditionals="6" coveredconditionals="6" methods="1" coveredmethods="1"/>
+      <file name="branding.ts" path="F:\Projects\AIGymCoatch\mobile\src\services\branding\branding.ts">
+        <metrics statements="3" coveredstatements="3" conditionals="6" coveredconditionals="6" methods="1" coveredmethods="1"/>
+        <line num="11" count="3" type="stmt"/>
+        <line num="20" count="4" type="stmt"/>
+        <line num="21" count="4" type="stmt"/>
+      </file>
+    </package>
+    <package name="services.localization">
+      <metrics statements="12" coveredstatements="6" conditionals="6" coveredconditionals="1" methods="6" coveredmethods="3"/>
+      <file name="deviceLocale.ts" path="F:\Projects\AIGymCoatch\mobile\src\services\localization\deviceLocale.ts">
+        <metrics statements="4" coveredstatements="0" conditionals="4" coveredconditionals="0" methods="1" coveredmethods="0"/>
+        <line num="5" count="0" type="stmt"/>
+        <line num="6" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="7" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="9" count="0" type="stmt"/>
+      </file>
+      <file name="format.ts" path="F:\Projects\AIGymCoatch\mobile\src\services\localization\format.ts">
+        <metrics statements="5" coveredstatements="4" conditionals="2" coveredconditionals="1" methods="4" coveredmethods="3"/>
+        <line num="1" count="1" type="stmt"/>
+        <line num="8" count="2" type="cond" truecount="1" falsecount="1"/>
+        <line num="12" count="0" type="stmt"/>
+        <line num="16" count="1" type="stmt"/>
+        <line num="20" count="1" type="stmt"/>
+      </file>
+      <file name="i18n.ts" path="F:\Projects\AIGymCoatch\mobile\src\services\localization\i18n.ts">
+        <metrics statements="3" coveredstatements="2" conditionals="0" coveredconditionals="0" methods="1" coveredmethods="0"/>
+        <line num="7" count="22" type="stmt"/>
+        <line num="11" count="0" type="stmt"/>
+        <line num="14" count="22" type="stmt"/>
+      </file>
+    </package>
+    <package name="services.storage">
+      <metrics statements="23" coveredstatements="13" conditionals="16" coveredconditionals="2" methods="11" coveredmethods="7"/>
+      <file name="preferences.ts" path="F:\Projects\AIGymCoatch\mobile\src\services\storage\preferences.ts">
+        <metrics statements="11" coveredstatements="4" conditionals="14" coveredconditionals="0" methods="2" coveredmethods="1"/>
+        <line num="14" count="13" type="stmt"/>
+        <line num="20" count="13" type="stmt"/>
+        <line num="21" count="13" type="stmt"/>
+        <line num="24" count="0" type="stmt"/>
+        <line num="25" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="26" count="0" type="stmt"/>
+        <line num="28" count="0" type="stmt"/>
+        <line num="29" count="0" type="stmt"/>
+        <line num="30" count="0" type="stmt"/>
+        <line num="36" count="0" type="stmt"/>
+        <line num="41" count="2" type="stmt"/>
+      </file>
+      <file name="secretDriver.ts" path="F:\Projects\AIGymCoatch\mobile\src\services\storage\secretDriver.ts">
+        <metrics statements="12" coveredstatements="9" conditionals="2" coveredconditionals="2" methods="9" coveredmethods="6"/>
+        <line num="9" count="14" type="stmt"/>
+        <line num="10" count="0" type="stmt"/>
+        <line num="11" count="0" type="stmt"/>
+        <line num="12" count="0" type="stmt"/>
+        <line num="15" count="14" type="stmt"/>
+        <line num="18" count="3" type="stmt"/>
+        <line num="22" count="14" type="stmt"/>
+        <line num="26" count="3" type="stmt"/>
+        <line num="27" count="3" type="stmt"/>
+        <line num="29" count="12" type="cond" truecount="2" falsecount="0"/>
+        <line num="32" count="9" type="stmt"/>
+        <line num="35" count="7" type="stmt"/>
+      </file>
+    </package>
+    <package name="store">
+      <metrics statements="23" coveredstatements="8" conditionals="2" coveredconditionals="0" methods="16" coveredmethods="6"/>
+      <file name="preferencesStore.ts" path="F:\Projects\AIGymCoatch\mobile\src\store\preferencesStore.ts">
+        <metrics statements="11" coveredstatements="6" conditionals="0" coveredconditionals="0" methods="6" coveredmethods="4"/>
+        <line num="14" count="13" type="stmt"/>
+        <line num="18" count="0" type="stmt"/>
+        <line num="19" count="0" type="stmt"/>
+        <line num="22" count="1" type="stmt"/>
+        <line num="23" count="1" type="stmt"/>
+        <line num="26" count="1" type="stmt"/>
+        <line num="27" count="1" type="stmt"/>
+        <line num="30" count="0" type="stmt"/>
+        <line num="31" count="0" type="stmt"/>
+        <line num="32" count="0" type="stmt"/>
+        <line num="37" count="2" type="stmt"/>
+      </file>
+      <file name="sessionStore.ts" path="F:\Projects\AIGymCoatch\mobile\src\store\sessionStore.ts">
+        <metrics statements="4" coveredstatements="1" conditionals="0" coveredconditionals="0" methods="4" coveredmethods="1"/>
+        <line num="24" count="9" type="stmt"/>
+        <line num="31" count="0" type="stmt"/>
+        <line num="33" count="0" type="stmt"/>
+        <line num="41" count="0" type="stmt"/>
+      </file>
+      <file name="workspaceStore.ts" path="F:\Projects\AIGymCoatch\mobile\src\store\workspaceStore.ts">
+        <metrics statements="8" coveredstatements="1" conditionals="2" coveredconditionals="0" methods="6" coveredmethods="1"/>
+        <line num="14" count="2" type="stmt"/>
+        <line num="18" count="0" type="stmt"/>
+        <line num="20" count="0" type="stmt"/>
+        <line num="21" count="0" type="cond" truecount="0" falsecount="2"/>
+        <line num="22" count="0" type="stmt"/>
+        <line num="24" count="0" type="stmt"/>
+        <line num="26" count="0" type="stmt"/>
+        <line num="27" count="0" type="stmt"/>
+      </file>
+    </package>
+    <package name="test">
+      <metrics statements="3" coveredstatements="3" conditionals="0" coveredconditionals="0" methods="3" coveredmethods="3"/>
+      <file name="render.tsx" path="F:\Projects\AIGymCoatch\mobile\src\test\render.tsx">
+        <metrics statements="3" coveredstatements="3" conditionals="0" coveredconditionals="0" methods="3" coveredmethods="3"/>
+        <line num="8" count="21" type="stmt"/>
+        <line num="11" count="21" type="stmt"/>
+        <line num="21" count="21" type="stmt"/>
+      </file>
+    </package>
+    <package name="theme">
+      <metrics statements="27" coveredstatements="26" conditionals="8" coveredconditionals="5" methods="6" coveredmethods="5"/>
+      <file name="colors.ts" path="F:\Projects\AIGymCoatch\mobile\src\theme\colors.ts">
+        <metrics statements="4" coveredstatements="4" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+        <line num="1" count="14" type="stmt"/>
+        <line num="17" count="14" type="stmt"/>
+        <line num="27" count="14" type="stmt"/>
+        <line num="39" count="14" type="stmt"/>
+      </file>
+      <file name="contrast.ts" path="F:\Projects\AIGymCoatch\mobile\src\theme\contrast.ts">
+        <metrics statements="7" coveredstatements="6" conditionals="4" coveredconditionals="2" methods="4" coveredmethods="3"/>
+        <line num="2" count="26" type="stmt"/>
+        <line num="3" count="26" type="cond" truecount="1" falsecount="1"/>
+        <line num="4" count="0" type="stmt"/>
+        <line num="6" count="78" type="stmt"/>
+        <line num="7" count="78" type="cond" truecount="1" falsecount="1"/>
+        <line num="8" count="26" type="stmt"/>
+        <line num="9" count="26" type="stmt"/>
+      </file>
+      <file name="dimensions.ts" path="F:\Projects\AIGymCoatch\mobile\src\theme\dimensions.ts">
+        <metrics statements="3" coveredstatements="3" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+        <line num="1" count="14" type="stmt"/>
+        <line num="8" count="14" type="stmt"/>
+        <line num="16" count="14" type="stmt"/>
+      </file>
+      <file name="index.ts" path="F:\Projects\AIGymCoatch\mobile\src\theme\index.ts">
+        <metrics statements="0" coveredstatements="0" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+      </file>
+      <file name="motion.ts" path="F:\Projects\AIGymCoatch\mobile\src\theme\motion.ts">
+        <metrics statements="2" coveredstatements="2" conditionals="2" coveredconditionals="1" methods="1" coveredmethods="1"/>
+        <line num="1" count="14" type="stmt"/>
+        <line num="8" count="1" type="cond" truecount="1" falsecount="1"/>
+      </file>
+      <file name="radius.ts" path="F:\Projects\AIGymCoatch\mobile\src\theme\radius.ts">
+        <metrics statements="1" coveredstatements="1" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+        <line num="1" count="14" type="stmt"/>
+      </file>
+      <file name="shadows.ts" path="F:\Projects\AIGymCoatch\mobile\src\theme\shadows.ts">
+        <metrics statements="5" coveredstatements="5" conditionals="2" coveredconditionals="2" methods="1" coveredmethods="1"/>
+        <line num="3" count="14" type="stmt"/>
+        <line num="10" count="14" type="stmt"/>
+        <line num="19" count="25" type="cond" truecount="2" falsecount="0"/>
+        <line num="20" count="2" type="stmt"/>
+        <line num="23" count="23" type="stmt"/>
+      </file>
+      <file name="spacing.ts" path="F:\Projects\AIGymCoatch\mobile\src\theme\spacing.ts">
+        <metrics statements="1" coveredstatements="1" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+        <line num="1" count="14" type="stmt"/>
+      </file>
+      <file name="typography.ts" path="F:\Projects\AIGymCoatch\mobile\src\theme\typography.ts">
+        <metrics statements="4" coveredstatements="4" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
+        <line num="1" count="14" type="stmt"/>
+        <line num="7" count="14" type="stmt"/>
+        <line num="15" count="14" type="stmt"/>
+        <line num="21" count="14" type="stmt"/>
+      </file>
+    </package>
+    <package name="theme.themes">
+      <metrics statements="4" coveredstatements="4" conditionals="4" coveredconditionals="4" methods="2" coveredmethods="2"/>
+      <file name="default.ts" path="F:\Projects\AIGymCoatch\mobile\src\theme\themes\default.ts">
+        <metrics statements="4" coveredstatements="4" conditionals="4" coveredconditionals="4" methods="2" coveredmethods="2"/>
+        <line num="28" count="25" type="cond" truecount="2" falsecount="0"/>
+        <line num="29" count="25" type="stmt"/>
+        <line num="30" count="25" type="stmt"/>
+        <line num="44" count="1" type="stmt"/>
+      </file>
+    </package>
+  </project>
+</coverage>

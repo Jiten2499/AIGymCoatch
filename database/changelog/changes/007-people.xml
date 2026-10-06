@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0014" author="lifefit-architecture">
+        <comment>Ticket: LF-0014. Staff, trainer, and member profiles extend a Part 2 user inside one tenant. They do not store passwords. BranchId is the primary branch only. Index review: PK on Id; UX_StaffProfiles_TenantId_UserId and the trainer and member equivalents stop a second active profile; UX employee and member codes are unique per tenant; IX_MemberProfiles_TenantId_Status supports member lists. Performance note: unique indexes are filtered so a removed profile can be recreated.</comment>
+        <sql splitStatements="false">
+            CREATE TABLE app.StaffProfiles
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                UserId UNIQUEIDENTIFIER NOT NULL,
+                EmployeeCode NVARCHAR(32) NOT NULL,
+                BranchId UNIQUEIDENTIFIER NULL,
+                StaffType NVARCHAR(32) NOT NULL,
+                JoiningDate DATE NOT NULL,
+                Status NVARCHAR(32) NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_StaffProfiles PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_StaffProfiles_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_StaffProfiles_Users FOREIGN KEY (UserId) REFERENCES app.Users (Id),
+                CONSTRAINT FK_StaffProfiles_Branches FOREIGN KEY (BranchId) REFERENCES app.Branches (Id),
+                CONSTRAINT CK_StaffProfiles_StaffType CHECK (StaffType IN (N'Trainer', N'Receptionist', N'Manager', N'Other')),
+                CONSTRAINT CK_StaffProfiles_Status CHECK (Status IN (N'Active', N'Inactive'))
+            );
+            CREATE UNIQUE INDEX UX_StaffProfiles_TenantId_UserId
+                ON app.StaffProfiles (TenantId, UserId) WHERE DeletedAt IS NULL;
+            CREATE UNIQUE INDEX UX_StaffProfiles_TenantId_EmployeeCode
+                ON app.StaffProfiles (TenantId, EmployeeCode) WHERE DeletedAt IS NULL;
+            CREATE INDEX IX_StaffProfiles_TenantId
+                ON app.StaffProfiles (TenantId, StaffType) WHERE DeletedAt IS NULL;
+
+            CREATE TABLE app.TrainerProfiles
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                UserId UNIQUEIDENTIFIER NOT NULL,
+                Bio NVARCHAR(2000) NULL,
+                Specialization NVARCHAR(200) NULL,
+                ExperienceYears INT NULL,
+                Certification NVARCHAR(500) NULL,
+                ProfileImageUrl NVARCHAR(500) NULL,
+                BranchId UNIQUEIDENTIFIER NULL,
+                Status NVARCHAR(32) NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_TrainerProfiles PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_TrainerProfiles_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_TrainerProfiles_Users FOREIGN KEY (UserId) REFERENCES app.Users (Id),
+                CONSTRAINT FK_TrainerProfiles_Branches FOREIGN KEY (BranchId) REFERENCES app.Branches (Id),
+                CONSTRAINT CK_TrainerProfiles_Status CHECK (Status IN (N'Active', N'Inactive'))
+            );
+            CREATE UNIQUE INDEX UX_TrainerProfiles_TenantId_UserId
+                ON app.TrainerProfiles (TenantId, UserId) WHERE DeletedAt IS NULL;
+
+            CREATE TABLE app.MemberProfiles
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                UserId UNIQUEIDENTIFIER NOT NULL,
+                MemberCode NVARCHAR(32) NOT NULL,
+                DateOfBirth DATE NULL,
+                Gender NVARCHAR(32) NULL,
+                EmergencyContactName NVARCHAR(200) NULL,
+                EmergencyContactPhone NVARCHAR(32) NULL,
+                Address NVARCHAR(300) NULL,
+                City NVARCHAR(100) NULL,
+                State NVARCHAR(100) NULL,
+                PostalCode NVARCHAR(20) NULL,
+                JoinDate DATE NOT NULL,
+                Status NVARCHAR(32) NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_MemberProfiles PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_MemberProfiles_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_MemberProfiles_Users FOREIGN KEY (UserId) REFERENCES app.Users (Id),
+                CONSTRAINT CK_MemberProfiles_Status CHECK (Status IN (N'Active', N'Inactive'))
+            );
+            CREATE UNIQUE INDEX UX_MemberProfiles_TenantId_UserId
+                ON app.MemberProfiles (TenantId, UserId) WHERE DeletedAt IS NULL;
+            CREATE UNIQUE INDEX UX_MemberProfiles_TenantId_MemberCode
+                ON app.MemberProfiles (TenantId, MemberCode) WHERE DeletedAt IS NULL;
+            CREATE INDEX IX_MemberProfiles_TenantId_Status
+                ON app.MemberProfiles (TenantId, Status, JoinDate) WHERE DeletedAt IS NULL;
+        </sql>
+        <rollback>
+            <sql splitStatements="false">
+                DROP TABLE app.MemberProfiles;
+                DROP TABLE app.TrainerProfiles;
+                DROP TABLE app.StaffProfiles;
+            </sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

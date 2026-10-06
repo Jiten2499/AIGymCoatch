@@ -1,0 +1,245 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0028" author="lifefit-architecture">
+        <comment>Ticket: LF-0028. Replace the per-tenant licensing model (TenantLicenses, FeatureFlags, PlanLimits, LicenseCapacityGrants, UserLicenseAssignments, LicenseOverrides) with an industry-standard subscription model: one Subscriptions table (a subscriber is a tenant or a user attached to a plan) and one SubscriptionSeats table (a paid seat on a subscription). Entitlements are computed live from the plan's features; there are no per-tenant feature copies or overrides. Index review: PK_Subscriptions on Id; UX_Subscriptions_TenantId enforces one active subscription per tenant (the entitlement lookup); IX_Subscriptions_UserId supports user subscriptions; IX_Subscriptions_ExpiresAt lists expiring subscriptions; PK_SubscriptionSeats on Id; IX_SubscriptionSeats_SubscriptionId_Status counts active seats; UX_SubscriptionSeats_Subscription_User stops a second active seat for the same person. Performance note: seat counts and entitlement checks filter by the parent key first, then a short status. Migration keeps each license Id as the subscription Id so assignments map onto seats by foreign key.</comment>
+        <sql splitStatements="false"><![CDATA[
+            CREATE TABLE app.Subscriptions
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                SubscriberType NVARCHAR(16) NOT NULL,
+                TenantId UNIQUEIDENTIFIER NULL,
+                UserId UNIQUEIDENTIFIER NULL,
+                PlanId UNIQUEIDENTIFIER NOT NULL,
+                Status NVARCHAR(16) NOT NULL,
+                StartsAt DATETIME2 NOT NULL,
+                ExpiresAt DATETIME2 NULL,
+                Seats INT NOT NULL CONSTRAINT DF_Subscriptions_Seats DEFAULT (0),
+                Notes NVARCHAR(500) NULL,
+                RevokedAt DATETIME2 NULL,
+                RevokedBy UNIQUEIDENTIFIER NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_Subscriptions PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_Subscriptions_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_Subscriptions_Users FOREIGN KEY (UserId) REFERENCES app.Users (Id),
+                CONSTRAINT FK_Subscriptions_Plans FOREIGN KEY (PlanId) REFERENCES app.Plans (Id),
+                CONSTRAINT CK_Subscriptions_SubscriberType CHECK (SubscriberType IN (N'Tenant', N'User')),
+                CONSTRAINT CK_Subscriptions_Status CHECK (Status IN (N'Active', N'Expired', N'Suspended', N'Cancelled')),
+                CONSTRAINT CK_Subscriptions_Seats CHECK (Seats >= 0),
+                CONSTRAINT CK_Subscriptions_Subscriber CHECK (
+                    (SubscriberType = N'Tenant' AND TenantId IS NOT NULL AND UserId IS NULL) OR
+                    (SubscriberType = N'User' AND UserId IS NOT NULL AND TenantId IS NULL))
+            );
+            CREATE UNIQUE INDEX UX_Subscriptions_TenantId
+                ON app.Subscriptions (TenantId) WHERE SubscriberType = N'Tenant' AND Status = N'Active' AND DeletedAt IS NULL;
+            CREATE UNIQUE INDEX UX_Subscriptions_UserId
+                ON app.Subscriptions (UserId) WHERE SubscriberType = N'User' AND Status = N'Active' AND DeletedAt IS NULL;
+            CREATE INDEX IX_Subscriptions_UserId ON app.Subscriptions (UserId) WHERE UserId IS NOT NULL;
+            CREATE INDEX IX_Subscriptions_ExpiresAt
+                ON app.Subscriptions (ExpiresAt) WHERE Status = N'Active' AND DeletedAt IS NULL AND ExpiresAt IS NOT NULL;
+
+            CREATE TABLE app.SubscriptionSeats
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                SubscriptionId UNIQUEIDENTIFIER NOT NULL,
+                UserId UNIQUEIDENTIFIER NOT NULL,
+                Status NVARCHAR(16) NOT NULL,
+                AssignedAt DATETIME2 NOT NULL,
+                AssignedBy UNIQUEIDENTIFIER NULL,
+                ReleasedAt DATETIME2 NULL,
+                ReleasedBy UNIQUEIDENTIFIER NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_SubscriptionSeats PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_SubscriptionSeats_Subscriptions FOREIGN KEY (SubscriptionId) REFERENCES app.Subscriptions (Id),
+                CONSTRAINT FK_SubscriptionSeats_Users FOREIGN KEY (UserId) REFERENCES app.Users (Id),
+                CONSTRAINT CK_SubscriptionSeats_Status CHECK (Status IN (N'Active', N'Released'))
+            );
+            CREATE INDEX IX_SubscriptionSeats_SubscriptionId_Status ON app.SubscriptionSeats (SubscriptionId, Status) WHERE DeletedAt IS NULL;
+            CREATE UNIQUE INDEX UX_SubscriptionSeats_Subscription_User
+                ON app.SubscriptionSeats (SubscriptionId, UserId) WHERE Status = N'Active' AND DeletedAt IS NULL;
+
+            -- Migrate every tenant license into a tenant subscription, keeping the same Id so seats map by foreign key.
+            INSERT INTO app.Subscriptions (Id, SubscriberType, TenantId, UserId, PlanId, Status, StartsAt, ExpiresAt, Seats, Notes, RevokedAt, RevokedBy, CreatedAt, UpdatedAt, DeletedAt, CreatedBy, UpdatedBy)
+            SELECT tl.Id, N'Tenant', tl.TenantId, NULL,
+                COALESCE(tl.PlanDefinitionId, fallback.Id),
+                CASE WHEN tl.Status = N'Revoked' THEN N'Cancelled' WHEN tl.Status = N'Scheduled' THEN N'Active' ELSE tl.Status END,
+                tl.StartsAt, tl.ExpiresAt, ISNULL(tl.BaseCapacity, 0), tl.Notes, tl.RevokedAt, tl.RevokedBy,
+                tl.CreatedAt, tl.UpdatedAt, tl.DeletedAt, tl.CreatedBy, tl.UpdatedBy
+            FROM app.TenantLicenses tl
+            OUTER APPLY (
+                SELECT TOP 1 p.Id FROM app.Plans p
+                WHERE p.Code = CASE tl.[Plan]
+                    WHEN N'Free' THEN N'BUSINESS_FREE'
+                    WHEN N'Basic' THEN N'BASIC'
+                    WHEN N'Pro' THEN N'PRO'
+                    ELSE N'ENTERPRISE' END
+            ) fallback;
+
+            -- Migrate each user license assignment into a seat on its subscription.
+            INSERT INTO app.SubscriptionSeats (Id, SubscriptionId, UserId, Status, AssignedAt, AssignedBy, ReleasedAt, ReleasedBy, CreatedAt, UpdatedAt, DeletedAt, CreatedBy, UpdatedBy)
+            SELECT ula.Id, ula.TenantLicenseId, ula.UserId,
+                CASE WHEN ula.Status = N'Active' THEN N'Active' ELSE N'Released' END,
+                ula.AssignedAt, ula.AssignedBy, ula.RevokedAt, ula.RevokedBy,
+                ula.CreatedAt, ula.UpdatedAt, ula.DeletedAt, ula.CreatedBy, ula.UpdatedBy
+            FROM app.UserLicenseAssignments ula;
+
+            -- Drop the retired licensing tables (children first).
+            DROP TABLE app.LicenseOverrides;
+            DROP TABLE app.UserLicenseAssignments;
+            DROP TABLE app.LicenseCapacityGrants;
+            DROP TABLE app.PlanLimits;
+            DROP TABLE app.FeatureFlags;
+            DROP TABLE app.TenantLicenses;
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                -- Schema rollback. Recreate the retired licensing tables so the 005/017 rollbacks stay valid.
+                -- Row data from the subscription model is not reconstructed.
+                CREATE TABLE app.TenantLicenses
+                (
+                    Id UNIQUEIDENTIFIER NOT NULL,
+                    TenantId UNIQUEIDENTIFIER NOT NULL,
+                    [Plan] NVARCHAR(32) NOT NULL,
+                    Status NVARCHAR(32) NOT NULL,
+                    StartsAt DATETIME2 NOT NULL,
+                    ExpiresAt DATETIME2 NULL,
+                    CreatedAt DATETIME2 NOT NULL,
+                    UpdatedAt DATETIME2 NOT NULL,
+                    DeletedAt DATETIME2 NULL,
+                    CreatedBy UNIQUEIDENTIFIER NULL,
+                    UpdatedBy UNIQUEIDENTIFIER NULL,
+                    PlanDefinitionId UNIQUEIDENTIFIER NULL,
+                    BaseCapacity INT NOT NULL CONSTRAINT DF_TenantLicenses_BaseCapacity DEFAULT (0),
+                    Notes NVARCHAR(500) NULL,
+                    RevokedAt DATETIME2 NULL,
+                    RevokedBy UNIQUEIDENTIFIER NULL,
+                    RowVersion ROWVERSION NOT NULL,
+                    CONSTRAINT PK_TenantLicenses PRIMARY KEY CLUSTERED (Id),
+                    CONSTRAINT FK_TenantLicenses_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                    CONSTRAINT FK_TenantLicenses_Plans FOREIGN KEY (PlanDefinitionId) REFERENCES app.Plans (Id),
+                    CONSTRAINT CK_TenantLicenses_Plan CHECK ([Plan] IN (N'Free', N'Basic', N'Pro', N'Enterprise')),
+                    CONSTRAINT CK_TenantLicenses_Status CHECK (Status IN (N'Active', N'Expired', N'Suspended', N'Cancelled', N'Scheduled', N'Revoked'))
+                );
+                CREATE UNIQUE INDEX UX_TenantLicenses_TenantId ON app.TenantLicenses (TenantId) WHERE Status = N'Active' AND DeletedAt IS NULL;
+                CREATE INDEX IX_TenantLicenses_TenantId_ExpiresAt ON app.TenantLicenses (TenantId, ExpiresAt) WHERE DeletedAt IS NULL;
+                CREATE INDEX IX_TenantLicenses_ExpiresAt ON app.TenantLicenses (ExpiresAt) WHERE Status = N'Active' AND DeletedAt IS NULL AND ExpiresAt IS NOT NULL;
+
+                CREATE TABLE app.FeatureFlags
+                (
+                    Id UNIQUEIDENTIFIER NOT NULL,
+                    LicenseId UNIQUEIDENTIFIER NOT NULL,
+                    FeatureCode NVARCHAR(64) NOT NULL,
+                    [Enabled] BIT NOT NULL,
+                    CreatedAt DATETIME2 NOT NULL,
+                    UpdatedAt DATETIME2 NOT NULL,
+                    RowVersion ROWVERSION NOT NULL,
+                    CONSTRAINT PK_FeatureFlags PRIMARY KEY CLUSTERED (Id),
+                    CONSTRAINT FK_FeatureFlags_TenantLicenses FOREIGN KEY (LicenseId) REFERENCES app.TenantLicenses (Id)
+                );
+                CREATE UNIQUE INDEX UX_FeatureFlags_LicenseId_FeatureCode ON app.FeatureFlags (LicenseId, FeatureCode);
+
+                CREATE TABLE app.PlanLimits
+                (
+                    Id UNIQUEIDENTIFIER NOT NULL,
+                    PlanId UNIQUEIDENTIFIER NOT NULL,
+                    LimitCode NVARCHAR(64) NOT NULL,
+                    LimitValue DECIMAL(18, 2) NOT NULL,
+                    CreatedAt DATETIME2 NOT NULL,
+                    UpdatedAt DATETIME2 NOT NULL,
+                    RowVersion ROWVERSION NOT NULL,
+                    CONSTRAINT PK_PlanLimits PRIMARY KEY CLUSTERED (Id),
+                    CONSTRAINT FK_PlanLimits_Plans FOREIGN KEY (PlanId) REFERENCES app.Plans (Id)
+                );
+                CREATE UNIQUE INDEX UX_PlanLimits_PlanId_LimitCode ON app.PlanLimits (PlanId, LimitCode);
+
+                CREATE TABLE app.LicenseCapacityGrants
+                (
+                    Id UNIQUEIDENTIFIER NOT NULL,
+                    TenantLicenseId UNIQUEIDENTIFIER NOT NULL,
+                    Quantity INT NOT NULL,
+                    StartsAt DATETIME2 NOT NULL,
+                    ExpiresAt DATETIME2 NULL,
+                    Status NVARCHAR(32) NOT NULL,
+                    GrantedBy UNIQUEIDENTIFIER NULL,
+                    Reason NVARCHAR(500) NULL,
+                    RevokedAt DATETIME2 NULL,
+                    CreatedAt DATETIME2 NOT NULL,
+                    UpdatedAt DATETIME2 NOT NULL,
+                    DeletedAt DATETIME2 NULL,
+                    CreatedBy UNIQUEIDENTIFIER NULL,
+                    UpdatedBy UNIQUEIDENTIFIER NULL,
+                    RowVersion ROWVERSION NOT NULL,
+                    CONSTRAINT PK_LicenseCapacityGrants PRIMARY KEY CLUSTERED (Id),
+                    CONSTRAINT FK_LicenseCapacityGrants_TenantLicenses FOREIGN KEY (TenantLicenseId) REFERENCES app.TenantLicenses (Id),
+                    CONSTRAINT CK_LicenseCapacityGrants_Quantity CHECK (Quantity > 0)
+                );
+                CREATE INDEX IX_LicenseCapacityGrants_TenantLicenseId ON app.LicenseCapacityGrants (TenantLicenseId) WHERE Status = N'Active' AND DeletedAt IS NULL;
+
+                CREATE TABLE app.UserLicenseAssignments
+                (
+                    Id UNIQUEIDENTIFIER NOT NULL,
+                    TenantId UNIQUEIDENTIFIER NOT NULL,
+                    TenantLicenseId UNIQUEIDENTIFIER NOT NULL,
+                    UserId UNIQUEIDENTIFIER NOT NULL,
+                    Status NVARCHAR(32) NOT NULL,
+                    AssignedAt DATETIME2 NOT NULL,
+                    AssignedBy UNIQUEIDENTIFIER NULL,
+                    RevokedAt DATETIME2 NULL,
+                    RevokedBy UNIQUEIDENTIFIER NULL,
+                    Notes NVARCHAR(500) NULL,
+                    CreatedAt DATETIME2 NOT NULL,
+                    UpdatedAt DATETIME2 NOT NULL,
+                    DeletedAt DATETIME2 NULL,
+                    CreatedBy UNIQUEIDENTIFIER NULL,
+                    UpdatedBy UNIQUEIDENTIFIER NULL,
+                    RowVersion ROWVERSION NOT NULL,
+                    CONSTRAINT PK_UserLicenseAssignments PRIMARY KEY CLUSTERED (Id),
+                    CONSTRAINT FK_UserLicenseAssignments_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                    CONSTRAINT FK_UserLicenseAssignments_TenantLicenses FOREIGN KEY (TenantLicenseId) REFERENCES app.TenantLicenses (Id),
+                    CONSTRAINT FK_UserLicenseAssignments_Users FOREIGN KEY (UserId) REFERENCES app.Users (Id)
+                );
+                CREATE INDEX IX_UserLicenseAssignments_LicenseId_Status ON app.UserLicenseAssignments (TenantLicenseId, Status) WHERE DeletedAt IS NULL;
+                CREATE UNIQUE INDEX UX_UserLicenseAssignments_License_User ON app.UserLicenseAssignments (TenantLicenseId, UserId) WHERE Status = N'Active' AND DeletedAt IS NULL;
+
+                CREATE TABLE app.LicenseOverrides
+                (
+                    Id UNIQUEIDENTIFIER NOT NULL,
+                    TenantId UNIQUEIDENTIFIER NOT NULL,
+                    FeatureCode NVARCHAR(64) NOT NULL,
+                    [Enabled] BIT NOT NULL,
+                    StartsAt DATETIME2 NOT NULL,
+                    ExpiresAt DATETIME2 NULL,
+                    Status NVARCHAR(32) NOT NULL,
+                    GrantedBy UNIQUEIDENTIFIER NULL,
+                    Reason NVARCHAR(500) NULL,
+                    RevokedAt DATETIME2 NULL,
+                    CreatedAt DATETIME2 NOT NULL,
+                    UpdatedAt DATETIME2 NOT NULL,
+                    DeletedAt DATETIME2 NULL,
+                    CreatedBy UNIQUEIDENTIFIER NULL,
+                    UpdatedBy UNIQUEIDENTIFIER NULL,
+                    RowVersion ROWVERSION NOT NULL,
+                    CONSTRAINT PK_LicenseOverrides PRIMARY KEY CLUSTERED (Id),
+                    CONSTRAINT FK_LicenseOverrides_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id)
+                );
+                CREATE INDEX IX_LicenseOverrides_TenantId_FeatureCode ON app.LicenseOverrides (TenantId, FeatureCode) WHERE Status = N'Active' AND DeletedAt IS NULL;
+
+                DROP TABLE app.SubscriptionSeats;
+                DROP TABLE app.Subscriptions;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

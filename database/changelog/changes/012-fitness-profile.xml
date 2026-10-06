@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0019" author="lifefit-architecture">
+        <comment>Ticket: LF-0019. User fitness profile, goals, measurements, and body-scan metadata. A profile belongs to one user inside one tenant, so personal and gym workspaces stay separate. Measurements are append-only history. Scan rows store an object-storage key, not a file. Index review: unique profile and nutrition-style user/tenant keys; IX_FitnessGoals_User_Status for the active-goal list; IX_BodyMeasurements_User_Date and IX_BodyScanRecords_User_Date for history. No index on every measurement column. Performance note: dashboard and history queries lead with UserId and TenantId.</comment>
+        <sql splitStatements="false"><![CDATA[
+            CREATE TABLE app.FitnessProfiles
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                UserId UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                UnitSystem NVARCHAR(16) NOT NULL,
+                Height DECIMAL(6,2) NULL,
+                Weight DECIMAL(8,2) NULL,
+                FitnessLevel NVARCHAR(32) NOT NULL,
+                PrimaryGoal NVARCHAR(32) NOT NULL,
+                ActivityLevel NVARCHAR(32) NOT NULL,
+                TrainingExperience NVARCHAR(500) NULL,
+                PreferredWorkoutDays INT NOT NULL,
+                PreferredWorkoutDuration INT NOT NULL,
+                PreferredTrainingLocation NVARCHAR(100) NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_FitnessProfiles PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_FitnessProfiles_Users FOREIGN KEY (UserId) REFERENCES app.Users (Id),
+                CONSTRAINT FK_FitnessProfiles_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT CK_FitnessProfiles_Unit CHECK (UnitSystem IN (N'Metric', N'Imperial')),
+                CONSTRAINT CK_FitnessProfiles_Level CHECK (FitnessLevel IN (N'Beginner', N'Intermediate', N'Advanced')),
+                CONSTRAINT CK_FitnessProfiles_Goal CHECK (PrimaryGoal IN (N'FatLoss', N'MuscleGain', N'Strength', N'Endurance', N'GeneralFitness', N'Mobility', N'WeightMaintenance')),
+                CONSTRAINT CK_FitnessProfiles_Activity CHECK (ActivityLevel IN (N'Sedentary', N'Light', N'Moderate', N'Active', N'VeryActive')),
+                CONSTRAINT CK_FitnessProfiles_Days CHECK (PreferredWorkoutDays BETWEEN 0 AND 7),
+                CONSTRAINT CK_FitnessProfiles_Duration CHECK (PreferredWorkoutDuration BETWEEN 0 AND 300)
+            );
+            CREATE UNIQUE INDEX UX_FitnessProfiles_User_Tenant ON app.FitnessProfiles (UserId, TenantId) WHERE DeletedAt IS NULL;
+
+            CREATE TABLE app.FitnessGoals
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                UserId UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                GoalType NVARCHAR(32) NOT NULL,
+                TargetValue DECIMAL(12,2) NULL,
+                CurrentValue DECIMAL(12,2) NULL,
+                StartDate DATE NOT NULL,
+                TargetDate DATE NULL,
+                Status NVARCHAR(32) NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_FitnessGoals PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_FitnessGoals_Users FOREIGN KEY (UserId) REFERENCES app.Users (Id),
+                CONSTRAINT FK_FitnessGoals_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT CK_FitnessGoals_Type CHECK (GoalType IN (N'FatLoss', N'MuscleGain', N'Strength', N'Endurance', N'GeneralFitness', N'Mobility', N'WeightMaintenance')),
+                CONSTRAINT CK_FitnessGoals_Status CHECK (Status IN (N'Active', N'Completed', N'Cancelled'))
+            );
+            CREATE INDEX IX_FitnessGoals_User_Status ON app.FitnessGoals (UserId, TenantId, Status, StartDate) WHERE DeletedAt IS NULL;
+
+            CREATE TABLE app.BodyMeasurements
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                UserId UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                UnitSystem NVARCHAR(16) NOT NULL,
+                MeasurementDate DATE NOT NULL,
+                Weight DECIMAL(8,2) NULL,
+                BodyFatPercentage DECIMAL(5,2) NULL,
+                Chest DECIMAL(8,2) NULL,
+                Waist DECIMAL(8,2) NULL,
+                Hip DECIMAL(8,2) NULL,
+                Arm DECIMAL(8,2) NULL,
+                Thigh DECIMAL(8,2) NULL,
+                Notes NVARCHAR(500) NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_BodyMeasurements PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_BodyMeasurements_Users FOREIGN KEY (UserId) REFERENCES app.Users (Id),
+                CONSTRAINT FK_BodyMeasurements_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT CK_BodyMeasurements_Unit CHECK (UnitSystem IN (N'Metric', N'Imperial')),
+                CONSTRAINT CK_BodyMeasurements_Fat CHECK (BodyFatPercentage IS NULL OR BodyFatPercentage BETWEEN 0 AND 100)
+            );
+            CREATE INDEX IX_BodyMeasurements_User_Date ON app.BodyMeasurements (UserId, TenantId, MeasurementDate);
+
+            CREATE TABLE app.BodyScanRecords
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                UserId UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                ScanDate DATE NOT NULL,
+                Source NVARCHAR(32) NOT NULL,
+                StorageReference NVARCHAR(200) NOT NULL,
+                Status NVARCHAR(32) NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                CONSTRAINT PK_BodyScanRecords PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_BodyScanRecords_Users FOREIGN KEY (UserId) REFERENCES app.Users (Id),
+                CONSTRAINT FK_BodyScanRecords_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT CK_BodyScanRecords_Source CHECK (Source IN (N'Manual', N'Device', N'Import')),
+                CONSTRAINT CK_BodyScanRecords_Status CHECK (Status IN (N'Pending', N'Stored', N'Failed'))
+            );
+            CREATE INDEX IX_BodyScanRecords_User_Date ON app.BodyScanRecords (UserId, TenantId, ScanDate);
+        ]]></sql>
+        <rollback>
+            <sql>DROP TABLE app.BodyScanRecords; DROP TABLE app.BodyMeasurements; DROP TABLE app.FitnessGoals; DROP TABLE app.FitnessProfiles;</sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

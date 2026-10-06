@@ -1,0 +1,28 @@
+---
+description: How Cursor should change the LifeFit AI codebase
+alwaysApply: true
+---
+
+# AI development
+
+- Read `AGENTS.md` before adding a project, package, or architectural pattern.
+- Explain the plan before editing. Generate production-ready code. Never leave TODOs.
+- Build the requested slice only. Do not start payments, notification delivery, or Part 6.
+- Never create EF Core migrations. Database schema changes belong under `/database`. Liquibase is the schema source of truth.
+- Never bypass tenant isolation or trust a client-provided tenant id.
+- Never store raw refresh tokens or log passwords and authentication secrets.
+- Never assign SuperAdmin during normal registration.
+- Never expose sensitive user data to AI unnecessarily. Never hardcode AI provider secrets.
+- Never trust raw AI output as domain data. Validate structured AI data before persistence.
+- AI providers stay behind an abstraction. Do not expose internal system prompts.
+- Respect license and feature gating. Do not duplicate existing identity or business models.
+- Never duplicate a user account for a business membership. `TenantMember` is workspace access. `GymMembership` is the business membership.
+- Use permission-based authorization and the existing license and feature-flag services.
+- Do not expose EF entities directly from APIs. Keep business rules in the domain and application layers.
+- When a feature changes the database: identify the schema change, add the Liquibase changeset under `/database`, review indexes and constraints, update EF Core mappings if required, add or update application tests, and confirm Liquibase remains the schema source of truth.
+- Match the existing layer. A new endpoint needs a thin controller, a MediatR request, a handler, and a validator.
+- Do not put EF Core queries in controllers or React components.
+- Pin MediatR to 12.x and FluentAssertions to 7.x unless the user adopts the commercial licenses.
+- Keep new files under 300 lines.
+- Run the build and tests for the area you changed before handing the work back.
+- If a change affects `web/` UI, verify the flow in the browser, not only by reading the component.

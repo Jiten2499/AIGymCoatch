@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0009" author="lifefit-architecture">
+        <comment>Ticket: LF-0009. Create tenant licenses and feature flags. Index review: PK_TenantLicenses on Id; UX_TenantLicenses_TenantId allows one Active license per tenant, which is the feature-gate lookup; IX_TenantLicenses_TenantId_ExpiresAt supports "which license is current" including expired rows the unique index excludes; UX_FeatureFlags_LicenseId_FeatureCode prevents a duplicate flag and is the enablement lookup. Status is not indexed alone because license checks always start from TenantId. Performance note: both unique indexes are narrow and filtered or prefixed by the parent key.</comment>
+        <sql splitStatements="false">
+            CREATE TABLE app.TenantLicenses
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                [Plan] NVARCHAR(32) NOT NULL,
+                Status NVARCHAR(32) NOT NULL,
+                StartsAt DATETIME2 NOT NULL,
+                ExpiresAt DATETIME2 NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_TenantLicenses PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_TenantLicenses_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT CK_TenantLicenses_Plan CHECK ([Plan] IN (N'Free', N'Basic', N'Pro', N'Enterprise')),
+                CONSTRAINT CK_TenantLicenses_Status CHECK (Status IN (N'Active', N'Expired', N'Suspended', N'Cancelled'))
+            );
+            CREATE UNIQUE INDEX UX_TenantLicenses_TenantId
+                ON app.TenantLicenses (TenantId) WHERE Status = N'Active' AND DeletedAt IS NULL;
+            CREATE INDEX IX_TenantLicenses_TenantId_ExpiresAt
+                ON app.TenantLicenses (TenantId, ExpiresAt) WHERE DeletedAt IS NULL;
+
+            CREATE TABLE app.FeatureFlags
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                LicenseId UNIQUEIDENTIFIER NOT NULL,
+                FeatureCode NVARCHAR(64) NOT NULL,
+                [Enabled] BIT NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_FeatureFlags PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_FeatureFlags_TenantLicenses FOREIGN KEY (LicenseId) REFERENCES app.TenantLicenses (Id)
+            );
+            CREATE UNIQUE INDEX UX_FeatureFlags_LicenseId_FeatureCode
+                ON app.FeatureFlags (LicenseId, FeatureCode);
+        </sql>
+        <rollback>
+            <sql splitStatements="false">
+                DROP TABLE app.FeatureFlags;
+                DROP TABLE app.TenantLicenses;
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="LF-0010" author="lifefit-architecture">
+        <comment>Ticket: LF-0010. Create refresh-token and password-reset storage. Only hashes are stored. Index review: PK on Id; UX_RefreshTokens_TokenHash and UX_PasswordResetTokens_TokenHash are the presented-token lookup; IX_RefreshTokens_UserId covers active-token revocation for one user; IX_RefreshTokens_ReplacedByTokenId supports the replacement foreign key; IX_PasswordResetTokens_UserId supports the user foreign key. ExpiresAt is the second column of the user index because revocation lists active rows for a user rather than scanning by expiry alone. Performance note: hash indexes are unique and equal to the lookup predicate.</comment>
+        <sql splitStatements="false">
+            CREATE TABLE app.RefreshTokens
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                UserId UNIQUEIDENTIFIER NOT NULL,
+                TokenHash NVARCHAR(128) NOT NULL,
+                ExpiresAt DATETIME2 NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                RevokedAt DATETIME2 NULL,
+                ReplacedByTokenId UNIQUEIDENTIFIER NULL,
+                CreatedByIp NVARCHAR(64) NULL,
+                RevokedByIp NVARCHAR(64) NULL,
+                UserAgent NVARCHAR(512) NULL,
+                CONSTRAINT PK_RefreshTokens PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_RefreshTokens_Users FOREIGN KEY (UserId) REFERENCES app.Users (Id),
+                CONSTRAINT FK_RefreshTokens_RefreshTokens FOREIGN KEY (ReplacedByTokenId) REFERENCES app.RefreshTokens (Id)
+            );
+            CREATE UNIQUE INDEX UX_RefreshTokens_TokenHash ON app.RefreshTokens (TokenHash);
+            CREATE INDEX IX_RefreshTokens_UserId ON app.RefreshTokens (UserId, ExpiresAt) WHERE RevokedAt IS NULL;
+            CREATE INDEX IX_RefreshTokens_ReplacedByTokenId ON app.RefreshTokens (ReplacedByTokenId) WHERE ReplacedByTokenId IS NOT NULL;
+
+            CREATE TABLE app.PasswordResetTokens
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                UserId UNIQUEIDENTIFIER NOT NULL,
+                TokenHash NVARCHAR(128) NOT NULL,
+                ExpiresAt DATETIME2 NOT NULL,
+                UsedAt DATETIME2 NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                CONSTRAINT PK_PasswordResetTokens PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_PasswordResetTokens_Users FOREIGN KEY (UserId) REFERENCES app.Users (Id)
+            );
+            CREATE UNIQUE INDEX UX_PasswordResetTokens_TokenHash ON app.PasswordResetTokens (TokenHash);
+            CREATE INDEX IX_PasswordResetTokens_UserId ON app.PasswordResetTokens (UserId);
+        </sql>
+        <rollback>
+            <sql splitStatements="false">
+                DROP TABLE app.PasswordResetTokens;
+                DROP TABLE app.RefreshTokens;
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="LF-0011" author="lifefit-architecture">
+        <comment>Ticket: LF-0011. Create AuditLogs for identity and licensing changes. Index review: PK_AuditLogs on Id; IX_AuditLogs_TenantId_CreatedAt serves workspace history in time order; IX_AuditLogs_UserId_CreatedAt serves one user's security history. Entity plus EntityId is not indexed because Part 2 does not query audit rows by entity. Performance note: both secondary indexes match the only planned filters and lead with the equality column.</comment>
+        <sql splitStatements="false">
+            CREATE TABLE app.AuditLogs
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NULL,
+                UserId UNIQUEIDENTIFIER NULL,
+                Action NVARCHAR(64) NOT NULL,
+                Entity NVARCHAR(64) NOT NULL,
+                EntityId UNIQUEIDENTIFIER NULL,
+                OldValues NVARCHAR(MAX) NULL,
+                NewValues NVARCHAR(MAX) NULL,
+                IPAddress NVARCHAR(64) NULL,
+                UserAgent NVARCHAR(512) NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                CONSTRAINT PK_AuditLogs PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_AuditLogs_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_AuditLogs_Users FOREIGN KEY (UserId) REFERENCES app.Users (Id)
+            );
+            CREATE INDEX IX_AuditLogs_TenantId_CreatedAt ON app.AuditLogs (TenantId, CreatedAt) WHERE TenantId IS NOT NULL;
+            CREATE INDEX IX_AuditLogs_UserId_CreatedAt ON app.AuditLogs (UserId, CreatedAt) WHERE UserId IS NOT NULL;
+        </sql>
+        <rollback>
+            <sql>DROP TABLE app.AuditLogs;</sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

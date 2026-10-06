@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0003" author="lifefit-architecture">
+        <comment>Ticket: LF-0003. Create Tenants. Index review: clustered PK_Tenants on Id. OwnerUserId is nullable until Users exists, so its index and foreign key are added in LF-0005. TenantType and Status are not indexed: Part 2 does not list tenants by those columns. Performance note: the table is empty at creation and the statement only updates metadata.</comment>
+        <sql splitStatements="false">
+            CREATE TABLE app.Tenants
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                Name NVARCHAR(200) NOT NULL,
+                TenantType NVARCHAR(32) NOT NULL,
+                Status NVARCHAR(32) NOT NULL,
+                OwnerUserId UNIQUEIDENTIFIER NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_Tenants PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT CK_Tenants_TenantType CHECK (TenantType IN (N'Personal', N'Gym', N'YogaStudio', N'CrossFit', N'Physio', N'Corporate')),
+                CONSTRAINT CK_Tenants_Status CHECK (Status IN (N'Active', N'Suspended', N'Inactive'))
+            );
+        </sql>
+        <rollback>
+            <sql>DROP TABLE app.Tenants;</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="LF-0004" author="lifefit-architecture">
+        <comment>Ticket: LF-0004. Create Users. TenantId is the personal tenant, never a business workspace. Index review: PK_Users on Id; IX_Users_TenantId supports the personal-tenant foreign key and owner lookup; UX_Users_Email is the login and uniqueness key for active rows; UX_Users_Phone enforces uniqueness only when a phone is stored. Performance note: both unique indexes are filtered, so soft-deleted rows do not block reuse and the phone index stays narrow.</comment>
+        <sql splitStatements="false">
+            CREATE TABLE app.Users
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                Email NVARCHAR(256) NOT NULL,
+                Phone NVARCHAR(32) NULL,
+                PasswordHash NVARCHAR(512) NOT NULL,
+                PasswordSalt NVARCHAR(128) NOT NULL,
+                FirstName NVARCHAR(100) NOT NULL,
+                LastName NVARCHAR(100) NOT NULL,
+                Status NVARCHAR(32) NOT NULL,
+                LastLoginAt DATETIME2 NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_Users PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_Users_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT CK_Users_Status CHECK (Status IN (N'Active', N'Disabled'))
+            );
+            CREATE INDEX IX_Users_TenantId ON app.Users (TenantId);
+            CREATE UNIQUE INDEX UX_Users_Email ON app.Users (Email) WHERE DeletedAt IS NULL;
+            CREATE UNIQUE INDEX UX_Users_Phone ON app.Users (Phone) WHERE Phone IS NOT NULL AND DeletedAt IS NULL;
+        </sql>
+        <rollback>
+            <sql splitStatements="false">
+                DROP TABLE app.Users;
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="LF-0005" author="lifefit-architecture">
+        <comment>Ticket: LF-0005. Add Tenants.OwnerUserId foreign key after Users exists so the two tables can be created without a circular dependency. Index review: IX_Tenants_OwnerUserId supports the foreign key and "tenants owned by this user". Filtered to non-null owners so personal rows that are not yet linked are not indexed. Performance note: the index is created on an empty column and does not scan user pages.</comment>
+        <sql splitStatements="false">
+            ALTER TABLE app.Tenants
+                ADD CONSTRAINT FK_Tenants_Users FOREIGN KEY (OwnerUserId) REFERENCES app.Users (Id);
+            CREATE INDEX IX_Tenants_OwnerUserId ON app.Tenants (OwnerUserId) WHERE OwnerUserId IS NOT NULL;
+        </sql>
+        <rollback>
+            <sql splitStatements="false">
+                DROP INDEX IX_Tenants_OwnerUserId ON app.Tenants;
+                ALTER TABLE app.Tenants DROP CONSTRAINT FK_Tenants_Users;
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="LF-0006" author="lifefit-architecture">
+        <comment>Ticket: LF-0006. Create TenantMembers for workspace membership. Index review: PK_TenantMembers on Id; UX_TenantMembers_TenantId_UserId prevents a second active membership and serves tenant-to-member lookups; IX_TenantMembers_UserId serves "workspaces for this user", which is the switcher query. Performance note: the unique index is filtered to active rows so a removed membership can be replaced.</comment>
+        <sql splitStatements="false">
+            CREATE TABLE app.TenantMembers
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                UserId UNIQUEIDENTIFIER NOT NULL,
+                Status NVARCHAR(32) NOT NULL,
+                JoinedAt DATETIME2 NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_TenantMembers PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_TenantMembers_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_TenantMembers_Users FOREIGN KEY (UserId) REFERENCES app.Users (Id),
+                CONSTRAINT CK_TenantMembers_Status CHECK (Status IN (N'Active', N'Removed'))
+            );
+            CREATE UNIQUE INDEX UX_TenantMembers_TenantId_UserId ON app.TenantMembers (TenantId, UserId) WHERE DeletedAt IS NULL;
+            CREATE INDEX IX_TenantMembers_UserId ON app.TenantMembers (UserId, TenantId) WHERE DeletedAt IS NULL;
+        </sql>
+        <rollback>
+            <sql>DROP TABLE app.TenantMembers;</sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

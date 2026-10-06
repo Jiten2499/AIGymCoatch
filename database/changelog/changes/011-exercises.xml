@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0018" author="lifefit-architecture">
+        <comment>Ticket: LF-0018. Exercise library. TenantId NULL is a system exercise and is immutable to tenants. A non-null TenantId is a custom exercise owned by that workspace. Index review: PK_Exercises; UX_Exercises_SystemName enforces one live system name; UX_Exercises_TenantId_Name enforces one live custom name per tenant; IX_Exercises_Catalog serves the active system list. Performance note: catalog reads filter IsActive and DeletedAt, so both unique indexes are filtered and the system list does not scan custom rows.</comment>
+        <sql splitStatements="false"><![CDATA[
+            CREATE TABLE app.Exercises
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NULL,
+                Name NVARCHAR(200) NOT NULL,
+                Description NVARCHAR(1000) NULL,
+                Instructions NVARCHAR(2000) NULL,
+                MuscleGroup NVARCHAR(32) NOT NULL,
+                Equipment NVARCHAR(100) NULL,
+                ExerciseType NVARCHAR(32) NOT NULL,
+                Difficulty NVARCHAR(32) NOT NULL,
+                VideoUrl NVARCHAR(500) NULL,
+                ImageUrl NVARCHAR(500) NULL,
+                IsActive BIT NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_Exercises PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_Exercises_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT CK_Exercises_MuscleGroup CHECK (MuscleGroup IN (N'Chest', N'Back', N'Shoulders', N'Biceps', N'Triceps', N'Legs', N'Glutes', N'Core', N'FullBody', N'Cardio', N'Mobility')),
+                CONSTRAINT CK_Exercises_Type CHECK (ExerciseType IN (N'Strength', N'Cardio', N'Mobility', N'Stretching', N'Bodyweight')),
+                CONSTRAINT CK_Exercises_Difficulty CHECK (Difficulty IN (N'Beginner', N'Intermediate', N'Advanced'))
+            );
+            CREATE UNIQUE INDEX UX_Exercises_SystemName ON app.Exercises (Name) WHERE TenantId IS NULL AND DeletedAt IS NULL;
+            CREATE UNIQUE INDEX UX_Exercises_TenantId_Name ON app.Exercises (TenantId, Name) WHERE TenantId IS NOT NULL AND DeletedAt IS NULL;
+            CREATE INDEX IX_Exercises_Catalog ON app.Exercises (Name) WHERE TenantId IS NULL AND DeletedAt IS NULL AND IsActive = 1;
+
+            INSERT INTO app.Exercises (Id, TenantId, Name, Description, Instructions, MuscleGroup, Equipment, ExerciseType, Difficulty, IsActive, CreatedAt, UpdatedAt)
+            VALUES
+                ('33333333-3333-4333-8333-333333333001', NULL, N'Barbell Bench Press', N'Horizontal press.', N'Lower the bar to the chest and press up.', N'Chest', N'Barbell', N'Strength', N'Beginner', 1, SYSUTCDATETIME(), SYSUTCDATETIME()),
+                ('33333333-3333-4333-8333-333333333002', NULL, N'Bent Over Row', N'Horizontal pull.', N'Pull the bar to the lower ribs.', N'Back', N'Barbell', N'Strength', N'Beginner', 1, SYSUTCDATETIME(), SYSUTCDATETIME()),
+                ('33333333-3333-4333-8333-333333333003', NULL, N'Overhead Press', N'Vertical press.', N'Press the bar overhead from the shoulders.', N'Shoulders', N'Barbell', N'Strength', N'Beginner', 1, SYSUTCDATETIME(), SYSUTCDATETIME()),
+                ('33333333-3333-4333-8333-333333333004', NULL, N'Dumbbell Curl', N'Elbow flexion.', N'Curl the dumbbells without swinging.', N'Biceps', N'Dumbbell', N'Strength', N'Beginner', 1, SYSUTCDATETIME(), SYSUTCDATETIME()),
+                ('33333333-3333-4333-8333-333333333005', NULL, N'Tricep Pushdown', N'Elbow extension.', N'Push the cable down and control the return.', N'Triceps', N'Cable', N'Strength', N'Beginner', 1, SYSUTCDATETIME(), SYSUTCDATETIME()),
+                ('33333333-3333-4333-8333-333333333006', NULL, N'Back Squat', N'Knee-dominant squat.', N'Squat to a comfortable depth and stand.', N'Legs', N'Barbell', N'Strength', N'Intermediate', 1, SYSUTCDATETIME(), SYSUTCDATETIME()),
+                ('33333333-3333-4333-8333-333333333007', NULL, N'Romanian Deadlift', N'Hip hinge.', N'Hinge until the hamstrings load, then stand.', N'Glutes', N'Barbell', N'Strength', N'Intermediate', 1, SYSUTCDATETIME(), SYSUTCDATETIME()),
+                ('33333333-3333-4333-8333-333333333008', NULL, N'Plank', N'Core hold.', N'Hold a straight line from head to heels.', N'Core', N'None', N'Bodyweight', N'Beginner', 1, SYSUTCDATETIME(), SYSUTCDATETIME()),
+                ('33333333-3333-4333-8333-333333333009', NULL, N'Burpee', N'Full-body conditioning.', N'Move from a squat to a plank and stand.', N'FullBody', N'None', N'Bodyweight', N'Intermediate', 1, SYSUTCDATETIME(), SYSUTCDATETIME()),
+                ('33333333-3333-4333-8333-333333333010', NULL, N'Treadmill Run', N'Steady cardio.', N'Run or walk at a steady pace.', N'Cardio', N'Treadmill', N'Cardio', N'Beginner', 1, SYSUTCDATETIME(), SYSUTCDATETIME()),
+                ('33333333-3333-4333-8333-333333333011', NULL, N'Hip Flexor Stretch', N'Mobility hold.', N'Hold a gentle hip-flexor stretch.', N'Mobility', N'None', N'Stretching', N'Beginner', 1, SYSUTCDATETIME(), SYSUTCDATETIME()),
+                ('33333333-3333-4333-8333-333333333012', NULL, N'Bodyweight Squat', N'Unloaded squat.', N'Sit down and stand without added weight.', N'Legs', N'None', N'Bodyweight', N'Beginner', 1, SYSUTCDATETIME(), SYSUTCDATETIME());
+        ]]></sql>
+        <rollback>
+            <sql>DROP TABLE app.Exercises;</sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

@@ -1,0 +1,61 @@
+namespace LifeFitAI.Domain.Identity;
+
+public static class PermissionCodes
+{
+    public const string UserRead = "USER_READ";
+    public const string UserCreate = "USER_CREATE";
+    public const string UserUpdate = "USER_UPDATE";
+    public const string UserDelete = "USER_DELETE";
+    public const string TenantRead = "TENANT_READ";
+    public const string TenantUpdate = "TENANT_UPDATE";
+    public const string TenantCreate = "TENANT_CREATE";
+    public const string TenantMemberRead = "TENANT_MEMBER_READ";
+    public const string TenantMemberInvite = "TENANT_MEMBER_INVITE";
+    public const string TenantMemberRemove = "TENANT_MEMBER_REMOVE";
+    public const string RoleRead = "ROLE_READ";
+    public const string RoleAssign = "ROLE_ASSIGN";
+    public const string LicenseRead = "LICENSE_READ";
+    public const string LicenseManage = "LICENSE_MANAGE";
+    public const string FeatureRead = "FEATURE_READ";
+
+    public const string BusinessProfileRead = "BUSINESS_PROFILE_READ";
+    public const string BusinessProfileUpdate = "BUSINESS_PROFILE_UPDATE";
+    public const string BranchRead = "BRANCH_READ";
+    public const string BranchCreate = "BRANCH_CREATE";
+    public const string BranchUpdate = "BRANCH_UPDATE";
+    public const string BranchDelete = "BRANCH_DELETE";
+    public const string MemberRead = "MEMBER_READ";
+    public const string MemberCreate = "MEMBER_CREATE";
+    public const string MemberUpdate = "MEMBER_UPDATE";
+    public const string MemberDelete = "MEMBER_DELETE";
+    public const string StaffRead = "STAFF_READ";
+    public const string StaffCreate = "STAFF_CREATE";
+    public const string StaffUpdate = "STAFF_UPDATE";
+    public const string StaffRemove = "STAFF_REMOVE";
+    public const string TrainerRead = "TRAINER_READ";
+    public const string TrainerUpdate = "TRAINER_UPDATE";
+    public const string MembershipPlanRead = "MEMBERSHIP_PLAN_READ";
+    public const string MembershipPlanManage = "MEMBERSHIP_PLAN_MANAGE";
+    public const string MembershipRead = "MEMBERSHIP_READ";
+    public const string MembershipCreate = "MEMBERSHIP_CREATE";
+    public const string MembershipRenew = "MEMBERSHIP_RENEW";
+    public const string MembershipFreeze = "MEMBERSHIP_FREEZE";
+    public const string MembershipCancel = "MEMBERSHIP_CANCEL";
+    public const string AttendanceRead = "ATTENDANCE_READ";
+    public const string AttendanceCheckIn = "ATTENDANCE_CHECKIN";
+    public const string AttendanceCheckOut = "ATTENDANCE_CHECKOUT";
+    public const string ReportRead = "REPORT_READ";
+    public const string FitnessRead = "FITNESS_READ";
+    public const string FitnessManage = "FITNESS_MANAGE";
+    public const string ExerciseRead = "EXERCISE_READ";
+    public const string ExerciseManage = "EXERCISE_MANAGE";
+    public const string WorkoutRead = "WORKOUT_READ";
+    public const string WorkoutManage = "WORKOUT_MANAGE";
+    public const string NutritionRead = "NUTRITION_READ";
+    public const string NutritionManage = "NUTRITION_MANAGE";
+    public const string AiUse = "AI_USE";
+    public const string ChallengeRead = "CHALLENGE_READ";
+    public const string ChallengeManage = "CHALLENGE_MANAGE";
+    public const string NotificationRead = "NOTIFICATION_READ";
+    public const string PlatformAdmin = "PLATFORM_ADMIN";
+}

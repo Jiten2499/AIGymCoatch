@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0012" author="lifefit-architecture">
+        <comment>Ticket: LF-0012. Business profile is the contact and locale record for a business tenant. Tenant.Name remains the workspace name, so this table does not copy it. Index review: PK_BusinessProfiles on Id; UX_BusinessProfiles_TenantId is the one-profile lookup and enforces one active profile per tenant. Performance note: the unique index is filtered and matches the profile read by tenant.</comment>
+        <sql splitStatements="false">
+            CREATE TABLE app.BusinessProfiles
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                LegalName NVARCHAR(200) NULL,
+                Description NVARCHAR(1000) NULL,
+                Email NVARCHAR(256) NULL,
+                Phone NVARCHAR(32) NULL,
+                Website NVARCHAR(500) NULL,
+                Address NVARCHAR(300) NULL,
+                City NVARCHAR(100) NULL,
+                State NVARCHAR(100) NULL,
+                Country NVARCHAR(100) NULL,
+                PostalCode NVARCHAR(20) NULL,
+                LogoUrl NVARCHAR(500) NULL,
+                TimeZone NVARCHAR(64) NOT NULL,
+                Currency NVARCHAR(3) NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_BusinessProfiles PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_BusinessProfiles_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id)
+            );
+            CREATE UNIQUE INDEX UX_BusinessProfiles_TenantId
+                ON app.BusinessProfiles (TenantId) WHERE DeletedAt IS NULL;
+        </sql>
+        <rollback>
+            <sql>DROP TABLE app.BusinessProfiles;</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="LF-0013" author="lifefit-architecture">
+        <comment>Ticket: LF-0013. Branches belong to one business tenant. Branch code is unique inside the tenant, not globally. Index review: PK_Branches on Id; UX_Branches_TenantId_Code enforces the code rule for active rows and serves branch lookup; IX_Branches_TenantId supports the branch list. Status is not indexed alone because lists always start from TenantId. Performance note: both secondary indexes are filtered to active rows.</comment>
+        <sql splitStatements="false">
+            CREATE TABLE app.Branches
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                Name NVARCHAR(200) NOT NULL,
+                Code NVARCHAR(32) NOT NULL,
+                Address NVARCHAR(300) NULL,
+                City NVARCHAR(100) NULL,
+                State NVARCHAR(100) NULL,
+                Country NVARCHAR(100) NULL,
+                PostalCode NVARCHAR(20) NULL,
+                Phone NVARCHAR(32) NULL,
+                Email NVARCHAR(256) NULL,
+                TimeZone NVARCHAR(64) NOT NULL,
+                Status NVARCHAR(32) NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_Branches PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_Branches_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT CK_Branches_Status CHECK (Status IN (N'Active', N'Inactive'))
+            );
+            CREATE UNIQUE INDEX UX_Branches_TenantId_Code
+                ON app.Branches (TenantId, Code) WHERE DeletedAt IS NULL;
+            CREATE INDEX IX_Branches_TenantId
+                ON app.Branches (TenantId, Name) WHERE DeletedAt IS NULL;
+        </sql>
+        <rollback>
+            <sql>DROP TABLE app.Branches;</sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

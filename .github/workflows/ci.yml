@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+      - name: Restore
+        run: dotnet restore backend/LifeFitAI.sln
+      - name: Build
+        run: dotnet build backend/LifeFitAI.sln --configuration Release --no-restore
+      - name: Test
+        run: dotnet test backend/LifeFitAI.sln --configuration Release --no-build
+      - name: Secret scan
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -RIn --exclude-dir=bin --exclude-dir=obj --exclude-dir=.git --exclude-dir=node_modules --exclude=appsettings.example.json -E "BEGIN (RSA |OPENSSH )?PRIVATE KEY|AKIA[0-9A-Z]{16}" .; then
+            echo "Potential secret material found."
+            exit 1
+          fi
+          python3 - <<'PY'
+          import json
+          settings = json.load(open("backend/src/Api/appsettings.json", encoding="utf-8"))
+          assert settings["Jwt"]["SigningKey"] == ""
+          assert settings["Ai"]["ApiKey"] == ""
+          assert settings["ConnectionStrings"]["SqlServer"] == ""
+          assert settings["Redis"]["ConnectionString"] == ""
+          assert settings["Email"]["Password"] == ""
+          PY
+
+  database:
+    runs-on: ubuntu-latest
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_SA_PASSWORD: CI_Only_Not_A_Deployed_Secret_1
+        ports:
+          - 1433:1433
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create database
+        run: |
+          for i in $(seq 1 36); do
+            if docker run --rm --network host mcr.microsoft.com/mssql/server:2022-latest /opt/mssql-tools18/bin/sqlcmd -S 127.0.0.1 -U sa -P "CI_Only_Not_A_Deployed_Secret_1" -C -Q "IF DB_ID(N'LifeFitAI') IS NULL CREATE DATABASE LifeFitAI;"; then
+              exit 0
+            fi
+            sleep 5
+          done
+          exit 1
+      - name: Liquibase validate and update
+        run: |
+          docker build -t lifefit-liquibase ./database
+          docker run --rm --network host \
+            -e LIQUIBASE_COMMAND_URL="jdbc:sqlserver://127.0.0.1:1433;databaseName=LifeFitAI;encrypt=false;trustServerCertificate=true" \
+            -e LIQUIBASE_COMMAND_USERNAME=sa \
+            -e LIQUIBASE_COMMAND_PASSWORD=CI_Only_Not_A_Deployed_Secret_1 \
+            lifefit-liquibase
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build API image
+        run: docker build -f backend/docker/Dockerfile backend

@@ -1,0 +1,33 @@
+# .NET
+bin/
+obj/
+TestResults/
+*.user
+*.suo
+.vs/
+
+# Node
+node_modules/
+.next/
+out/
+dist/
+.expo/
+web/tsconfig.tsbuildinfo
+
+# Secrets and local env
+.env
+.env.local
+.env.*.local
+*.pfx
+liquibase.properties
+databasechangelog.csv
+
+# OS and editors
+Thumbs.db
+.DS_Store
+.idea/
+
+# Logs and local files
+logs/
+*.log
+storage/

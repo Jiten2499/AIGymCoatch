@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0020" author="lifefit-architecture">
+        <comment>Ticket: LF-0020. Workout programs are plans. Workout sessions are performed work. System programs have a null tenant. User programs store UserId and TenantId. Sets keep optional weight, reps, duration, and distance so strength and cardio share one table. Index review: unique day number and exercise sequence; IX_WorkoutSessions_User_Started for history; IX_WorkoutPrograms_Tenant for the program list. Child tables are reached from the parent key, so they do not repeat UserId. Performance note: history and personal-record queries start at the user session index and then join exercises and sets.</comment>
+        <sql splitStatements="false"><![CDATA[
+            CREATE TABLE app.WorkoutPrograms
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NULL,
+                UserId UNIQUEIDENTIFIER NULL,
+                Name NVARCHAR(200) NOT NULL,
+                Description NVARCHAR(1000) NULL,
+                GoalType NVARCHAR(32) NOT NULL,
+                Difficulty NVARCHAR(32) NOT NULL,
+                DurationWeeks INT NOT NULL,
+                FrequencyPerWeek INT NOT NULL,
+                Status NVARCHAR(32) NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_WorkoutPrograms PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_WorkoutPrograms_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_WorkoutPrograms_Users FOREIGN KEY (UserId) REFERENCES app.Users (Id),
+                CONSTRAINT CK_WorkoutPrograms_Goal CHECK (GoalType IN (N'FatLoss', N'MuscleGain', N'Strength', N'Endurance', N'GeneralFitness', N'Mobility', N'WeightMaintenance')),
+                CONSTRAINT CK_WorkoutPrograms_Difficulty CHECK (Difficulty IN (N'Beginner', N'Intermediate', N'Advanced')),
+                CONSTRAINT CK_WorkoutPrograms_Duration CHECK (DurationWeeks BETWEEN 1 AND 52),
+                CONSTRAINT CK_WorkoutPrograms_Frequency CHECK (FrequencyPerWeek BETWEEN 1 AND 7),
+                CONSTRAINT CK_WorkoutPrograms_Status CHECK (Status IN (N'Active', N'Archived'))
+            );
+            CREATE INDEX IX_WorkoutPrograms_Tenant ON app.WorkoutPrograms (TenantId, Name) WHERE DeletedAt IS NULL;
+
+            CREATE TABLE app.WorkoutProgramDays
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                WorkoutProgramId UNIQUEIDENTIFIER NOT NULL,
+                DayNumber INT NOT NULL,
+                Name NVARCHAR(200) NOT NULL,
+                Description NVARCHAR(1000) NULL,
+                RestDay BIT NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_WorkoutProgramDays PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_WorkoutProgramDays_Programs FOREIGN KEY (WorkoutProgramId) REFERENCES app.WorkoutPrograms (Id),
+                CONSTRAINT CK_WorkoutProgramDays_Number CHECK (DayNumber BETWEEN 1 AND 14)
+            );
+            CREATE UNIQUE INDEX UX_WorkoutProgramDays_Program_Day ON app.WorkoutProgramDays (WorkoutProgramId, DayNumber) WHERE DeletedAt IS NULL;
+
+            CREATE TABLE app.WorkoutProgramExercises
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                WorkoutProgramDayId UNIQUEIDENTIFIER NOT NULL,
+                ExerciseId UNIQUEIDENTIFIER NOT NULL,
+                Sequence INT NOT NULL,
+                Sets INT NULL,
+                TargetReps INT NULL,
+                TargetDurationSeconds INT NULL,
+                TargetDistance DECIMAL(10,2) NULL,
+                TargetWeight DECIMAL(8,2) NULL,
+                RestSeconds INT NULL,
+                Notes NVARCHAR(500) NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_WorkoutProgramExercises PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_WorkoutProgramExercises_Days FOREIGN KEY (WorkoutProgramDayId) REFERENCES app.WorkoutProgramDays (Id),
+                CONSTRAINT FK_WorkoutProgramExercises_Exercises FOREIGN KEY (ExerciseId) REFERENCES app.Exercises (Id),
+                CONSTRAINT CK_WorkoutProgramExercises_Sequence CHECK (Sequence BETWEEN 1 AND 50)
+            );
+            CREATE UNIQUE INDEX UX_WorkoutProgramExercises_Day_Sequence ON app.WorkoutProgramExercises (WorkoutProgramDayId, Sequence) WHERE DeletedAt IS NULL;
+
+            CREATE TABLE app.WorkoutSessions
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                UserId UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                WorkoutProgramId UNIQUEIDENTIFIER NULL,
+                WorkoutProgramDayId UNIQUEIDENTIFIER NULL,
+                StartedAt DATETIME2 NULL,
+                CompletedAt DATETIME2 NULL,
+                Status NVARCHAR(32) NOT NULL,
+                DurationSeconds INT NULL,
+                Notes NVARCHAR(1000) NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_WorkoutSessions PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_WorkoutSessions_Users FOREIGN KEY (UserId) REFERENCES app.Users (Id),
+                CONSTRAINT FK_WorkoutSessions_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_WorkoutSessions_Programs FOREIGN KEY (WorkoutProgramId) REFERENCES app.WorkoutPrograms (Id),
+                CONSTRAINT FK_WorkoutSessions_Days FOREIGN KEY (WorkoutProgramDayId) REFERENCES app.WorkoutProgramDays (Id),
+                CONSTRAINT CK_WorkoutSessions_Status CHECK (Status IN (N'Planned', N'InProgress', N'Completed', N'Cancelled'))
+            );
+            CREATE INDEX IX_WorkoutSessions_User_Started ON app.WorkoutSessions (UserId, TenantId, StartedAt) WHERE DeletedAt IS NULL;
+
+            CREATE TABLE app.WorkoutSessionExercises
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                WorkoutSessionId UNIQUEIDENTIFIER NOT NULL,
+                ExerciseId UNIQUEIDENTIFIER NOT NULL,
+                Sequence INT NOT NULL,
+                Notes NVARCHAR(500) NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                CONSTRAINT PK_WorkoutSessionExercises PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_WorkoutSessionExercises_Sessions FOREIGN KEY (WorkoutSessionId) REFERENCES app.WorkoutSessions (Id),
+                CONSTRAINT FK_WorkoutSessionExercises_Exercises FOREIGN KEY (ExerciseId) REFERENCES app.Exercises (Id),
+                CONSTRAINT CK_WorkoutSessionExercises_Sequence CHECK (Sequence BETWEEN 1 AND 50)
+            );
+            CREATE UNIQUE INDEX UX_WorkoutSessionExercises_Session_Sequence ON app.WorkoutSessionExercises (WorkoutSessionId, Sequence);
+
+            CREATE TABLE app.WorkoutSets
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                WorkoutSessionExerciseId UNIQUEIDENTIFIER NOT NULL,
+                SetNumber INT NOT NULL,
+                Reps INT NULL,
+                Weight DECIMAL(8,2) NULL,
+                DurationSeconds INT NULL,
+                Distance DECIMAL(10,2) NULL,
+                Rpe DECIMAL(3,1) NULL,
+                Completed BIT NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_WorkoutSets PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_WorkoutSets_SessionExercises FOREIGN KEY (WorkoutSessionExerciseId) REFERENCES app.WorkoutSessionExercises (Id),
+                CONSTRAINT CK_WorkoutSets_Number CHECK (SetNumber BETWEEN 1 AND 50),
+                CONSTRAINT CK_WorkoutSets_Rpe CHECK (Rpe IS NULL OR Rpe BETWEEN 0 AND 10)
+            );
+            CREATE UNIQUE INDEX UX_WorkoutSets_Exercise_Set ON app.WorkoutSets (WorkoutSessionExerciseId, SetNumber);
+        ]]></sql>
+        <rollback>
+            <sql>DROP TABLE app.WorkoutSets; DROP TABLE app.WorkoutSessionExercises; DROP TABLE app.WorkoutSessions; DROP TABLE app.WorkoutProgramExercises; DROP TABLE app.WorkoutProgramDays; DROP TABLE app.WorkoutPrograms;</sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

@@ -1,0 +1,21 @@
+---
+description: React Native TypeScript standards for the LifeFit AI mobile app
+globs: mobile/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# React Native
+
+- Use TypeScript, functional components, and named exports for screens and shared UI.
+- Navigate with React Navigation. Server state goes through TanStack Query. HTTP goes through `src/services/api/client.ts`.
+- Forms use React Hook Form. Do not manage field state with scattered `useState` calls.
+- Keep color, type, and spacing tokens in `src/theme`. Screens use `useTheme` for light, dark, and system appearance.
+- Put reusable UI in `src/components` and data hooks in `src/hooks`.
+- Screens stay thin: they render state and call hooks. No API URLs inside screen files.
+- A physical device cannot use `localhost` or `10.0.2.2`. The API client rewrites a localhost base URL to the Expo packager host on port 8080. Android emulators that cannot reach that host use `http://10.0.2.2:8080`.
+
+```tsx
+export function HomeScreen({ navigation }: HomeScreenProps) {
+  return <View style={styles.screen} />;
+}
+```

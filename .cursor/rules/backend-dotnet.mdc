@@ -1,0 +1,20 @@
+---
+description: ASP.NET Core 9 API standards for the LifeFit AI backend
+globs: backend/**/*.cs
+alwaysApply: false
+---
+
+# Backend
+
+- Target ASP.NET Core 9 and C# with nullable reference types.
+- Expose REST under `/api/v{version}/...` using ASP.NET API versioning.
+- Return `ProblemDetails` for failures. Do not invent a second error envelope.
+- Let `GlobalExceptionMiddleware` map exceptions. Do not catch and rewrite responses inside endpoints.
+- Log with Serilog message templates and named properties. Do not log secrets, tokens, or full request bodies.
+- Read secrets from configuration. Do not hardcode connection strings or passwords.
+- Add health checks for new infrastructure dependencies that the API cannot serve without.
+- Keep `Program.cs` as composition. Put registration in extension methods.
+
+```csharp
+_logger.LogInformation("Checked in {UserId} at {BranchId}", userId, branchId);
+```

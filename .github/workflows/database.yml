@@ -1,0 +1,57 @@
+name: database
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate Liquibase changelog
+    runs-on: ubuntu-latest
+    env:
+      # Disposable password for the GitHub-hosted SQL Server container. It is not a deployed credential.
+      MSSQL_SA_PASSWORD: CiOnly-NotASecret-aA1!
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_PID: Developer
+          MSSQL_SA_PASSWORD: CiOnly-NotASecret-aA1!
+        ports:
+          - 1433:1433
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Wait for SQL Server and create the database
+        run: |
+          for attempt in $(seq 1 40); do
+            if docker run --rm --add-host=host.docker.internal:host-gateway \
+              -e LIQUIBASE_COMMAND_USERNAME=sa \
+              -e LIQUIBASE_COMMAND_PASSWORD="$MSSQL_SA_PASSWORD" \
+              liquibase/liquibase:4.31 \
+              --url="jdbc:sqlserver://host.docker.internal:1433;databaseName=master;encrypt=false;trustServerCertificate=true" \
+              execute-sql --sql="IF DB_ID(N'LifeFitAI') IS NULL CREATE DATABASE LifeFitAI;"; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "SQL Server did not accept a connection."
+          exit 1
+
+      - name: Build the Liquibase image
+        run: docker build -t lifefit-liquibase ./database
+
+      - name: Validate and update
+        run: |
+          docker run --rm --add-host=host.docker.internal:host-gateway \
+            -e LIQUIBASE_COMMAND_URL="jdbc:sqlserver://host.docker.internal:1433;databaseName=LifeFitAI;encrypt=false;trustServerCertificate=true" \
+            -e LIQUIBASE_COMMAND_USERNAME=sa \
+            -e LIQUIBASE_COMMAND_PASSWORD="$MSSQL_SA_PASSWORD" \
+            lifefit-liquibase

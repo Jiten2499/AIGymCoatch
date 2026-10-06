@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0001" author="lifefit-architecture">
+        <comment>Ticket: LF-0001. Create the application schema. Index review: no indexes, because this changeset creates no table. Performance note: schema creation is a metadata operation and does not scan or lock user data.</comment>
+        <sql splitStatements="false">
+            IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = N'app')
+                EXEC(N'CREATE SCHEMA app AUTHORIZATION dbo');
+        </sql>
+        <rollback>
+            <sql splitStatements="false">
+                IF EXISTS (SELECT 1 FROM sys.schemas WHERE name = N'app')
+                    DROP SCHEMA app;
+            </sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

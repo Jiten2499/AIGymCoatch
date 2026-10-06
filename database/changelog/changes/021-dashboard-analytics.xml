@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0029" author="lifefit-architecture">
+        <comment>Ticket: LF-0029. Support tenant-scoped membership activity charts. Index review: PK and existing membership indexes stay; IX_MembershipHistory_TenantId_CreatedAt does not seek EffectiveDate; IX_MembershipHistory_TenantId_EffectiveDate (TenantId, EffectiveDate, Action) seeks one gym's history for a date range and groups created, renewed, and expired actions. Member joins stay on IX_MemberProfiles_TenantId_Status, which already includes JoinDate. Check-ins stay on IX_Attendance_TenantId_CheckInTime. Performance note: the new index leads with TenantId so a dashboard range never scans another gym's history.</comment>
+        <sql splitStatements="false">
+            CREATE INDEX IX_MembershipHistory_TenantId_EffectiveDate
+                ON app.MembershipHistory (TenantId, EffectiveDate, Action);
+        </sql>
+        <rollback>
+            <sql>DROP INDEX IX_MembershipHistory_TenantId_EffectiveDate ON app.MembershipHistory;</sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>
