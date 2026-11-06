@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0059" author="lifefit-architecture">
+        <comment>Ticket: LF-0059. Trainer employment fields on the existing trainer profile. Index review: none until the following changeset. Performance note: columns are unused by list queries until indexed.</comment>
+        <sql>
+            ALTER TABLE app.TrainerProfiles ADD EmployeeCode NVARCHAR(32) NULL;
+            ALTER TABLE app.TrainerProfiles ADD JoiningDate DATE NULL;
+            ALTER TABLE app.TrainerProfiles ADD CommissionEligible BIT NOT NULL CONSTRAINT DF_TrainerProfiles_CommissionEligible DEFAULT 0;
+        </sql>
+        <rollback>
+            <sql>
+                ALTER TABLE app.TrainerProfiles DROP CONSTRAINT DF_TrainerProfiles_CommissionEligible;
+                ALTER TABLE app.TrainerProfiles DROP COLUMN CommissionEligible;
+                ALTER TABLE app.TrainerProfiles DROP COLUMN JoiningDate;
+                ALTER TABLE app.TrainerProfiles DROP COLUMN EmployeeCode;
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="LF-0060" author="lifefit-architecture">
+        <comment>
+            Ticket: LF-0060. Trainer assignment history, targets, and incentive rules. MemberProfiles.AssignedTrainerId stays the current trainer.
+            Index review: PK on each id; UX_TrainerProfiles_TenantId_EmployeeCode for optional codes; UX_TrainerMemberAssignments_ActiveMember allows one open assignment per member;
+            IX_TrainerMemberAssignments_TrainerId lists a trainer's members; UX_TrainerTargets_Period stops a duplicate target; UX_TrainerIncentiveRules_Tenant_Type keeps one rule per target type.
+            Performance note: assignment and performance reads filter by TenantId first.
+        </comment>
+        <sql splitStatements="false"><![CDATA[
+            CREATE UNIQUE INDEX UX_TrainerProfiles_TenantId_EmployeeCode
+                ON app.TrainerProfiles (TenantId, EmployeeCode) WHERE EmployeeCode IS NOT NULL AND DeletedAt IS NULL;
+
+            CREATE TABLE app.TrainerMemberAssignments
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                TrainerProfileId UNIQUEIDENTIFIER NOT NULL,
+                MemberProfileId UNIQUEIDENTIFIER NOT NULL,
+                StartDate DATE NOT NULL,
+                EndDate DATE NULL,
+                Status NVARCHAR(16) NOT NULL,
+                AssignedByUserId UNIQUEIDENTIFIER NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_TrainerMemberAssignments PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_TrainerMemberAssignments_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_TrainerMemberAssignments_TrainerProfiles FOREIGN KEY (TrainerProfileId) REFERENCES app.TrainerProfiles (Id),
+                CONSTRAINT FK_TrainerMemberAssignments_MemberProfiles FOREIGN KEY (MemberProfileId) REFERENCES app.MemberProfiles (Id),
+                CONSTRAINT FK_TrainerMemberAssignments_Users FOREIGN KEY (AssignedByUserId) REFERENCES app.Users (Id),
+                CONSTRAINT CK_TrainerMemberAssignments_Status CHECK (Status IN (N'Active', N'Ended'))
+            );
+            CREATE UNIQUE INDEX UX_TrainerMemberAssignments_ActiveMember
+                ON app.TrainerMemberAssignments (TenantId, MemberProfileId) WHERE Status = N'Active' AND DeletedAt IS NULL;
+            CREATE INDEX IX_TrainerMemberAssignments_TrainerId
+                ON app.TrainerMemberAssignments (TenantId, TrainerProfileId, Status) WHERE DeletedAt IS NULL;
+
+            CREATE TABLE app.TrainerTargets
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                TrainerProfileId UNIQUEIDENTIFIER NOT NULL,
+                TargetType NVARCHAR(32) NOT NULL,
+                Period NVARCHAR(16) NOT NULL,
+                PeriodStart DATE NOT NULL,
+                PeriodEnd DATE NOT NULL,
+                TargetValue DECIMAL(19, 4) NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_TrainerTargets PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_TrainerTargets_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_TrainerTargets_TrainerProfiles FOREIGN KEY (TrainerProfileId) REFERENCES app.TrainerProfiles (Id),
+                CONSTRAINT CK_TrainerTargets_Type CHECK (TargetType IN (N'PtRevenue', N'PtSessions', N'NewPtClients')),
+                CONSTRAINT CK_TrainerTargets_Period CHECK (Period IN (N'Monthly', N'Quarterly', N'Custom')),
+                CONSTRAINT CK_TrainerTargets_Value CHECK (TargetValue > 0)
+            );
+            CREATE UNIQUE INDEX UX_TrainerTargets_Period
+                ON app.TrainerTargets (TenantId, TrainerProfileId, TargetType, PeriodStart, PeriodEnd) WHERE DeletedAt IS NULL;
+
+            CREATE TABLE app.TrainerIncentiveRules
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                TargetType NVARCHAR(32) NOT NULL,
+                IncentivePercent DECIMAL(9, 4) NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_TrainerIncentiveRules PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_TrainerIncentiveRules_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT CK_TrainerIncentiveRules_Type CHECK (TargetType IN (N'PtRevenue', N'PtSessions', N'NewPtClients')),
+                CONSTRAINT CK_TrainerIncentiveRules_Percent CHECK (IncentivePercent >= 0 AND IncentivePercent <= 100)
+            );
+            CREATE UNIQUE INDEX UX_TrainerIncentiveRules_Tenant_Type
+                ON app.TrainerIncentiveRules (TenantId, TargetType) WHERE DeletedAt IS NULL;
+        ]]></sql>
+        <rollback>
+            <sql>DROP TABLE app.TrainerIncentiveRules; DROP TABLE app.TrainerTargets; DROP TABLE app.TrainerMemberAssignments; DROP INDEX UX_TrainerProfiles_TenantId_EmployeeCode ON app.TrainerProfiles;</sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

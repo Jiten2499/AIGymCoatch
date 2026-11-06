@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0058" author="lifefit-architecture">
+        <comment>
+            Ticket: LF-0058. System job definitions and membership-expiry reminder uniqueness.
+            Hangfire still owns execution history. Index review: PK_SystemJobDefinitions; UX_SystemJobDefinitions_JobKey is the scheduler identity;
+            PK_MembershipExpiryReminders; UX_MembershipExpiryReminders_Tenant_Membership_Type_Expiry guarantees one reminder per membership, reminder type, and expiry date;
+            foreign keys to Tenants and GymMemberships. Performance note: the daily job filters memberships through the existing IX_GymMemberships_TenantId_Status_EndDate index, then checks this unique key per candidate.
+        </comment>
+        <sql splitStatements="false"><![CDATA[
+            CREATE TABLE app.SystemJobDefinitions
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                JobKey NVARCHAR(100) NOT NULL,
+                Name NVARCHAR(200) NOT NULL,
+                Description NVARCHAR(1000) NULL,
+                JobType NVARCHAR(200) NOT NULL,
+                CronExpression NVARCHAR(100) NOT NULL,
+                Queue NVARCHAR(50) NOT NULL,
+                IsEnabled BIT NOT NULL,
+                FeatureKey NVARCHAR(100) NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_SystemJobDefinitions PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT UX_SystemJobDefinitions_JobKey UNIQUE (JobKey)
+            );
+
+            CREATE TABLE app.MembershipExpiryReminders
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                MembershipId UNIQUEIDENTIFIER NOT NULL,
+                ReminderType NVARCHAR(40) NOT NULL,
+                ExpiryDate DATE NOT NULL,
+                CreatedAtUtc DATETIME2 NOT NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_MembershipExpiryReminders PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_MembershipExpiryReminders_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_MembershipExpiryReminders_GymMemberships FOREIGN KEY (MembershipId) REFERENCES app.GymMemberships (Id),
+                CONSTRAINT CK_MembershipExpiryReminders_Type CHECK (ReminderType IN (N'EXPIRING_IN_10_DAYS', N'EXPIRING_IN_5_DAYS', N'EXPIRING_TODAY')),
+                CONSTRAINT UX_MembershipExpiryReminders_Tenant_Membership_Type_Expiry UNIQUE (TenantId, MembershipId, ReminderType, ExpiryDate)
+            );
+
+            INSERT INTO app.SystemJobDefinitions
+                (Id, JobKey, Name, Description, JobType, CronExpression, Queue, IsEnabled, FeatureKey, CreatedAt, UpdatedAt)
+            VALUES
+                ('33333333-3333-4333-8333-333333333301', N'MEMBERSHIP_EXPIRY_NOTIFICATION', N'Membership Expiry Notification',
+                 N'Sends an in-app reminder 10 days before, 5 days before, and on the membership expiry date.',
+                 N'MembershipExpiryNotificationJob', N'0 1 * * *', N'notifications', 1, N'GYM_COMMUNICATIONS', SYSUTCDATETIME(), SYSUTCDATETIME());
+        ]]></sql>
+        <rollback>
+            <sql>DELETE FROM app.SystemJobDefinitions WHERE JobKey = N'MEMBERSHIP_EXPIRY_NOTIFICATION'; DROP TABLE app.MembershipExpiryReminders; DROP TABLE app.SystemJobDefinitions;</sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

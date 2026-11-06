@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0066" author="lifefit-architecture">
+        <comment>Ticket: LF-0066. Trainers record dated member progress without replacing earlier assessments. Measurements stay nullable so a missing value is not stored as zero. Index review: PK_MemberProgressAssessments. FKs to Tenants, MemberProfiles, TrainerProfiles, and optional BodyMeasurements. IX_MemberProgressAssessments_Member_Date loads one member's history by date. Performance note: the trainer progress screen reads one assigned member inside the current tenant.</comment>
+        <sql splitStatements="false"><![CDATA[
+            SET QUOTED_IDENTIFIER ON;
+            IF OBJECT_ID(N'app.MemberProgressAssessments', N'U') IS NULL
+            BEGIN
+                CREATE TABLE app.MemberProgressAssessments
+                (
+                    Id UNIQUEIDENTIFIER NOT NULL,
+                    TenantId UNIQUEIDENTIFIER NOT NULL,
+                    MemberProfileId UNIQUEIDENTIFIER NOT NULL,
+                    TrainerProfileId UNIQUEIDENTIFIER NOT NULL,
+                    BodyMeasurementId UNIQUEIDENTIFIER NULL,
+                    AssessmentDate DATE NOT NULL,
+                    UnitSystem NVARCHAR(16) NOT NULL,
+                    Weight DECIMAL(8, 2) NULL,
+                    Waist DECIMAL(8, 2) NULL,
+                    Chest DECIMAL(8, 2) NULL,
+                    Hip DECIMAL(8, 2) NULL,
+                    Arm DECIMAL(8, 2) NULL,
+                    Thigh DECIMAL(8, 2) NULL,
+                    BodyFatPercentage DECIMAL(5, 2) NULL,
+                    FitnessScore DECIMAL(5, 2) NULL,
+                    TrainingPerformance NVARCHAR(500) NULL,
+                    Notes NVARCHAR(1000) NULL,
+                    AchievedGoals NVARCHAR(500) NULL,
+                    NextGoals NVARCHAR(500) NULL,
+                    PhotoConsent BIT NOT NULL CONSTRAINT DF_MemberProgressAssessments_PhotoConsent DEFAULT 0,
+                    PhotoStorageKey NVARCHAR(200) NULL,
+                    PhotoContentType NVARCHAR(80) NULL,
+                    CreatedAt DATETIME2 NOT NULL,
+                    UpdatedAt DATETIME2 NOT NULL,
+                    DeletedAt DATETIME2 NULL,
+                    CreatedBy UNIQUEIDENTIFIER NULL,
+                    UpdatedBy UNIQUEIDENTIFIER NULL,
+                    RowVersion ROWVERSION NOT NULL,
+                    CONSTRAINT PK_MemberProgressAssessments PRIMARY KEY CLUSTERED (Id),
+                    CONSTRAINT FK_MemberProgressAssessments_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                    CONSTRAINT FK_MemberProgressAssessments_MemberProfiles FOREIGN KEY (MemberProfileId) REFERENCES app.MemberProfiles (Id),
+                    CONSTRAINT FK_MemberProgressAssessments_TrainerProfiles FOREIGN KEY (TrainerProfileId) REFERENCES app.TrainerProfiles (Id),
+                    CONSTRAINT FK_MemberProgressAssessments_BodyMeasurements FOREIGN KEY (BodyMeasurementId) REFERENCES app.BodyMeasurements (Id),
+                    CONSTRAINT CK_MemberProgressAssessments_Unit CHECK (UnitSystem IN (N'Metric', N'Imperial')),
+                    CONSTRAINT CK_MemberProgressAssessments_Weight CHECK (Weight IS NULL OR (Weight > 0 AND Weight <= 500)),
+                    CONSTRAINT CK_MemberProgressAssessments_Waist CHECK (Waist IS NULL OR (Waist > 0 AND Waist <= 500)),
+                    CONSTRAINT CK_MemberProgressAssessments_Chest CHECK (Chest IS NULL OR (Chest > 0 AND Chest <= 500)),
+                    CONSTRAINT CK_MemberProgressAssessments_Hip CHECK (Hip IS NULL OR (Hip > 0 AND Hip <= 500)),
+                    CONSTRAINT CK_MemberProgressAssessments_Arm CHECK (Arm IS NULL OR (Arm > 0 AND Arm <= 500)),
+                    CONSTRAINT CK_MemberProgressAssessments_Thigh CHECK (Thigh IS NULL OR (Thigh > 0 AND Thigh <= 500)),
+                    CONSTRAINT CK_MemberProgressAssessments_Fat CHECK (BodyFatPercentage IS NULL OR BodyFatPercentage BETWEEN 0 AND 100),
+                    CONSTRAINT CK_MemberProgressAssessments_Score CHECK (FitnessScore IS NULL OR FitnessScore BETWEEN 0 AND 100),
+                    CONSTRAINT CK_MemberProgressAssessments_Photo CHECK (PhotoConsent = 1 OR (PhotoStorageKey IS NULL AND PhotoContentType IS NULL))
+                );
+                CREATE INDEX IX_MemberProgressAssessments_Member_Date
+                    ON app.MemberProgressAssessments (TenantId, MemberProfileId, AssessmentDate)
+                    WHERE DeletedAt IS NULL;
+            END
+        ]]></sql>
+        <rollback>
+            <sql>IF OBJECT_ID(N'app.MemberProgressAssessments', N'U') IS NOT NULL DROP TABLE app.MemberProgressAssessments;</sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

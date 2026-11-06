@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0064" author="lifefit-architecture">
+        <comment>
+            Ticket: LF-0064. Tenant-scoped coach recognition targets and an append-only points ledger.
+            Existing TrainerTargets and TrainerCompensationCalculations remain the money/performance path; these tables store reusable definitions, assignments with reward-rule snapshots, and recognition points.
+            Index review: PK on each id; UX_TrainerRewardSettings_TenantId one settings row; UX_TrainerTargetDefinitions_Tenant_Name active names;
+            UX_TrainerTargetAssignments_Open blocks a second open assignment for the same coach and definition; UX_TrainerRewardTransactions_Idempotency blocks duplicate posts;
+            UX_TrainerRewardTransactions_AwardSource allows one non-rejected award per assignment; IX_TrainerRewardTransactions_CoachBalance supports balance reads by coach.
+            Performance note: every list index leads with TenantId. Balances are summed from approved ledger rows only.
+        </comment>
+        <sql splitStatements="false"><![CDATA[
+            CREATE TABLE app.TrainerRewardSettings
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                PointsEnabled BIT NOT NULL,
+                DefaultAwardPoints INT NOT NULL,
+                RequireApprovalForAwards BIT NOT NULL,
+                AllowManualAdjustments BIT NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_TrainerRewardSettings PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_TrainerRewardSettings_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT CK_TrainerRewardSettings_DefaultAwardPoints CHECK (DefaultAwardPoints >= 0)
+            );
+            CREATE UNIQUE INDEX UX_TrainerRewardSettings_TenantId
+                ON app.TrainerRewardSettings (TenantId) WHERE DeletedAt IS NULL;
+
+            CREATE TABLE app.TrainerTargetDefinitions
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                Name NVARCHAR(120) NOT NULL,
+                Description NVARCHAR(500) NULL,
+                Metric NVARCHAR(32) NOT NULL,
+                DefaultGoal DECIMAL(19, 4) NOT NULL,
+                Period NVARCHAR(16) NOT NULL,
+                DefaultAwardPoints INT NOT NULL,
+                Status NVARCHAR(16) NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_TrainerTargetDefinitions PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_TrainerTargetDefinitions_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT CK_TrainerTargetDefinitions_Metric CHECK (Metric IN (N'PtRevenue', N'PtSessions', N'NewPtClients')),
+                CONSTRAINT CK_TrainerTargetDefinitions_Period CHECK (Period IN (N'Monthly', N'Quarterly', N'Custom')),
+                CONSTRAINT CK_TrainerTargetDefinitions_DefaultGoal CHECK (DefaultGoal > 0),
+                CONSTRAINT CK_TrainerTargetDefinitions_DefaultAwardPoints CHECK (DefaultAwardPoints >= 0),
+                CONSTRAINT CK_TrainerTargetDefinitions_Status CHECK (Status IN (N'Draft', N'Active', N'Inactive'))
+            );
+            CREATE UNIQUE INDEX UX_TrainerTargetDefinitions_Tenant_Name
+                ON app.TrainerTargetDefinitions (TenantId, Name) WHERE DeletedAt IS NULL;
+            CREATE INDEX IX_TrainerTargetDefinitions_Tenant_Status
+                ON app.TrainerTargetDefinitions (TenantId, Status) WHERE DeletedAt IS NULL;
+
+            CREATE TABLE app.TrainerTargetAssignments
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                TrainerProfileId UNIQUEIDENTIFIER NOT NULL,
+                TargetDefinitionId UNIQUEIDENTIFIER NOT NULL,
+                GoalValue DECIMAL(19, 4) NOT NULL,
+                Period NVARCHAR(16) NOT NULL,
+                EffectiveStart DATE NOT NULL,
+                EffectiveEnd DATE NULL,
+                Status NVARCHAR(16) NOT NULL,
+                SnapshotName NVARCHAR(120) NOT NULL,
+                SnapshotMetric NVARCHAR(32) NOT NULL,
+                SnapshotPeriod NVARCHAR(16) NOT NULL,
+                SnapshotDefaultGoal DECIMAL(19, 4) NOT NULL,
+                SnapshotAwardPoints INT NOT NULL,
+                SnapshotRewardRule NVARCHAR(500) NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_TrainerTargetAssignments PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_TrainerTargetAssignments_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_TrainerTargetAssignments_TrainerProfiles FOREIGN KEY (TrainerProfileId) REFERENCES app.TrainerProfiles (Id),
+                CONSTRAINT FK_TrainerTargetAssignments_Definitions FOREIGN KEY (TargetDefinitionId) REFERENCES app.TrainerTargetDefinitions (Id),
+                CONSTRAINT CK_TrainerTargetAssignments_Period CHECK (Period IN (N'Monthly', N'Quarterly', N'Custom')),
+                CONSTRAINT CK_TrainerTargetAssignments_Goal CHECK (GoalValue > 0),
+                CONSTRAINT CK_TrainerTargetAssignments_Status CHECK (Status IN (N'Active', N'Completed', N'Cancelled')),
+                CONSTRAINT CK_TrainerTargetAssignments_Dates CHECK (EffectiveEnd IS NULL OR EffectiveEnd >= EffectiveStart)
+            );
+            CREATE UNIQUE INDEX UX_TrainerTargetAssignments_Open
+                ON app.TrainerTargetAssignments (TenantId, TrainerProfileId, TargetDefinitionId)
+                WHERE Status = N'Active' AND DeletedAt IS NULL;
+            CREATE INDEX IX_TrainerTargetAssignments_Coach
+                ON app.TrainerTargetAssignments (TenantId, TrainerProfileId, Status) WHERE DeletedAt IS NULL;
+
+            CREATE TABLE app.TrainerRewardTransactions
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                TrainerProfileId UNIQUEIDENTIFIER NOT NULL,
+                Points INT NOT NULL,
+                TransactionType NVARCHAR(16) NOT NULL,
+                ApprovalStatus NVARCHAR(16) NOT NULL,
+                SourceAssignmentId UNIQUEIDENTIFIER NULL,
+                SourceTransactionId UNIQUEIDENTIFIER NULL,
+                IdempotencyKey NVARCHAR(100) NOT NULL,
+                Reason NVARCHAR(500) NULL,
+                PostedAt DATETIME2 NULL,
+                ApprovedByUserId UNIQUEIDENTIFIER NULL,
+                RejectedByUserId UNIQUEIDENTIFIER NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_TrainerRewardTransactions PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_TrainerRewardTransactions_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_TrainerRewardTransactions_TrainerProfiles FOREIGN KEY (TrainerProfileId) REFERENCES app.TrainerProfiles (Id),
+                CONSTRAINT FK_TrainerRewardTransactions_Assignments FOREIGN KEY (SourceAssignmentId) REFERENCES app.TrainerTargetAssignments (Id),
+                CONSTRAINT FK_TrainerRewardTransactions_SourceTx FOREIGN KEY (SourceTransactionId) REFERENCES app.TrainerRewardTransactions (Id),
+                CONSTRAINT FK_TrainerRewardTransactions_ApprovedBy FOREIGN KEY (ApprovedByUserId) REFERENCES app.Users (Id),
+                CONSTRAINT FK_TrainerRewardTransactions_RejectedBy FOREIGN KEY (RejectedByUserId) REFERENCES app.Users (Id),
+                CONSTRAINT CK_TrainerRewardTransactions_Type CHECK (TransactionType IN (N'Award', N'Adjustment', N'Reversal')),
+                CONSTRAINT CK_TrainerRewardTransactions_Approval CHECK (ApprovalStatus IN (N'Pending', N'Approved', N'Rejected')),
+                CONSTRAINT CK_TrainerRewardTransactions_Points CHECK (Points <> 0)
+            );
+            CREATE UNIQUE INDEX UX_TrainerRewardTransactions_Idempotency
+                ON app.TrainerRewardTransactions (TenantId, IdempotencyKey) WHERE DeletedAt IS NULL;
+            CREATE UNIQUE INDEX UX_TrainerRewardTransactions_AwardSource
+                ON app.TrainerRewardTransactions (TenantId, SourceAssignmentId)
+                WHERE TransactionType = N'Award' AND ApprovalStatus IN (N'Pending', N'Approved') AND DeletedAt IS NULL;
+            CREATE INDEX IX_TrainerRewardTransactions_CoachBalance
+                ON app.TrainerRewardTransactions (TenantId, TrainerProfileId, ApprovalStatus) WHERE DeletedAt IS NULL;
+        ]]></sql>
+        <rollback>
+            <sql>
+                DROP TABLE app.TrainerRewardTransactions;
+                DROP TABLE app.TrainerTargetAssignments;
+                DROP TABLE app.TrainerTargetDefinitions;
+                DROP TABLE app.TrainerRewardSettings;
+            </sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

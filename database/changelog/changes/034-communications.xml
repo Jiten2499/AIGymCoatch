@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0045" author="lifefit-architecture">
+        <comment>
+            Ticket: LF-0045. Tenant-scoped gym communications (announcements, circulars, offers, events, alerts).
+            Index review: PK on each Id; IX_Communications_TenantId_Status_PublishAt for admin lists and member feeds;
+            IX_Communications_TenantId_Type for type filters; IX_CommunicationAudienceMembers_CommunicationId and
+            IX_CommunicationAudienceMembers_MemberProfileId for selected-member targeting; UX_CommunicationReads_CommunicationId_UserId
+            for unread checks. Performance note: every list index leads with TenantId. Soft-deleted rows stay filtered out.
+            Member category targeting is deferred until members carry a category FK.
+        </comment>
+        <sql splitStatements="false"><![CDATA[
+            CREATE TABLE app.Communications
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                Type NVARCHAR(32) NOT NULL,
+                Title NVARCHAR(200) NOT NULL,
+                Message NVARCHAR(4000) NOT NULL,
+                Priority NVARCHAR(16) NOT NULL,
+                Status NVARCHAR(32) NOT NULL,
+                AudienceType NVARCHAR(32) NOT NULL,
+                AudiencePackageId UNIQUEIDENTIFIER NULL,
+                AudienceTrainerId UNIQUEIDENTIFIER NULL,
+                ExpiringWithinDays INT NULL,
+                ImageStorageKey NVARCHAR(500) NULL,
+                ImageContentType NVARCHAR(100) NULL,
+                PublishAt DATETIME2 NULL,
+                ExpiresAt DATETIME2 NULL,
+                CreatedByUserId UNIQUEIDENTIFIER NOT NULL,
+                PublishedAt DATETIME2 NULL,
+                ArchivedAt DATETIME2 NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_Communications PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_Communications_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_Communications_CreatedByUsers FOREIGN KEY (CreatedByUserId) REFERENCES app.Users (Id),
+                CONSTRAINT FK_Communications_AudiencePackages FOREIGN KEY (AudiencePackageId) REFERENCES app.MembershipPlans (Id),
+                CONSTRAINT FK_Communications_AudienceTrainers FOREIGN KEY (AudienceTrainerId) REFERENCES app.TrainerProfiles (Id),
+                CONSTRAINT CK_Communications_Type CHECK (Type IN (N'Announcement', N'Circular', N'Offer', N'Event', N'Alert', N'General')),
+                CONSTRAINT CK_Communications_Priority CHECK (Priority IN (N'Low', N'Normal', N'High')),
+                CONSTRAINT CK_Communications_Status CHECK (Status IN (N'Draft', N'Scheduled', N'Published', N'Archived')),
+                CONSTRAINT CK_Communications_AudienceType CHECK (AudienceType IN (N'AllMembers', N'ActiveMembers', N'ExpiringMembers', N'MembershipPackage', N'TrainerMembers', N'SelectedMembers'))
+            );
+            CREATE INDEX IX_Communications_TenantId_Status_PublishAt ON app.Communications (TenantId, Status, PublishAt) WHERE DeletedAt IS NULL;
+            CREATE INDEX IX_Communications_TenantId_Type ON app.Communications (TenantId, Type) WHERE DeletedAt IS NULL;
+
+            CREATE TABLE app.CommunicationAudienceMembers
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                CommunicationId UNIQUEIDENTIFIER NOT NULL,
+                MemberProfileId UNIQUEIDENTIFIER NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_CommunicationAudienceMembers PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_CommunicationAudienceMembers_Communications FOREIGN KEY (CommunicationId) REFERENCES app.Communications (Id),
+                CONSTRAINT FK_CommunicationAudienceMembers_MemberProfiles FOREIGN KEY (MemberProfileId) REFERENCES app.MemberProfiles (Id),
+                CONSTRAINT FK_CommunicationAudienceMembers_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id)
+            );
+            CREATE UNIQUE INDEX UX_CommunicationAudienceMembers_CommunicationId_MemberProfileId
+                ON app.CommunicationAudienceMembers (CommunicationId, MemberProfileId) WHERE DeletedAt IS NULL;
+            CREATE INDEX IX_CommunicationAudienceMembers_MemberProfileId ON app.CommunicationAudienceMembers (MemberProfileId) WHERE DeletedAt IS NULL;
+
+            CREATE TABLE app.CommunicationReads
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                CommunicationId UNIQUEIDENTIFIER NOT NULL,
+                UserId UNIQUEIDENTIFIER NOT NULL,
+                ReadAt DATETIME2 NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_CommunicationReads PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_CommunicationReads_Communications FOREIGN KEY (CommunicationId) REFERENCES app.Communications (Id),
+                CONSTRAINT FK_CommunicationReads_Users FOREIGN KEY (UserId) REFERENCES app.Users (Id),
+                CONSTRAINT FK_CommunicationReads_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id)
+            );
+            CREATE UNIQUE INDEX UX_CommunicationReads_CommunicationId_UserId
+                ON app.CommunicationReads (CommunicationId, UserId) WHERE DeletedAt IS NULL;
+            CREATE INDEX IX_CommunicationReads_TenantId_UserId ON app.CommunicationReads (TenantId, UserId) WHERE DeletedAt IS NULL;
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DROP TABLE app.CommunicationReads;
+                DROP TABLE app.CommunicationAudienceMembers;
+                DROP TABLE app.Communications;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="LF-0046" author="lifefit-architecture">
+        <comment>Ticket: LF-0046. Enable GYM_COMMUNICATIONS and grant communication permissions. Index review: catalog inserts only.</comment>
+        <sql splitStatements="false"><![CDATA[
+            DECLARE @Now DATETIME2 = SYSUTCDATETIME();
+            INSERT INTO app.FeatureDefinitions (Id, Code, Name, Description, Category, IsActive, Scope, ConsumesLicense, CreatedAt, UpdatedAt)
+            VALUES ('a2222222-2222-4222-8222-222222222007', N'GYM_COMMUNICATIONS', N'Communications', N'Create and deliver in-app gym announcements, offers, and alerts.', N'Platform', 1, N'Tenant', 0, @Now, @Now);
+
+            INSERT INTO app.PlanFeatures (Id, PlanId, FeatureCode, [Enabled], CreatedAt, UpdatedAt)
+            SELECT NEWID(), p.Id, N'GYM_COMMUNICATIONS',
+                CASE WHEN p.Code IN (N'BASIC', N'PRO', N'ENTERPRISE') THEN 1 ELSE 0 END,
+                @Now, @Now
+            FROM app.Plans p;
+
+            INSERT INTO app.Permissions (Id, Code, Name, Description, CreatedAt, UpdatedAt)
+            VALUES
+                ('22222222-2222-4222-8222-222222222072', N'COMMUNICATION_READ', N'Read communications', N'Read gym communications.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222073', N'COMMUNICATION_CREATE', N'Create communications', N'Create draft communications.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222074', N'COMMUNICATION_UPDATE', N'Update communications', N'Edit draft or scheduled communications.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222075', N'COMMUNICATION_PUBLISH', N'Publish communications', N'Publish or schedule communications.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222076', N'COMMUNICATION_ARCHIVE', N'Archive communications', N'Archive published communications.', @Now, @Now);
+
+            INSERT INTO app.RolePermissions (RoleId, PermissionId)
+            SELECT r.Id, p.Id
+            FROM app.Roles r
+            JOIN app.Permissions p ON p.Code IN (N'COMMUNICATION_READ', N'COMMUNICATION_CREATE', N'COMMUNICATION_UPDATE', N'COMMUNICATION_PUBLISH', N'COMMUNICATION_ARCHIVE')
+            WHERE r.Name IN (N'SuperAdmin', N'GymOwner', N'GymManager');
+
+            INSERT INTO app.RolePermissions (RoleId, PermissionId)
+            SELECT r.Id, p.Id
+            FROM app.Roles r
+            JOIN app.Permissions p ON p.Code IN (N'COMMUNICATION_READ', N'COMMUNICATION_CREATE')
+            WHERE r.Name = N'Receptionist';
+
+            INSERT INTO app.RolePermissions (RoleId, PermissionId)
+            SELECT r.Id, p.Id
+            FROM app.Roles r
+            JOIN app.Permissions p ON p.Code = N'COMMUNICATION_READ'
+            WHERE r.Name = N'Member';
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DELETE FROM app.RolePermissions WHERE PermissionId IN (
+                    '22222222-2222-4222-8222-222222222072',
+                    '22222222-2222-4222-8222-222222222073',
+                    '22222222-2222-4222-8222-222222222074',
+                    '22222222-2222-4222-8222-222222222075',
+                    '22222222-2222-4222-8222-222222222076');
+                DELETE FROM app.Permissions WHERE Code IN (N'COMMUNICATION_READ', N'COMMUNICATION_CREATE', N'COMMUNICATION_UPDATE', N'COMMUNICATION_PUBLISH', N'COMMUNICATION_ARCHIVE');
+                DELETE FROM app.PlanFeatures WHERE FeatureCode = N'GYM_COMMUNICATIONS';
+                DELETE FROM app.FeatureDefinitions WHERE Code = N'GYM_COMMUNICATIONS';
+            ]]></sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

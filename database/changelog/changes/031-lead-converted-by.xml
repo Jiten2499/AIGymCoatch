@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0041" author="lifefit-architecture">
+        <comment>Ticket: LF-0041. Record who converted a lead. Index review: FK_Leads_ConvertedByUsers mirrors LostByUserId; no new list index because conversion history is read with the lead by Id. Performance note: nullable ConvertedByUserId does not change IX_Leads_TenantId_Status.</comment>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE app.Leads ADD ConvertedByUserId UNIQUEIDENTIFIER NULL;
+            ALTER TABLE app.Leads ADD CONSTRAINT FK_Leads_ConvertedByUsers
+                FOREIGN KEY (ConvertedByUserId) REFERENCES app.Users (Id);
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                ALTER TABLE app.Leads DROP CONSTRAINT FK_Leads_ConvertedByUsers;
+                ALTER TABLE app.Leads DROP COLUMN ConvertedByUserId;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

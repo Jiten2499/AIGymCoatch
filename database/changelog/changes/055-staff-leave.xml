@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0073" author="lifefit-architecture">
+        <comment>Ticket: LF-0073. Staff leave requests with tenant isolation, date ranges, optional attachment, and decision audit. Index review: PK on Id; UX_StaffLeave_Pending_Staff_Range prevents overlapping pending/approved rows per staff when active; IX_StaffLeaveRequests_Tenant_Dates and IX_StaffLeaveRequests_Staff serve calendar and my-leaves queries. Performance note: every list filter leads with TenantId.</comment>
+        <sql splitStatements="false"><![CDATA[
+            SET QUOTED_IDENTIFIER ON;
+            IF OBJECT_ID(N'app.StaffLeaveRequests', N'U') IS NULL
+            BEGIN
+                CREATE TABLE app.StaffLeaveRequests
+                (
+                    Id UNIQUEIDENTIFIER NOT NULL,
+                    TenantId UNIQUEIDENTIFIER NOT NULL,
+                    StaffProfileId UNIQUEIDENTIFIER NOT NULL,
+                    UserId UNIQUEIDENTIFIER NOT NULL,
+                    LeaveType NVARCHAR(32) NOT NULL,
+                    StartDate DATE NOT NULL,
+                    EndDate DATE NOT NULL,
+                    DurationDays INT NOT NULL,
+                    Reason NVARCHAR(1000) NOT NULL,
+                    AttachmentFileId UNIQUEIDENTIFIER NULL,
+                    Status NVARCHAR(32) NOT NULL,
+                    ApprovalRequestId UNIQUEIDENTIFIER NULL,
+                    SubmittedAt DATETIME2 NOT NULL,
+                    DecisionComment NVARCHAR(500) NULL,
+                    DecidedByUserId UNIQUEIDENTIFIER NULL,
+                    DecidedAt DATETIME2 NULL,
+                    CreatedAt DATETIME2 NOT NULL,
+                    CreatedBy UNIQUEIDENTIFIER NULL,
+                    UpdatedAt DATETIME2 NULL,
+                    UpdatedBy UNIQUEIDENTIFIER NULL,
+                    DeletedAt DATETIME2 NULL,
+                    RowVersion ROWVERSION NOT NULL,
+                    CONSTRAINT PK_StaffLeaveRequests PRIMARY KEY CLUSTERED (Id),
+                    CONSTRAINT FK_StaffLeaveRequests_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                    CONSTRAINT FK_StaffLeaveRequests_StaffProfiles FOREIGN KEY (StaffProfileId) REFERENCES app.StaffProfiles (Id),
+                    CONSTRAINT FK_StaffLeaveRequests_Users FOREIGN KEY (UserId) REFERENCES app.Users (Id),
+                    CONSTRAINT CK_StaffLeaveRequests_Dates CHECK (EndDate >= StartDate),
+                    CONSTRAINT CK_StaffLeaveRequests_Duration CHECK (DurationDays > 0),
+                    CONSTRAINT CK_StaffLeaveRequests_Type CHECK (LeaveType IN (N'Annual', N'Sick', N'Casual', N'Unpaid', N'Other')),
+                    CONSTRAINT CK_StaffLeaveRequests_Status CHECK (Status IN (N'Pending', N'Approved', N'Rejected', N'Cancelled'))
+                );
+                CREATE INDEX IX_StaffLeaveRequests_Tenant_Dates ON app.StaffLeaveRequests (TenantId, StartDate, EndDate) WHERE DeletedAt IS NULL;
+                CREATE INDEX IX_StaffLeaveRequests_Staff ON app.StaffLeaveRequests (TenantId, StaffProfileId, Status) WHERE DeletedAt IS NULL;
+                CREATE INDEX IX_StaffLeaveRequests_Approval ON app.StaffLeaveRequests (TenantId, ApprovalRequestId) WHERE DeletedAt IS NULL AND ApprovalRequestId IS NOT NULL;
+            END;
+        ]]></sql>
+        <rollback>
+            <sql>DROP TABLE IF EXISTS app.StaffLeaveRequests;</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="LF-0073b" author="lifefit-architecture">
+        <comment>Ticket: LF-0073. Allow StaffLeaveUpdate notification type for leave decisions. Index review: constraint only. Performance note: no row rewrite.</comment>
+        <sql splitStatements="false"><![CDATA[
+            SET QUOTED_IDENTIFIER ON;
+            IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_Notifications_Type')
+            BEGIN
+                ALTER TABLE app.Notifications DROP CONSTRAINT CK_Notifications_Type;
+                ALTER TABLE app.Notifications ADD CONSTRAINT CK_Notifications_Type CHECK (Type IN (N'WorkoutReminder', N'MembershipReminder', N'ChallengeReminder', N'AiRecommendation', N'WorkoutCompleted', N'StaffLeaveUpdate'));
+            END;
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_Notifications_Type')
+                BEGIN
+                    ALTER TABLE app.Notifications DROP CONSTRAINT CK_Notifications_Type;
+                    ALTER TABLE app.Notifications ADD CONSTRAINT CK_Notifications_Type CHECK (Type IN (N'WorkoutReminder', N'MembershipReminder', N'ChallengeReminder', N'AiRecommendation', N'WorkoutCompleted'));
+                END;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="LF-0074" author="lifefit-architecture">
+        <comment>Ticket: LF-0074. Enable STAFF_LEAVE and grant leave permissions. Index review: catalog inserts only. Performance note: fixed seed rows.</comment>
+        <sql splitStatements="false"><![CDATA[
+            SET QUOTED_IDENTIFIER ON;
+            DECLARE @Now DATETIME2 = SYSUTCDATETIME();
+
+            IF NOT EXISTS (SELECT 1 FROM app.FeatureDefinitions WHERE Code = N'STAFF_LEAVE')
+            BEGIN
+                INSERT INTO app.FeatureDefinitions (Id, Code, Name, Description, Category, IsActive, Scope, ConsumesLicense, CreatedAt, UpdatedAt)
+                VALUES ('a2222222-2222-4222-8222-222222222011', N'STAFF_LEAVE', N'Staff leave', N'Apply for leave and review staff leave requests.', N'Platform', 1, N'Tenant', 0, @Now, @Now);
+            END;
+
+            INSERT INTO app.PlanFeatures (Id, PlanId, FeatureCode, [Enabled], CreatedAt, UpdatedAt)
+            SELECT NEWID(), p.Id, N'STAFF_LEAVE',
+                CASE WHEN p.Code IN (N'BUSINESS_FREE', N'BASIC', N'PRO', N'ENTERPRISE') THEN 1 ELSE 0 END,
+                @Now, @Now
+            FROM app.Plans p
+            WHERE NOT EXISTS (
+                SELECT 1 FROM app.PlanFeatures pf
+                WHERE pf.PlanId = p.Id AND pf.FeatureCode = N'STAFF_LEAVE');
+
+            IF NOT EXISTS (SELECT 1 FROM app.Permissions WHERE Code = N'LEAVE_APPLY')
+            BEGIN
+                INSERT INTO app.Permissions (Id, Code, Name, Description, CreatedAt, UpdatedAt)
+                VALUES
+                    ('22222222-2222-4222-8222-2222222220b1', N'LEAVE_APPLY', N'Apply leave', N'Submit and cancel own staff leave requests.', @Now, @Now),
+                    ('22222222-2222-4222-8222-2222222220b2', N'LEAVE_READ', N'Read staff leave', N'View staff leave calendar and request details.', @Now, @Now),
+                    ('22222222-2222-4222-8222-2222222220b3', N'LEAVE_APPROVE', N'Approve staff leave', N'Approve or reject staff leave requests.', @Now, @Now);
+            END;
+
+            INSERT INTO app.RolePermissions (RoleId, PermissionId)
+            SELECT r.Id, p.Id
+            FROM app.Roles r
+            JOIN app.Permissions p ON p.Code = N'LEAVE_APPLY'
+            WHERE r.Name IN (N'SuperAdmin', N'GymOwner', N'GymManager', N'Trainer', N'Receptionist')
+              AND NOT EXISTS (SELECT 1 FROM app.RolePermissions rp WHERE rp.RoleId = r.Id AND rp.PermissionId = p.Id);
+
+            INSERT INTO app.RolePermissions (RoleId, PermissionId)
+            SELECT r.Id, p.Id
+            FROM app.Roles r
+            JOIN app.Permissions p ON p.Code IN (N'LEAVE_READ', N'LEAVE_APPROVE')
+            WHERE r.Name IN (N'SuperAdmin', N'GymOwner', N'GymManager')
+              AND NOT EXISTS (SELECT 1 FROM app.RolePermissions rp WHERE rp.RoleId = r.Id AND rp.PermissionId = p.Id);
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DELETE rp FROM app.RolePermissions rp
+                INNER JOIN app.Permissions p ON p.Id = rp.PermissionId
+                WHERE p.Code IN (N'LEAVE_APPLY', N'LEAVE_READ', N'LEAVE_APPROVE');
+                DELETE FROM app.Permissions WHERE Code IN (N'LEAVE_APPLY', N'LEAVE_READ', N'LEAVE_APPROVE');
+                DELETE FROM app.PlanFeatures WHERE FeatureCode = N'STAFF_LEAVE';
+                DELETE FROM app.FeatureDefinitions WHERE Code = N'STAFF_LEAVE';
+            ]]></sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

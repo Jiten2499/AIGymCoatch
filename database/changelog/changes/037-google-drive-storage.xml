@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0051" author="lifefit-architecture">
+        <comment>
+            Ticket: LF-0051. Tenant Google Drive storage connections, OAuth state, and stored file metadata.
+            Index review: PK on each Id; UX_TenantStorageConnections_TenantId_Provider for one connection per provider;
+            IX_TenantStorageConnections_TenantId_Status; UX_StoredFiles_TenantId_LogicalKey; UX_StoredFiles_TenantId_ExternalFileId;
+            IX_StoredFiles_TenantId_Entity; UX_StorageOAuthStates_StateHash; IX_StorageOAuthStates_ExpiresAt.
+            Performance note: every list index leads with TenantId. Soft-deleted rows stay filtered out. Tokens are never plaintext.
+        </comment>
+        <sql splitStatements="false"><![CDATA[
+            CREATE TABLE app.TenantStorageConnections
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                Provider NVARCHAR(32) NOT NULL,
+                Status NVARCHAR(32) NOT NULL,
+                AccountEmail NVARCHAR(320) NULL,
+                RootFolderId NVARCHAR(128) NULL,
+                MembersFolderId NVARCHAR(128) NULL,
+                CommunicationsFolderId NVARCHAR(128) NULL,
+                GymFolderId NVARCHAR(128) NULL,
+                OtherFolderId NVARCHAR(128) NULL,
+                ProtectedRefreshToken NVARCHAR(MAX) NULL,
+                GrantedScopes NVARCHAR(500) NULL,
+                ConnectedByUserId UNIQUEIDENTIFIER NULL,
+                ConnectedAt DATETIME2 NULL,
+                LastValidatedAt DATETIME2 NULL,
+                LastError NVARCHAR(500) NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_TenantStorageConnections PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_TenantStorageConnections_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_TenantStorageConnections_Users FOREIGN KEY (ConnectedByUserId) REFERENCES app.Users (Id),
+                CONSTRAINT CK_TenantStorageConnections_Provider CHECK (Provider IN (N'GoogleDrive')),
+                CONSTRAINT CK_TenantStorageConnections_Status CHECK (Status IN (N'NotConnected', N'Connecting', N'Connected', N'Failed', N'Revoked'))
+            );
+            CREATE UNIQUE INDEX UX_TenantStorageConnections_TenantId_Provider
+                ON app.TenantStorageConnections (TenantId, Provider) WHERE DeletedAt IS NULL;
+            CREATE INDEX IX_TenantStorageConnections_TenantId_Status
+                ON app.TenantStorageConnections (TenantId, Status) WHERE DeletedAt IS NULL;
+
+            CREATE TABLE app.StorageOAuthStates
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                UserId UNIQUEIDENTIFIER NOT NULL,
+                StateHash NVARCHAR(128) NOT NULL,
+                CodeVerifier NVARCHAR(128) NOT NULL,
+                ClientKind NVARCHAR(16) NOT NULL,
+                ReturnPath NVARCHAR(500) NULL,
+                ExpiresAt DATETIME2 NOT NULL,
+                ConsumedAt DATETIME2 NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                CONSTRAINT PK_StorageOAuthStates PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_StorageOAuthStates_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_StorageOAuthStates_Users FOREIGN KEY (UserId) REFERENCES app.Users (Id),
+                CONSTRAINT CK_StorageOAuthStates_ClientKind CHECK (ClientKind IN (N'Web', N'Mobile'))
+            );
+            CREATE UNIQUE INDEX UX_StorageOAuthStates_StateHash ON app.StorageOAuthStates (StateHash);
+            CREATE INDEX IX_StorageOAuthStates_ExpiresAt ON app.StorageOAuthStates (ExpiresAt);
+
+            CREATE TABLE app.StoredFiles
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                Provider NVARCHAR(32) NOT NULL,
+                ExternalFileId NVARCHAR(128) NOT NULL,
+                ParentFolderId NVARCHAR(128) NOT NULL,
+                FileName NVARCHAR(255) NOT NULL,
+                ContentType NVARCHAR(128) NOT NULL,
+                FileSize BIGINT NOT NULL,
+                LogicalKey NVARCHAR(500) NOT NULL,
+                EntityType NVARCHAR(64) NULL,
+                EntityId UNIQUEIDENTIFIER NULL,
+                Status NVARCHAR(16) NOT NULL,
+                CreatedByUserId UNIQUEIDENTIFIER NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_StoredFiles PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_StoredFiles_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_StoredFiles_Users FOREIGN KEY (CreatedByUserId) REFERENCES app.Users (Id),
+                CONSTRAINT CK_StoredFiles_Provider CHECK (Provider IN (N'GoogleDrive')),
+                CONSTRAINT CK_StoredFiles_Status CHECK (Status IN (N'Active', N'Deleted')),
+                CONSTRAINT CK_StoredFiles_FileSize CHECK (FileSize >= 0)
+            );
+            CREATE UNIQUE INDEX UX_StoredFiles_TenantId_LogicalKey ON app.StoredFiles (TenantId, LogicalKey) WHERE DeletedAt IS NULL;
+            CREATE UNIQUE INDEX UX_StoredFiles_TenantId_ExternalFileId ON app.StoredFiles (TenantId, ExternalFileId) WHERE DeletedAt IS NULL;
+            CREATE INDEX IX_StoredFiles_TenantId_Entity ON app.StoredFiles (TenantId, EntityType, EntityId) WHERE DeletedAt IS NULL;
+            CREATE INDEX IX_StoredFiles_TenantId_Status ON app.StoredFiles (TenantId, Status) WHERE DeletedAt IS NULL;
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DROP TABLE app.StoredFiles;
+                DROP TABLE app.StorageOAuthStates;
+                DROP TABLE app.TenantStorageConnections;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="LF-0052" author="lifefit-architecture">
+        <comment>Ticket: LF-0052. Enable GOOGLE_DRIVE_STORAGE and grant integration/storage permissions. Index review: catalog inserts only.</comment>
+        <sql splitStatements="false"><![CDATA[
+            DECLARE @Now DATETIME2 = SYSUTCDATETIME();
+            INSERT INTO app.FeatureDefinitions (Id, Code, Name, Description, Category, IsActive, Scope, ConsumesLicense, CreatedAt, UpdatedAt)
+            VALUES ('a2222222-2222-4222-8222-222222222006', N'GOOGLE_DRIVE_STORAGE', N'Google Drive Storage', N'Connect a Google Drive account for LifeFit file storage.', N'Platform', 1, N'Tenant', 0, @Now, @Now);
+
+            INSERT INTO app.PlanFeatures (Id, PlanId, FeatureCode, [Enabled], CreatedAt, UpdatedAt)
+            SELECT NEWID(), p.Id, N'GOOGLE_DRIVE_STORAGE',
+                CASE WHEN p.Code IN (N'BASIC', N'PRO', N'ENTERPRISE') THEN 1 ELSE 0 END,
+                @Now, @Now
+            FROM app.Plans p;
+
+            INSERT INTO app.Permissions (Id, Code, Name, Description, CreatedAt, UpdatedAt)
+            VALUES
+                ('22222222-2222-4222-8222-222222222100', N'INTEGRATION_READ', N'View integrations', N'View storage and integration connection status.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222101', N'INTEGRATION_MANAGE', N'Manage integrations', N'Connect, test, and disconnect storage integrations.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222102', N'STORAGE_FILE_READ', N'Read stored files', N'Download and view stored file metadata.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222103', N'STORAGE_FILE_WRITE', N'Write stored files', N'Upload and delete stored files.', @Now, @Now);
+
+            INSERT INTO app.RolePermissions (RoleId, PermissionId)
+            SELECT r.Id, p.Id
+            FROM app.Roles r
+            JOIN app.Permissions p ON p.Code IN (N'INTEGRATION_READ', N'INTEGRATION_MANAGE', N'STORAGE_FILE_READ', N'STORAGE_FILE_WRITE')
+            WHERE r.Name IN (N'SuperAdmin', N'GymOwner', N'GymManager');
+
+            INSERT INTO app.RolePermissions (RoleId, PermissionId)
+            SELECT r.Id, p.Id
+            FROM app.Roles r
+            JOIN app.Permissions p ON p.Code IN (N'INTEGRATION_READ', N'STORAGE_FILE_READ')
+            WHERE r.Name = N'Receptionist';
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DELETE FROM app.RolePermissions WHERE PermissionId IN (
+                    '22222222-2222-4222-8222-222222222100',
+                    '22222222-2222-4222-8222-222222222101',
+                    '22222222-2222-4222-8222-222222222102',
+                    '22222222-2222-4222-8222-222222222103');
+                DELETE FROM app.Permissions WHERE Code IN (N'INTEGRATION_READ', N'INTEGRATION_MANAGE', N'STORAGE_FILE_READ', N'STORAGE_FILE_WRITE');
+                DELETE FROM app.PlanFeatures WHERE FeatureCode = N'GOOGLE_DRIVE_STORAGE';
+                DELETE FROM app.FeatureDefinitions WHERE Code = N'GOOGLE_DRIVE_STORAGE';
+            ]]></sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

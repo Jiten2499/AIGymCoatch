@@ -1,0 +1,26 @@
+namespace LifeFitAI.Domain.Fitness;
+
+public sealed record ProgressCapture(
+    DateOnly Date,
+    UnitSystem UnitSystem,
+    decimal? Weight,
+    decimal? Height,
+    decimal? Waist,
+    decimal? Chest,
+    decimal? Hip,
+    decimal? Arm,
+    decimal? RightArm,
+    decimal? Thigh,
+    decimal? RightThigh,
+    decimal? BodyFatPercentage,
+    decimal? VisceralFat,
+    decimal? FitnessScore,
+    decimal? StrengthScore,
+    decimal? EnduranceScore,
+    decimal? FlexibilityScore,
+    decimal? CoreScore,
+    string? TrainingPerformance,
+    string? Notes,
+    string? AchievedGoals,
+    string? NextGoals,
+    bool PhotoConsent);

@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0054" author="lifefit-architecture">
+        <comment>
+            Ticket: LF-0054. Snapshot communication recipients at publish time and store selected trainer/staff targets.
+            Index review: UX_CommunicationRecipients_CommunicationId_UserId prevents duplicate delivery;
+            IX_CommunicationRecipients_TenantId_UserId_ReadAt serves the inbox and unread count;
+            UX_CommunicationAudienceTargets_CommunicationId_Kind_EntityId prevents duplicate selections.
+            Performance note: inbox and unread queries lead with TenantId and UserId.
+        </comment>
+        <sql>ALTER TABLE app.Communications DROP CONSTRAINT CK_Communications_AudienceType;</sql>
+        <sql>ALTER TABLE app.Communications ADD CONSTRAINT CK_Communications_AudienceType CHECK (AudienceType IN (N'AllMembers', N'ActiveMembers', N'ExpiringMembers', N'MembershipPackage', N'TrainerMembers', N'SelectedMembers', N'AllTrainers', N'AllStaff', N'AllBusinessUsers', N'SelectedTrainers', N'SelectedStaff'));</sql>
+        <sql splitStatements="false"><![CDATA[
+            CREATE TABLE app.CommunicationAudienceTargets
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                CommunicationId UNIQUEIDENTIFIER NOT NULL,
+                TargetKind NVARCHAR(16) NOT NULL,
+                EntityId UNIQUEIDENTIFIER NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_CommunicationAudienceTargets PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_CommunicationAudienceTargets_Communications FOREIGN KEY (CommunicationId) REFERENCES app.Communications (Id),
+                CONSTRAINT FK_CommunicationAudienceTargets_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT CK_CommunicationAudienceTargets_Kind CHECK (TargetKind IN (N'Trainer', N'Staff'))
+            );
+            CREATE UNIQUE INDEX UX_CommunicationAudienceTargets_CommunicationId_Kind_EntityId
+                ON app.CommunicationAudienceTargets (CommunicationId, TargetKind, EntityId) WHERE DeletedAt IS NULL;
+            CREATE INDEX IX_CommunicationAudienceTargets_TenantId_CommunicationId
+                ON app.CommunicationAudienceTargets (TenantId, CommunicationId) WHERE DeletedAt IS NULL;
+
+            CREATE TABLE app.CommunicationRecipients
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                CommunicationId UNIQUEIDENTIFIER NOT NULL,
+                UserId UNIQUEIDENTIFIER NOT NULL,
+                RecipientKind NVARCHAR(16) NOT NULL,
+                RecipientEntityId UNIQUEIDENTIFIER NULL,
+                DeliveredAt DATETIME2 NOT NULL,
+                ReadAt DATETIME2 NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_CommunicationRecipients PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_CommunicationRecipients_Communications FOREIGN KEY (CommunicationId) REFERENCES app.Communications (Id),
+                CONSTRAINT FK_CommunicationRecipients_Users FOREIGN KEY (UserId) REFERENCES app.Users (Id),
+                CONSTRAINT FK_CommunicationRecipients_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT CK_CommunicationRecipients_Kind CHECK (RecipientKind IN (N'Member', N'Trainer', N'Staff', N'BusinessUser'))
+            );
+            CREATE UNIQUE INDEX UX_CommunicationRecipients_CommunicationId_UserId
+                ON app.CommunicationRecipients (CommunicationId, UserId) WHERE DeletedAt IS NULL;
+            CREATE INDEX IX_CommunicationRecipients_TenantId_UserId_ReadAt
+                ON app.CommunicationRecipients (TenantId, UserId, ReadAt) WHERE DeletedAt IS NULL;
+        ]]></sql>
+        <sql splitStatements="false"><![CDATA[
+            INSERT INTO app.RolePermissions (RoleId, PermissionId)
+            SELECT r.Id, p.Id
+            FROM app.Roles r
+            JOIN app.Permissions p ON p.Code = N'COMMUNICATION_READ'
+            WHERE r.Name = N'Trainer'
+              AND NOT EXISTS (
+                SELECT 1 FROM app.RolePermissions existing
+                WHERE existing.RoleId = r.Id AND existing.PermissionId = p.Id);
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DELETE FROM app.RolePermissions
+                WHERE PermissionId = (SELECT Id FROM app.Permissions WHERE Code = N'COMMUNICATION_READ')
+                  AND RoleId = (SELECT Id FROM app.Roles WHERE Name = N'Trainer');
+                DROP TABLE app.CommunicationRecipients;
+                DROP TABLE app.CommunicationAudienceTargets;
+                ALTER TABLE app.Communications DROP CONSTRAINT CK_Communications_AudienceType;
+                ALTER TABLE app.Communications ADD CONSTRAINT CK_Communications_AudienceType CHECK (AudienceType IN (N'AllMembers', N'ActiveMembers', N'ExpiringMembers', N'MembershipPackage', N'TrainerMembers', N'SelectedMembers'));
+            ]]></sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0037" author="lifefit-architecture">
+        <comment>Ticket: LF-0037. Gym expense categories and expense records. An expense is not a payment, invoice, or ledger entry. Index review: PK on each Id; UX_ExpenseCategories_TenantId_Name keeps category names unique inside a gym; IX_Expenses_TenantId_ExpenseDate serves date-range lists and period totals; IX_Expenses_TenantId_CategoryId serves category filters and category totals. Performance note: both expense indexes lead with TenantId so one gym does not scan another gym's history. Voided rows stay in the table and are excluded by the status predicate, not by deletion.</comment>
+        <sql splitStatements="false"><![CDATA[
+            CREATE TABLE app.ExpenseCategories
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                Name NVARCHAR(100) NOT NULL,
+                Description NVARCHAR(500) NULL,
+                IsActive BIT NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_ExpenseCategories PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_ExpenseCategories_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id)
+            );
+            CREATE UNIQUE INDEX UX_ExpenseCategories_TenantId_Name ON app.ExpenseCategories (TenantId, Name) WHERE DeletedAt IS NULL;
+
+            CREATE TABLE app.Expenses
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                CategoryId UNIQUEIDENTIFIER NOT NULL,
+                Description NVARCHAR(200) NOT NULL,
+                Amount DECIMAL(19, 4) NOT NULL,
+                Currency NVARCHAR(3) NOT NULL,
+                ExpenseDate DATE NOT NULL,
+                PaymentMethod NVARCHAR(32) NOT NULL,
+                RecordedByUserId UNIQUEIDENTIFIER NOT NULL,
+                Notes NVARCHAR(2000) NULL,
+                Status NVARCHAR(32) NOT NULL,
+                VoidedAt DATETIME2 NULL,
+                VoidedByUserId UNIQUEIDENTIFIER NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_Expenses PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_Expenses_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_Expenses_ExpenseCategories FOREIGN KEY (CategoryId) REFERENCES app.ExpenseCategories (Id),
+                CONSTRAINT FK_Expenses_RecordedByUsers FOREIGN KEY (RecordedByUserId) REFERENCES app.Users (Id),
+                CONSTRAINT FK_Expenses_VoidedByUsers FOREIGN KEY (VoidedByUserId) REFERENCES app.Users (Id),
+                CONSTRAINT CK_Expenses_Amount CHECK (Amount > 0),
+                CONSTRAINT CK_Expenses_Status CHECK (Status IN (N'Active', N'Voided')),
+                CONSTRAINT CK_Expenses_PaymentMethod CHECK (PaymentMethod IN (N'Cash', N'Upi', N'BankTransfer', N'Card', N'Other'))
+            );
+            CREATE INDEX IX_Expenses_TenantId_ExpenseDate ON app.Expenses (TenantId, ExpenseDate) WHERE DeletedAt IS NULL;
+            CREATE INDEX IX_Expenses_TenantId_CategoryId ON app.Expenses (TenantId, CategoryId) WHERE DeletedAt IS NULL;
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DROP TABLE app.Expenses;
+                DROP TABLE app.ExpenseCategories;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="LF-0038" author="lifefit-architecture">
+        <comment>Ticket: LF-0038. Enable GYM_EXPENSE_MANAGEMENT on business plans and grant expense permissions. Index review: no new indexes; inserts use UX_FeatureDefinitions_Code, UX_PlanFeatures_PlanId_FeatureCode, UX_Permissions_Code, and PK_RolePermissions. Performance note: the catalog write is a fixed set of rows.</comment>
+        <sql splitStatements="false"><![CDATA[
+            DECLARE @Now DATETIME2 = SYSUTCDATETIME();
+            INSERT INTO app.FeatureDefinitions (Id, Code, Name, Description, Category, IsActive, Scope, ConsumesLicense, CreatedAt, UpdatedAt)
+            VALUES ('a2222222-2222-4222-8222-222222222002', N'GYM_EXPENSE_MANAGEMENT', N'Expense management', N'Record and review gym operating expenses.', N'Platform', 1, N'Tenant', 0, @Now, @Now);
+
+            INSERT INTO app.PlanFeatures (Id, PlanId, FeatureCode, [Enabled], CreatedAt, UpdatedAt)
+            SELECT NEWID(), p.Id, N'GYM_EXPENSE_MANAGEMENT',
+                CASE WHEN p.Code IN (N'BASIC', N'PRO', N'ENTERPRISE') THEN 1 ELSE 0 END,
+                @Now, @Now
+            FROM app.Plans p;
+
+            INSERT INTO app.Permissions (Id, Code, Name, Description, CreatedAt, UpdatedAt)
+            VALUES
+                ('22222222-2222-4222-8222-222222222065', N'EXPENSE_READ', N'Read expenses', N'Read expenses, categories, and expense summaries.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222066', N'EXPENSE_CREATE', N'Create expenses', N'Record an expense.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222067', N'EXPENSE_UPDATE', N'Update expenses', N'Update an active expense.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222068', N'EXPENSE_VOID', N'Void expenses', N'Void an expense without deleting its history.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222069', N'EXPENSE_CATEGORY_MANAGE', N'Manage expense categories', N'Create, update, and deactivate expense categories.', @Now, @Now);
+
+            INSERT INTO app.RolePermissions (RoleId, PermissionId)
+            SELECT r.Id, p.Id
+            FROM app.Roles r
+            JOIN app.Permissions p ON p.Code IN (N'EXPENSE_READ', N'EXPENSE_CREATE', N'EXPENSE_UPDATE', N'EXPENSE_VOID', N'EXPENSE_CATEGORY_MANAGE')
+            WHERE r.Name IN (N'SuperAdmin', N'GymOwner', N'GymManager');
+
+            INSERT INTO app.RolePermissions (RoleId, PermissionId)
+            SELECT r.Id, p.Id
+            FROM app.Roles r
+            JOIN app.Permissions p ON p.Code IN (N'EXPENSE_READ', N'EXPENSE_CREATE')
+            WHERE r.Name = N'Receptionist';
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DELETE FROM app.RolePermissions WHERE PermissionId IN (
+                    '22222222-2222-4222-8222-222222222065',
+                    '22222222-2222-4222-8222-222222222066',
+                    '22222222-2222-4222-8222-222222222067',
+                    '22222222-2222-4222-8222-222222222068',
+                    '22222222-2222-4222-8222-222222222069');
+                DELETE FROM app.Permissions WHERE Code IN (N'EXPENSE_READ', N'EXPENSE_CREATE', N'EXPENSE_UPDATE', N'EXPENSE_VOID', N'EXPENSE_CATEGORY_MANAGE');
+                DELETE FROM app.PlanFeatures WHERE FeatureCode = N'GYM_EXPENSE_MANAGEMENT';
+                DELETE FROM app.FeatureDefinitions WHERE Code = N'GYM_EXPENSE_MANAGEMENT';
+            ]]></sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

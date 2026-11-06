@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0062" author="lifefit-architecture">
+        <comment>Ticket: LF-0062. Optional personal-training sessions included with a membership, plus a separate personal-training package catalog and assignment. Index review: no new index on MembershipPlans or GymMemberships because the added counts are read with the existing plan and membership rows. PK on PtPackages and MemberPtAssignments. UX_PtPackages_TenantId_Name keeps catalog names unique per tenant. IX_PtPackages_TenantId_IsActive serves the active package picker. UX_MemberPtAssignments_Open stops a second active assignment of the same package to the same member. IX_MemberPtAssignments_MemberProfileId reads a member's package assignments. Performance note: package lists and assignment checks stay tenant-scoped and seek one member.</comment>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE app.MembershipPlans ADD IncludedPtSessions INT NOT NULL CONSTRAINT DF_MembershipPlans_IncludedPtSessions DEFAULT 0;
+        ]]></sql>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE app.MembershipPlans ADD CONSTRAINT CK_MembershipPlans_IncludedPtSessions CHECK (IncludedPtSessions >= 0);
+        ]]></sql>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE app.GymMemberships ADD IncludedPtSessions INT NOT NULL CONSTRAINT DF_GymMemberships_IncludedPtSessions DEFAULT 0;
+        ]]></sql>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE app.GymMemberships ADD CONSTRAINT CK_GymMemberships_IncludedPtSessions CHECK (IncludedPtSessions >= 0);
+        ]]></sql>
+        <sql splitStatements="false"><![CDATA[
+            CREATE TABLE app.PtPackages
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                Name NVARCHAR(200) NOT NULL,
+                Description NVARCHAR(1000) NULL,
+                SessionCount INT NOT NULL,
+                ValidityDays INT NOT NULL,
+                Price DECIMAL(19, 4) NOT NULL,
+                Currency NVARCHAR(3) NOT NULL,
+                IsActive BIT NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_PtPackages PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_PtPackages_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT CK_PtPackages_SessionCount CHECK (SessionCount > 0),
+                CONSTRAINT CK_PtPackages_ValidityDays CHECK (ValidityDays > 0),
+                CONSTRAINT CK_PtPackages_Price CHECK (Price >= 0)
+            );
+            CREATE UNIQUE INDEX UX_PtPackages_TenantId_Name ON app.PtPackages (TenantId, Name) WHERE DeletedAt IS NULL;
+            CREATE INDEX IX_PtPackages_TenantId_IsActive ON app.PtPackages (TenantId, IsActive) WHERE DeletedAt IS NULL;
+
+            CREATE TABLE app.MemberPtAssignments
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                MemberProfileId UNIQUEIDENTIFIER NOT NULL,
+                PtPackageId UNIQUEIDENTIFIER NOT NULL,
+                TrainerProfileId UNIQUEIDENTIFIER NULL,
+                StartDate DATE NOT NULL,
+                EndDate DATE NOT NULL,
+                SessionCount INT NOT NULL,
+                SessionsRemaining INT NOT NULL,
+                Price DECIMAL(19, 4) NOT NULL,
+                Currency NVARCHAR(3) NOT NULL,
+                PaymentStatus NVARCHAR(16) NOT NULL,
+                Status NVARCHAR(16) NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_MemberPtAssignments PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_MemberPtAssignments_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_MemberPtAssignments_MemberProfiles FOREIGN KEY (MemberProfileId) REFERENCES app.MemberProfiles (Id),
+                CONSTRAINT FK_MemberPtAssignments_PtPackages FOREIGN KEY (PtPackageId) REFERENCES app.PtPackages (Id),
+                CONSTRAINT FK_MemberPtAssignments_TrainerProfiles FOREIGN KEY (TrainerProfileId) REFERENCES app.TrainerProfiles (Id),
+                CONSTRAINT CK_MemberPtAssignments_Dates CHECK (EndDate >= StartDate),
+                CONSTRAINT CK_MemberPtAssignments_Sessions CHECK (SessionCount > 0 AND SessionsRemaining >= 0 AND SessionsRemaining <= SessionCount),
+                CONSTRAINT CK_MemberPtAssignments_PaymentStatus CHECK (PaymentStatus = N'Unpaid'),
+                CONSTRAINT CK_MemberPtAssignments_Status CHECK (Status = N'Active')
+            );
+            CREATE UNIQUE INDEX UX_MemberPtAssignments_Open ON app.MemberPtAssignments (MemberProfileId, PtPackageId) WHERE DeletedAt IS NULL AND Status = N'Active';
+            CREATE INDEX IX_MemberPtAssignments_MemberProfileId ON app.MemberPtAssignments (TenantId, MemberProfileId) WHERE DeletedAt IS NULL;
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DROP TABLE app.MemberPtAssignments;
+                DROP TABLE app.PtPackages;
+                ALTER TABLE app.GymMemberships DROP CONSTRAINT CK_GymMemberships_IncludedPtSessions;
+                ALTER TABLE app.GymMemberships DROP CONSTRAINT DF_GymMemberships_IncludedPtSessions;
+                ALTER TABLE app.GymMemberships DROP COLUMN IncludedPtSessions;
+                ALTER TABLE app.MembershipPlans DROP CONSTRAINT CK_MembershipPlans_IncludedPtSessions;
+                ALTER TABLE app.MembershipPlans DROP CONSTRAINT DF_MembershipPlans_IncludedPtSessions;
+                ALTER TABLE app.MembershipPlans DROP COLUMN IncludedPtSessions;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

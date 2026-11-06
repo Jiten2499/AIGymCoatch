@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0053" author="lifefit-architecture">
+        <comment>Ticket: LF-0053. Store the planned length of a membership freeze so the end date can move when the freeze is booked. Index review: no new index; UX_MembershipFreezes_Open and IX_MembershipFreezes_GymMembershipId already seek one membership. Performance note: the column is read with the freeze row.</comment>
+        <sql>ALTER TABLE app.MembershipFreezes ADD PlannedDays INT NULL;</sql>
+        <sql>ALTER TABLE app.MembershipFreezes ADD CONSTRAINT CK_MembershipFreezes_PlannedDays CHECK (PlannedDays IS NULL OR PlannedDays &gt; 0);</sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                ALTER TABLE app.MembershipFreezes DROP CONSTRAINT CK_MembershipFreezes_PlannedDays;
+                ALTER TABLE app.MembershipFreezes DROP COLUMN PlannedDays;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

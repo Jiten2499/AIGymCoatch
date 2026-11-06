@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        Ticket: LF-0044
+        Author: lifefit
+        Purpose: Gym members get basic LifeFit app login without a seat.
+                 Optional App Plan seats unlock premium (AI) features only.
+        Index review: no new tables; FeatureDefinitions updates by Code PK/unique.
+        Performance: one-time catalog update; hot path still keyed by FeatureCode.
+        Rollback: restore AI feature Scope to Tenant and ConsumesLicense to 0.
+    -->
+    <changeSet id="033-member-basic-app-access-ai-user-scope" author="lifefit">
+        <comment>LF-0044: Mark premium AI features as user-scoped so they consume a LifeFit app plan seat.</comment>
+        <sql>
+            UPDATE app.FeatureDefinitions
+            SET Scope = N'User',
+                ConsumesLicense = 1,
+                UpdatedAt = SYSUTCDATETIME()
+            WHERE Code IN (N'AI_COACH', N'AI_WORKOUT_GENERATION', N'AI_NUTRITION', N'AI_PROGRESS_INSIGHTS')
+              AND DeletedAt IS NULL;
+        </sql>
+        <rollback>
+            <sql>
+                UPDATE app.FeatureDefinitions
+                SET Scope = N'Tenant',
+                    ConsumesLicense = 0,
+                    UpdatedAt = SYSUTCDATETIME()
+                WHERE Code IN (N'AI_COACH', N'AI_WORKOUT_GENERATION', N'AI_NUTRITION', N'AI_PROGRESS_INSIGHTS')
+                  AND DeletedAt IS NULL;
+            </sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

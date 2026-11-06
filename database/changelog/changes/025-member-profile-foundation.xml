@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0033" author="lifefit-architecture">
+        <comment>Ticket: LF-0033. Extend the gym member profile with emergency relationship, fitness goal, assigned trainer, and private photo metadata. The photo file stays outside SQL Server. Index review: PK_MemberProfiles and IX_MemberProfiles_TenantId_Status already serve tenant lists, status filters, and join-date order; UX_MemberProfiles_TenantId_UserId stays the one-profile rule; FK_MemberProfiles_TrainerProfiles and IX_MemberProfiles_AssignedTrainerId support the optional same-tenant trainer link and are filtered to rows that have a trainer. Mobile stays unique on Users.Phone, so no second mobile index is added. Performance note: member search still seeks the tenant status index, then joins the matching users.</comment>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE app.MemberProfiles ADD
+                EmergencyContactRelationship NVARCHAR(64) NULL,
+                FitnessGoal NVARCHAR(32) NULL,
+                AssignedTrainerId UNIQUEIDENTIFIER NULL,
+                PhotoStorageKey NVARCHAR(200) NULL,
+                PhotoContentType NVARCHAR(64) NULL,
+                PhotoFileSize INT NULL;
+        ]]></sql>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE app.MemberProfiles ADD CONSTRAINT FK_MemberProfiles_TrainerProfiles
+                FOREIGN KEY (AssignedTrainerId) REFERENCES app.TrainerProfiles (Id);
+        ]]></sql>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE app.MemberProfiles ADD CONSTRAINT CK_MemberProfiles_FitnessGoal
+                CHECK (FitnessGoal IS NULL OR FitnessGoal IN (N'FatLoss', N'MuscleGain', N'Strength', N'Endurance', N'GeneralFitness', N'Mobility', N'WeightMaintenance'));
+        ]]></sql>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE app.MemberProfiles ADD CONSTRAINT CK_MemberProfiles_PhotoFileSize
+                CHECK (PhotoFileSize IS NULL OR PhotoFileSize > 0);
+        ]]></sql>
+        <sql splitStatements="false"><![CDATA[
+            CREATE INDEX IX_MemberProfiles_AssignedTrainerId
+                ON app.MemberProfiles (AssignedTrainerId) WHERE AssignedTrainerId IS NOT NULL AND DeletedAt IS NULL;
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DROP INDEX IX_MemberProfiles_AssignedTrainerId ON app.MemberProfiles;
+                ALTER TABLE app.MemberProfiles DROP CONSTRAINT CK_MemberProfiles_PhotoFileSize;
+                ALTER TABLE app.MemberProfiles DROP CONSTRAINT CK_MemberProfiles_FitnessGoal;
+                ALTER TABLE app.MemberProfiles DROP CONSTRAINT FK_MemberProfiles_TrainerProfiles;
+                ALTER TABLE app.MemberProfiles DROP COLUMN EmergencyContactRelationship, FitnessGoal, AssignedTrainerId, PhotoStorageKey, PhotoContentType, PhotoFileSize;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

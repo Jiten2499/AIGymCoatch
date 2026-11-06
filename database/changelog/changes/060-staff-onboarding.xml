@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0079" author="lifefit-architecture">
+        <comment>Ticket: LF-0079. Staff onboarding wizard fields: employment details, invitation statuses, multi-branch access, and optional user permission overrides. Seats stay on SubscriptionSeats. Index review: UX employee code already unique per tenant; IX_StaffBranchAccess_TenantId_UserId supports branch lists; UX_UserPermissionOverrides stops duplicate grants. Performance note: filtered unique indexes keep soft-deleted rows out of lookups. Branch scope is added for authorized branch data access.</comment>
+        <sql splitStatements="false">
+            ALTER TABLE app.StaffProfiles DROP CONSTRAINT CK_StaffProfiles_Status;
+            ALTER TABLE app.StaffProfiles ADD CONSTRAINT CK_StaffProfiles_Status CHECK (Status IN (N'Draft', N'PendingInvitation', N'Active', N'Suspended', N'Inactive'));
+
+            ALTER TABLE app.StaffProfiles ADD
+                Designation NVARCHAR(120) NULL,
+                Department NVARCHAR(120) NULL,
+                EmploymentType NVARCHAR(32) NULL,
+                ReportingManagerUserId UNIQUEIDENTIFIER NULL,
+                EmploymentNotes NVARCHAR(2000) NULL,
+                JobDescription NVARCHAR(2000) NULL,
+                DateOfBirth DATE NULL,
+                Gender NVARCHAR(32) NULL,
+                Address NVARCHAR(300) NULL,
+                EmergencyContactName NVARCHAR(200) NULL,
+                EmergencyContactPhone NVARCHAR(32) NULL;
+        </sql>
+        <sql splitStatements="false">
+            ALTER TABLE app.StaffProfiles ADD CONSTRAINT FK_StaffProfiles_ReportingManager
+                FOREIGN KEY (ReportingManagerUserId) REFERENCES app.Users (Id);
+            ALTER TABLE app.StaffProfiles ADD CONSTRAINT CK_StaffProfiles_EmploymentType
+                CHECK (EmploymentType IS NULL OR EmploymentType IN (N'FullTime', N'PartTime', N'Contract', N'Temporary', N'Intern'));
+
+            CREATE TABLE app.StaffBranchAccess
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                StaffProfileId UNIQUEIDENTIFIER NOT NULL,
+                BranchId UNIQUEIDENTIFIER NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_StaffBranchAccess PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_StaffBranchAccess_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_StaffBranchAccess_StaffProfiles FOREIGN KEY (StaffProfileId) REFERENCES app.StaffProfiles (Id),
+                CONSTRAINT FK_StaffBranchAccess_Branches FOREIGN KEY (BranchId) REFERENCES app.Branches (Id)
+            );
+            CREATE UNIQUE INDEX UX_StaffBranchAccess_StaffProfileId_BranchId
+                ON app.StaffBranchAccess (StaffProfileId, BranchId) WHERE DeletedAt IS NULL;
+            CREATE INDEX IX_StaffBranchAccess_TenantId_StaffProfileId
+                ON app.StaffBranchAccess (TenantId, StaffProfileId) WHERE DeletedAt IS NULL;
+
+            CREATE TABLE app.UserPermissionOverrides
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                UserId UNIQUEIDENTIFIER NOT NULL,
+                PermissionId UNIQUEIDENTIFIER NOT NULL,
+                Granted BIT NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_UserPermissionOverrides PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_UserPermissionOverrides_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_UserPermissionOverrides_Users FOREIGN KEY (UserId) REFERENCES app.Users (Id),
+                CONSTRAINT FK_UserPermissionOverrides_Permissions FOREIGN KEY (PermissionId) REFERENCES app.Permissions (Id)
+            );
+            CREATE UNIQUE INDEX UX_UserPermissionOverrides_TenantId_UserId_PermissionId
+                ON app.UserPermissionOverrides (TenantId, UserId, PermissionId) WHERE DeletedAt IS NULL;
+
+            CREATE TABLE app.UserResourceScopes
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                UserId UNIQUEIDENTIFIER NOT NULL,
+                Resource NVARCHAR(64) NOT NULL,
+                Scope NVARCHAR(32) NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_UserResourceScopes PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_UserResourceScopes_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_UserResourceScopes_Users FOREIGN KEY (UserId) REFERENCES app.Users (Id),
+                CONSTRAINT CK_UserResourceScopes_Scope CHECK (Scope IN (N'All', N'Branch', N'Assigned', N'Own'))
+            );
+            CREATE UNIQUE INDEX UX_UserResourceScopes_TenantId_UserId_Resource
+                ON app.UserResourceScopes (TenantId, UserId, Resource) WHERE DeletedAt IS NULL;
+
+            ALTER TABLE app.RoleResourceScopes DROP CONSTRAINT CK_RoleResourceScopes_Scope;
+            ALTER TABLE app.RoleResourceScopes ADD CONSTRAINT CK_RoleResourceScopes_Scope
+                CHECK (Scope IN (N'All', N'Branch', N'Assigned', N'Own'));
+        </sql>
+        <rollback>
+            <sql splitStatements="false">
+                ALTER TABLE app.RoleResourceScopes DROP CONSTRAINT CK_RoleResourceScopes_Scope;
+                ALTER TABLE app.RoleResourceScopes ADD CONSTRAINT CK_RoleResourceScopes_Scope
+                    CHECK (Scope IN (N'All', N'Assigned', N'Own'));
+                DROP TABLE app.UserResourceScopes;
+                DROP TABLE app.UserPermissionOverrides;
+                DROP TABLE app.StaffBranchAccess;
+                ALTER TABLE app.StaffProfiles DROP CONSTRAINT CK_StaffProfiles_EmploymentType;
+                ALTER TABLE app.StaffProfiles DROP CONSTRAINT FK_StaffProfiles_ReportingManager;
+                ALTER TABLE app.StaffProfiles DROP COLUMN Designation, Department, EmploymentType, ReportingManagerUserId, EmploymentNotes, JobDescription, DateOfBirth, Gender, Address, EmergencyContactName, EmergencyContactPhone;
+                ALTER TABLE app.StaffProfiles DROP CONSTRAINT CK_StaffProfiles_Status;
+                ALTER TABLE app.StaffProfiles ADD CONSTRAINT CK_StaffProfiles_Status CHECK (Status IN (N'Active', N'Inactive'));
+            </sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

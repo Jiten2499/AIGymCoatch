@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0074" author="lifefit-architecture">
+        <comment>Ticket: LF-0074. One-to-one tenant chat: permission rules, conversations, participants, messages, and attachment metadata. Binaries stay in the existing file store. Index review: PK on each table; FK indexes on TenantId, ConversationId, UserId, MessageId, and StoredFileId; UX_ChatConversations_TenantId_PairKey prevents a second direct thread for the same pair; UX_ChatParticipants_ConversationId_UserId and IX_ChatParticipants_TenantId_UserId serve membership and inbox; IX_ChatMessages_Conversation_Cursor pages history without a full scan; UX_ChatMessages_Idempotency stops duplicate submits; UX_ChatPermissionRules_TenantId_RuleCode keeps one rule per pair. Performance note: every list index leads with TenantId or ConversationId.</comment>
+        <sql splitStatements="false"><![CDATA[
+            CREATE TABLE app.ChatPermissionRules
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                RuleCode NVARCHAR(64) NOT NULL,
+                Enabled BIT NOT NULL,
+                Scope NVARCHAR(32) NOT NULL,
+                AllowImages BIT NOT NULL,
+                AllowDocuments BIT NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_ChatPermissionRules PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_ChatPermissionRules_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT CK_ChatPermissionRules_Scope CHECK (Scope IN (N'AssignedOnly', N'SameTenant'))
+            );
+            CREATE UNIQUE INDEX UX_ChatPermissionRules_TenantId_RuleCode ON app.ChatPermissionRules (TenantId, RuleCode) WHERE DeletedAt IS NULL;
+
+            CREATE TABLE app.ChatConversations
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                ConversationType NVARCHAR(32) NOT NULL,
+                PairKey NVARCHAR(80) NOT NULL,
+                LastMessageId UNIQUEIDENTIFIER NULL,
+                LastMessageAt DATETIME2 NULL,
+                LastPreview NVARCHAR(200) NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_ChatConversations PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_ChatConversations_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT CK_ChatConversations_Type CHECK (ConversationType IN (N'Direct'))
+            );
+            CREATE UNIQUE INDEX UX_ChatConversations_TenantId_PairKey ON app.ChatConversations (TenantId, PairKey) WHERE DeletedAt IS NULL;
+            CREATE INDEX IX_ChatConversations_TenantId_LastMessageAt ON app.ChatConversations (TenantId, LastMessageAt) WHERE DeletedAt IS NULL;
+
+            CREATE TABLE app.ChatParticipants
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                ConversationId UNIQUEIDENTIFIER NOT NULL,
+                UserId UNIQUEIDENTIFIER NOT NULL,
+                JoinedAt DATETIME2 NOT NULL,
+                LastReadMessageId UNIQUEIDENTIFIER NULL,
+                LastReadAt DATETIME2 NULL,
+                IsMuted BIT NOT NULL,
+                IsArchived BIT NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_ChatParticipants PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_ChatParticipants_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_ChatParticipants_ChatConversations FOREIGN KEY (ConversationId) REFERENCES app.ChatConversations (Id),
+                CONSTRAINT FK_ChatParticipants_Users FOREIGN KEY (UserId) REFERENCES app.Users (Id)
+            );
+            CREATE UNIQUE INDEX UX_ChatParticipants_ConversationId_UserId ON app.ChatParticipants (ConversationId, UserId) WHERE DeletedAt IS NULL;
+            CREATE INDEX IX_ChatParticipants_TenantId_UserId ON app.ChatParticipants (TenantId, UserId) WHERE DeletedAt IS NULL;
+
+            CREATE TABLE app.ChatMessages
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                ConversationId UNIQUEIDENTIFIER NOT NULL,
+                SenderUserId UNIQUEIDENTIFIER NOT NULL,
+                MessageType NVARCHAR(32) NOT NULL,
+                Body NVARCHAR(4000) NOT NULL,
+                ClientMessageId NVARCHAR(64) NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_ChatMessages PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_ChatMessages_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_ChatMessages_ChatConversations FOREIGN KEY (ConversationId) REFERENCES app.ChatConversations (Id),
+                CONSTRAINT FK_ChatMessages_Users FOREIGN KEY (SenderUserId) REFERENCES app.Users (Id),
+                CONSTRAINT CK_ChatMessages_Type CHECK (MessageType IN (N'Text', N'Image', N'Document'))
+            );
+            CREATE INDEX IX_ChatMessages_Conversation_Cursor ON app.ChatMessages (ConversationId, CreatedAt DESC, Id DESC) WHERE DeletedAt IS NULL;
+            CREATE UNIQUE INDEX UX_ChatMessages_Idempotency ON app.ChatMessages (TenantId, SenderUserId, ClientMessageId) WHERE DeletedAt IS NULL AND ClientMessageId IS NOT NULL;
+
+            CREATE TABLE app.ChatAttachments
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                MessageId UNIQUEIDENTIFIER NOT NULL,
+                StoredFileId UNIQUEIDENTIFIER NOT NULL,
+                StorageKey NVARCHAR(500) NOT NULL,
+                FileName NVARCHAR(200) NOT NULL,
+                ContentType NVARCHAR(100) NOT NULL,
+                SizeBytes BIGINT NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_ChatAttachments PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_ChatAttachments_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_ChatAttachments_ChatMessages FOREIGN KEY (MessageId) REFERENCES app.ChatMessages (Id),
+                CONSTRAINT FK_ChatAttachments_StoredFiles FOREIGN KEY (StoredFileId) REFERENCES app.StoredFiles (Id),
+                CONSTRAINT CK_ChatAttachments_SizeBytes CHECK (SizeBytes > 0)
+            );
+            CREATE INDEX IX_ChatAttachments_MessageId ON app.ChatAttachments (MessageId) WHERE DeletedAt IS NULL;
+
+            ALTER TABLE app.Notifications DROP CONSTRAINT CK_Notifications_Type;
+            ALTER TABLE app.Notifications ADD CONSTRAINT CK_Notifications_Type CHECK (Type IN (N'WorkoutReminder', N'MembershipReminder', N'ChallengeReminder', N'AiRecommendation', N'WorkoutCompleted', N'StaffLeaveUpdate', N'ChatMessage'));
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                ALTER TABLE app.Notifications DROP CONSTRAINT CK_Notifications_Type;
+                ALTER TABLE app.Notifications ADD CONSTRAINT CK_Notifications_Type CHECK (Type IN (N'WorkoutReminder', N'MembershipReminder', N'ChallengeReminder', N'AiRecommendation', N'WorkoutCompleted', N'StaffLeaveUpdate'));
+                DROP TABLE app.ChatAttachments;
+                DROP TABLE app.ChatMessages;
+                DROP TABLE app.ChatParticipants;
+                DROP TABLE app.ChatConversations;
+                DROP TABLE app.ChatPermissionRules;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="LF-0075" author="lifefit-architecture">
+        <comment>Ticket: LF-0075. Enable GYM_CHAT on business plans and grant chat permissions. Index review: catalog inserts use existing unique keys. Performance note: a fixed catalog write.</comment>
+        <sql splitStatements="false"><![CDATA[
+            DECLARE @Now DATETIME2 = SYSUTCDATETIME();
+            IF NOT EXISTS (SELECT 1 FROM app.FeatureDefinitions WHERE Code = N'GYM_CHAT')
+            BEGIN
+                INSERT INTO app.FeatureDefinitions (Id, Code, Name, Description, Category, IsActive, Scope, ConsumesLicense, CreatedAt, UpdatedAt)
+                VALUES ('a2222222-2222-4222-8222-222222222074', N'GYM_CHAT', N'Chat', N'One-to-one chat inside a business tenant.', N'Platform', 1, N'Tenant', 0, @Now, @Now);
+            END;
+
+            INSERT INTO app.PlanFeatures (Id, PlanId, FeatureCode, [Enabled], CreatedAt, UpdatedAt)
+            SELECT NEWID(), p.Id, N'GYM_CHAT',
+                CASE WHEN p.Code IN (N'BASIC', N'PRO', N'ENTERPRISE') THEN 1 ELSE 0 END,
+                @Now, @Now
+            FROM app.Plans p
+            WHERE NOT EXISTS (SELECT 1 FROM app.PlanFeatures existing WHERE existing.PlanId = p.Id AND existing.FeatureCode = N'GYM_CHAT');
+
+            IF NOT EXISTS (SELECT 1 FROM app.Permissions WHERE Code = N'CHAT_READ')
+            BEGIN
+                INSERT INTO app.Permissions (Id, Code, Name, Description, CreatedAt, UpdatedAt)
+                VALUES
+                    ('22222222-2222-4222-8222-222222222174', N'CHAT_READ', N'Read chat', N'Read conversations the user participates in.', @Now, @Now),
+                    ('22222222-2222-4222-8222-222222222175', N'CHAT_SEND', N'Send chat', N'Send messages to permitted people.', @Now, @Now),
+                    ('22222222-2222-4222-8222-222222222176', N'CHAT_CONFIGURE', N'Configure chat', N'Configure tenant chat permission rules.', @Now, @Now);
+            END;
+
+            INSERT INTO app.RolePermissions (RoleId, PermissionId)
+            SELECT r.Id, p.Id
+            FROM app.Roles r
+            JOIN app.Permissions p ON p.Code IN (N'CHAT_READ', N'CHAT_SEND', N'CHAT_CONFIGURE')
+            WHERE r.Name IN (N'SuperAdmin', N'GymOwner', N'GymManager')
+              AND NOT EXISTS (SELECT 1 FROM app.RolePermissions existing WHERE existing.RoleId = r.Id AND existing.PermissionId = p.Id);
+
+            INSERT INTO app.RolePermissions (RoleId, PermissionId)
+            SELECT r.Id, p.Id
+            FROM app.Roles r
+            JOIN app.Permissions p ON p.Code IN (N'CHAT_READ', N'CHAT_SEND')
+            WHERE r.Name IN (N'Trainer', N'Receptionist', N'Member')
+              AND NOT EXISTS (SELECT 1 FROM app.RolePermissions existing WHERE existing.RoleId = r.Id AND existing.PermissionId = p.Id);
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DELETE FROM app.RolePermissions WHERE PermissionId IN (
+                    '22222222-2222-4222-8222-222222222174',
+                    '22222222-2222-4222-8222-222222222175',
+                    '22222222-2222-4222-8222-222222222176');
+                DELETE FROM app.Permissions WHERE Code IN (N'CHAT_READ', N'CHAT_SEND', N'CHAT_CONFIGURE');
+                DELETE FROM app.PlanFeatures WHERE FeatureCode = N'GYM_CHAT';
+                DELETE FROM app.FeatureDefinitions WHERE Code = N'GYM_CHAT';
+            ]]></sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

@@ -1,0 +1,294 @@
+.leave-calendar[data-color-scheme="dark"],
+.lc-popover {
+  --fc-classic-button: var(--background);
+  --fc-classic-button-border: var(--line);
+  --fc-classic-button-strong: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  --fc-classic-button-strong-border: color-mix(in srgb, var(--accent) 45%, var(--line));
+  --fc-classic-button-outline: color-mix(in srgb, var(--accent) 45%, transparent);
+  --fc-classic-button-foreground: var(--foreground);
+  --fc-classic-primary: var(--accent);
+  --fc-classic-primary-foreground: var(--background);
+  --fc-classic-event: var(--accent);
+  --fc-classic-event-contrast: var(--background);
+  --fc-classic-highlight: color-mix(in srgb, var(--accent) 12%, transparent);
+  --fc-classic-today: color-mix(in srgb, var(--accent) 6%, transparent);
+  --fc-classic-now: var(--accent);
+  --fc-classic-background: var(--surface);
+  --fc-classic-faint: color-mix(in srgb, var(--foreground) 3%, transparent);
+  --fc-classic-muted: color-mix(in srgb, var(--foreground) 6%, transparent);
+  --fc-classic-strong: color-mix(in srgb, var(--foreground) 12%, transparent);
+  --fc-classic-foreground: var(--foreground);
+  --fc-classic-faint-foreground: color-mix(in srgb, var(--muted) 55%, transparent);
+  --fc-classic-muted-foreground: var(--muted);
+  --fc-classic-border: var(--line);
+  --fc-classic-strong-border: color-mix(in srgb, var(--accent) 35%, var(--line));
+  color: var(--foreground);
+  font-family: inherit;
+}
+
+:is(.leave-calendar, .lc-popover) .lc-toolbar {
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+:is(.leave-calendar, .lc-popover) .lc-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+:is(.leave-calendar, .lc-popover) .lc-btn-group {
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--background);
+}
+
+:is(.leave-calendar, .lc-popover) .lc-btn {
+  min-height: 2.25rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding-inline: 1rem;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+:is(.leave-calendar, .lc-popover) .lc-btn:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+  color: var(--accent);
+}
+
+:is(.leave-calendar, .lc-popover) .lc-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+:is(.leave-calendar, .lc-popover) .lc-btn:disabled {
+  color: var(--muted);
+  opacity: 0.55;
+}
+
+:is(.leave-calendar, .lc-popover) .lc-btn-group .lc-btn {
+  min-height: 2rem;
+  border-color: transparent;
+  border-radius: 999px;
+  background: transparent;
+}
+
+:is(.leave-calendar, .lc-popover) .lc-btn-group .lc-btn:hover:not(:disabled) {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+:is(.leave-calendar, .lc-popover) .lc-btn-icon {
+  width: 2rem;
+  padding-inline: 0;
+  justify-content: center;
+}
+
+:is(.leave-calendar, .lc-popover) .lc-btn.lc-btn-selected,
+:is(.leave-calendar, .lc-popover) .lc-btn-group .lc-btn.lc-btn-selected {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--background);
+}
+
+:is(.leave-calendar, .lc-popover) .lc-table {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--background) 45%, var(--surface));
+}
+
+:is(.leave-calendar, .lc-popover) .lc-day-header {
+  background: var(--surface);
+}
+
+:is(.leave-calendar, .lc-popover) .lc-day-header-inner {
+  padding-block: 0.625rem;
+  color: var(--muted);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+:is(.leave-calendar, .lc-popover) .lc-day {
+  transition: background-color 120ms ease;
+}
+
+.leave-calendar .lc-day-row {
+  min-height: 6.5rem;
+}
+
+.leave-calendar .lc-view-week .lc-day-row {
+  min-height: 16rem;
+}
+
+:is(.leave-calendar, .lc-popover) .lc-day:hover {
+  background: color-mix(in srgb, var(--accent) 4%, transparent);
+}
+
+:is(.leave-calendar, .lc-popover) .lc-day-other {
+  background: color-mix(in srgb, var(--background) 60%, transparent);
+}
+
+:is(.leave-calendar, .lc-popover) .lc-day-other .lc-day-number {
+  opacity: 0.45;
+}
+
+:is(.leave-calendar, .lc-popover) .lc-day-selected,
+:is(.leave-calendar, .lc-popover) .lc-day-selected:hover {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+:is(.leave-calendar, .lc-popover) .lc-day-number {
+  display: inline-flex;
+  min-width: 1.75rem;
+  height: 1.75rem;
+  margin: 0.25rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+:is(.leave-calendar, .lc-popover) .lc-day-today .lc-day-number {
+  background: var(--accent);
+  color: var(--background);
+}
+
+:is(.leave-calendar, .lc-popover) .lc-event {
+  margin-block: 1px;
+  border-width: 1px;
+  border-inline-start-width: 3px;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 120ms ease, transform 120ms ease;
+}
+
+:is(.leave-calendar, .lc-popover) .lc-event:hover {
+  filter: brightness(1.18);
+}
+
+:is(.leave-calendar, .lc-popover) .lc-event.lc-event-selected {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+:is(.leave-calendar, .lc-popover) .lc-status-approved {
+  --lc-status: #c8f54e;
+}
+
+:is(.leave-calendar, .lc-popover) .lc-status-pending {
+  --lc-status: #f5b942;
+}
+
+:is(.leave-calendar, .lc-popover) .lc-status-rejected {
+  --lc-status: #f07178;
+}
+
+:is(.leave-calendar, .lc-popover) .lc-status-cancelled {
+  --lc-status: #5a7264;
+}
+
+:is(.leave-calendar, .lc-popover) .lc-status-other {
+  --lc-status: var(--line);
+}
+
+:is(.leave-calendar, .lc-popover) .lc-event[class*="lc-status-"] {
+  border-color: color-mix(in srgb, var(--lc-status) 35%, transparent);
+  border-inline-start-color: var(--lc-status);
+}
+
+:is(.leave-calendar, .lc-popover) .lc-status-cancelled .lc-event-name {
+  text-decoration: line-through;
+}
+
+:is(.leave-calendar, .lc-popover) .lc-list-item[class*="lc-status-"] > * {
+  --fc-event-color: var(--lc-status);
+}
+
+:is(.leave-calendar, .lc-popover) .lc-more {
+  margin-inline: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+:is(.leave-calendar, .lc-popover) .lc-more:hover {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.lc-popover.lc-popover {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: var(--surface);
+  color: var(--foreground);
+  font-family: var(--font-sans), sans-serif;
+  box-shadow: 0 18px 40px rgb(0 0 0 / 45%);
+}
+
+:is(.leave-calendar, .lc-popover) .lc-list-day-header {
+  background: var(--surface);
+}
+
+:is(.leave-calendar, .lc-popover) .lc-list-day-header-inner {
+  color: var(--foreground);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+:is(.leave-calendar, .lc-popover) .lc-list-item {
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+:is(.leave-calendar, .lc-popover) .lc-list-item:hover {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+:is(.leave-calendar, .lc-popover) .lc-list-item-selected {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+:is(.leave-calendar, .lc-popover) .lc-no-events {
+  padding-block: 2.5rem;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+@media (max-width: 767px) {
+  :is(.leave-calendar, .lc-popover) .lc-toolbar {
+    justify-content: center;
+  }
+
+  .leave-calendar .lc-toolbar-end:empty {
+    display: none;
+  }
+
+  .leave-calendar .lc-toolbar-center {
+    order: -1;
+    width: 100%;
+    justify-content: center;
+  }
+
+  :is(.leave-calendar, .lc-popover) .lc-title {
+    font-size: 1rem;
+  }
+}

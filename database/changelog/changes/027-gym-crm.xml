@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0035" author="lifefit-architecture">
+        <comment>Ticket: LF-0035. Gym CRM leads, follow-ups, and trials. A lead is not a member and a trial is not an attendance visit. Index review: PK on each Id; IX_Leads_TenantId_Status serves the lead list and status filter; IX_Leads_TenantId_Mobile serves duplicate detection by exact mobile; IX_Leads_TenantId_AssignedUserId serves the salesperson filter and is limited to assigned rows; IX_LeadFollowUps_TenantId_ScheduledAt serves today, overdue, and upcoming queues for open follow-ups; IX_LeadTrials_LeadId serves a lead's trial history. Performance note: every list index leads with TenantId so one gym does not scan another gym's CRM.</comment>
+        <sql splitStatements="false"><![CDATA[
+            CREATE TABLE app.Leads
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                FullName NVARCHAR(200) NOT NULL,
+                Mobile NVARCHAR(32) NOT NULL,
+                Email NVARCHAR(256) NULL,
+                Source NVARCHAR(32) NOT NULL,
+                InterestedPlanId UNIQUEIDENTIFIER NULL,
+                AssignedUserId UNIQUEIDENTIFIER NULL,
+                Status NVARCHAR(32) NOT NULL,
+                NextFollowUpAt DATETIME2 NULL,
+                Notes NVARCHAR(2000) NULL,
+                ConvertedMemberId UNIQUEIDENTIFIER NULL,
+                ConvertedAt DATETIME2 NULL,
+                LostReason NVARCHAR(32) NULL,
+                LostAt DATETIME2 NULL,
+                LostByUserId UNIQUEIDENTIFIER NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_Leads PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_Leads_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_Leads_MembershipPlans FOREIGN KEY (InterestedPlanId) REFERENCES app.MembershipPlans (Id),
+                CONSTRAINT FK_Leads_AssignedUsers FOREIGN KEY (AssignedUserId) REFERENCES app.Users (Id),
+                CONSTRAINT FK_Leads_MemberProfiles FOREIGN KEY (ConvertedMemberId) REFERENCES app.MemberProfiles (Id),
+                CONSTRAINT FK_Leads_LostByUsers FOREIGN KEY (LostByUserId) REFERENCES app.Users (Id),
+                CONSTRAINT CK_Leads_Status CHECK (Status IN (N'New', N'Contacted', N'FollowUp', N'Trial', N'Converted', N'Lost')),
+                CONSTRAINT CK_Leads_Source CHECK (Source IN (N'Instagram', N'Google', N'WalkIn', N'Referral', N'Facebook', N'Website', N'Phone', N'Advertisement', N'Other'))
+            );
+            CREATE INDEX IX_Leads_TenantId_Status ON app.Leads (TenantId, Status, CreatedAt) WHERE DeletedAt IS NULL;
+            CREATE INDEX IX_Leads_TenantId_Mobile ON app.Leads (TenantId, Mobile) WHERE DeletedAt IS NULL;
+            CREATE INDEX IX_Leads_TenantId_AssignedUserId ON app.Leads (TenantId, AssignedUserId) WHERE AssignedUserId IS NOT NULL AND DeletedAt IS NULL;
+
+            CREATE TABLE app.LeadFollowUps
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                LeadId UNIQUEIDENTIFIER NOT NULL,
+                ScheduledAt DATETIME2 NOT NULL,
+                CompletedAt DATETIME2 NULL,
+                Notes NVARCHAR(2000) NULL,
+                Outcome NVARCHAR(200) NULL,
+                AssignedUserId UNIQUEIDENTIFIER NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                CONSTRAINT PK_LeadFollowUps PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_LeadFollowUps_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_LeadFollowUps_Leads FOREIGN KEY (LeadId) REFERENCES app.Leads (Id),
+                CONSTRAINT FK_LeadFollowUps_Users FOREIGN KEY (AssignedUserId) REFERENCES app.Users (Id)
+            );
+            CREATE INDEX IX_LeadFollowUps_TenantId_ScheduledAt ON app.LeadFollowUps (TenantId, ScheduledAt) WHERE CompletedAt IS NULL;
+            CREATE INDEX IX_LeadFollowUps_LeadId ON app.LeadFollowUps (LeadId, ScheduledAt);
+
+            CREATE TABLE app.LeadTrials
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                LeadId UNIQUEIDENTIFIER NOT NULL,
+                ScheduledAt DATETIME2 NOT NULL,
+                Status NVARCHAR(32) NOT NULL,
+                Notes NVARCHAR(2000) NULL,
+                Outcome NVARCHAR(200) NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                CONSTRAINT PK_LeadTrials PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_LeadTrials_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_LeadTrials_Leads FOREIGN KEY (LeadId) REFERENCES app.Leads (Id),
+                CONSTRAINT CK_LeadTrials_Status CHECK (Status IN (N'Scheduled', N'Completed', N'NoShow', N'Cancelled'))
+            );
+            CREATE INDEX IX_LeadTrials_LeadId ON app.LeadTrials (LeadId, ScheduledAt);
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DROP TABLE app.LeadTrials;
+                DROP TABLE app.LeadFollowUps;
+                DROP TABLE app.Leads;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="LF-0036" author="lifefit-architecture">
+        <comment>Ticket: LF-0036. Enable GYM_CRM on business plans and grant CRM permissions to owner, manager, and a limited receptionist set. Index review: no new indexes; inserts use UX_FeatureDefinitions_Code, UX_PlanFeatures_PlanId_FeatureCode, UX_Permissions_Code, and PK_RolePermissions. Performance note: the catalog write is a fixed set of rows.</comment>
+        <sql splitStatements="false"><![CDATA[
+            DECLARE @Now DATETIME2 = SYSUTCDATETIME();
+            INSERT INTO app.FeatureDefinitions (Id, Code, Name, Description, Category, IsActive, Scope, ConsumesLicense, CreatedAt, UpdatedAt)
+            VALUES ('a2222222-2222-4222-8222-222222222001', N'GYM_CRM', N'Gym CRM', N'Leads, follow-ups, and trials for the current gym.', N'Platform', 1, N'Tenant', 0, @Now, @Now);
+
+            INSERT INTO app.PlanFeatures (Id, PlanId, FeatureCode, [Enabled], CreatedAt, UpdatedAt)
+            SELECT NEWID(), p.Id, N'GYM_CRM',
+                CASE WHEN p.Code IN (N'BASIC', N'PRO', N'ENTERPRISE') THEN 1 ELSE 0 END,
+                @Now, @Now
+            FROM app.Plans p;
+
+            INSERT INTO app.Permissions (Id, Code, Name, Description, CreatedAt, UpdatedAt)
+            VALUES
+                ('22222222-2222-4222-8222-222222222060', N'CRM_READ', N'Read CRM', N'Read leads, follow-ups, and trials.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222061', N'CRM_CREATE', N'Create leads', N'Create a lead.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222062', N'CRM_UPDATE', N'Update leads', N'Update, assign, and follow up on a lead.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222063', N'CRM_CONVERT', N'Convert leads', N'Convert a lead to a member.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222064', N'CRM_LOST', N'Mark leads lost', N'Mark or reopen a lost lead.', @Now, @Now);
+
+            INSERT INTO app.RolePermissions (RoleId, PermissionId)
+            SELECT r.Id, p.Id
+            FROM app.Roles r
+            JOIN app.Permissions p ON p.Code IN (N'CRM_READ', N'CRM_CREATE', N'CRM_UPDATE', N'CRM_CONVERT', N'CRM_LOST')
+            WHERE r.Name IN (N'SuperAdmin', N'GymOwner', N'GymManager');
+
+            INSERT INTO app.RolePermissions (RoleId, PermissionId)
+            SELECT r.Id, p.Id
+            FROM app.Roles r
+            JOIN app.Permissions p ON p.Code IN (N'CRM_READ', N'CRM_CREATE', N'CRM_UPDATE')
+            WHERE r.Name = N'Receptionist';
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DELETE FROM app.RolePermissions WHERE PermissionId IN (
+                    '22222222-2222-4222-8222-222222222060',
+                    '22222222-2222-4222-8222-222222222061',
+                    '22222222-2222-4222-8222-222222222062',
+                    '22222222-2222-4222-8222-222222222063',
+                    '22222222-2222-4222-8222-222222222064');
+                DELETE FROM app.Permissions WHERE Code IN (N'CRM_READ', N'CRM_CREATE', N'CRM_UPDATE', N'CRM_CONVERT', N'CRM_LOST');
+                DELETE FROM app.PlanFeatures WHERE FeatureCode = N'GYM_CRM';
+                DELETE FROM app.FeatureDefinitions WHERE Code = N'GYM_CRM';
+            ]]></sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

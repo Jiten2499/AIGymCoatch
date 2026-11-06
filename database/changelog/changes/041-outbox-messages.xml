@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0057" author="lifefit-architecture">
+        <comment>
+            Ticket: LF-0057. Generic outbox for reliable delayed work. Hangfire still owns execution state.
+            Index review: PK_OutboxMessages; UX_OutboxMessages_TenantId_IdempotencyKey so one communication has one publish intent;
+            IX_OutboxMessages_Status_CreatedAtUtc for the dispatcher. Performance note: the dispatcher reads pending rows by status, not by scanning jobs.
+        </comment>
+        <sql splitStatements="false"><![CDATA[
+            CREATE TABLE app.OutboxMessages
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                MessageType NVARCHAR(100) NOT NULL,
+                Payload NVARCHAR(MAX) NOT NULL,
+                AvailableAtUtc DATETIME2 NOT NULL,
+                Status NVARCHAR(32) NOT NULL,
+                AttemptCount INT NOT NULL,
+                CorrelationId NVARCHAR(100) NULL,
+                IdempotencyKey NVARCHAR(200) NOT NULL,
+                CreatedAtUtc DATETIME2 NOT NULL,
+                ProcessedAtUtc DATETIME2 NULL,
+                LastError NVARCHAR(500) NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_OutboxMessages PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_OutboxMessages_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT CK_OutboxMessages_Status CHECK (Status IN (N'Pending', N'Dispatched', N'Cancelled')),
+                CONSTRAINT UX_OutboxMessages_TenantId_IdempotencyKey UNIQUE (TenantId, IdempotencyKey)
+            );
+            CREATE INDEX IX_OutboxMessages_Status_CreatedAtUtc ON app.OutboxMessages (Status, CreatedAtUtc);
+        ]]></sql>
+        <rollback>
+            <sql>DROP TABLE IF EXISTS app.OutboxMessages;</sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

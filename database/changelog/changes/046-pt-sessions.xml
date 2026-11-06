@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0063" author="lifefit-architecture">
+        <comment>Ticket: LF-0063. Catalogue status and assignment snapshots for personal-training packages, plus completed sessions and reversible entitlement consumption. Index review: PK on PtSessions and PtSessionConsumptions. UX_PtSessionConsumptions_Session keeps one consumption history row per session. IX_PtSessions_TenantId_Trainer_CompletedOn serves coach period counts. IX_MemberPtAssignments_TenantId_Trainer_Start supports package-sold counts. No extra index on the new snapshot columns because they are read with the assignment row. Performance note: coach reports filter by tenant, trainer, and date.</comment>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE app.PtPackages ADD CatalogueStatus NVARCHAR(16) NOT NULL CONSTRAINT DF_PtPackages_CatalogueStatus DEFAULT N'Active';
+        ]]></sql>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE app.PtPackages ADD CONSTRAINT CK_PtPackages_CatalogueStatus CHECK (CatalogueStatus IN (N'Draft', N'Active', N'Inactive'));
+        ]]></sql>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE app.MemberPtAssignments ADD PackageName NVARCHAR(200) NOT NULL CONSTRAINT DF_MemberPtAssignments_PackageName DEFAULT N'';
+            ALTER TABLE app.MemberPtAssignments ADD ValidityDays INT NOT NULL CONSTRAINT DF_MemberPtAssignments_ValidityDays DEFAULT 1;
+            ALTER TABLE app.MemberPtAssignments ADD CancelledAt DATETIME2 NULL;
+            ALTER TABLE app.MemberPtAssignments ADD CancellationReason NVARCHAR(500) NULL;
+        ]]></sql>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE app.MemberPtAssignments DROP CONSTRAINT CK_MemberPtAssignments_Status;
+            ALTER TABLE app.MemberPtAssignments ADD CONSTRAINT CK_MemberPtAssignments_Status CHECK (Status IN (N'PendingPayment', N'Active', N'Exhausted', N'Expired', N'Cancelled'));
+        ]]></sql>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE app.GymMemberships ADD PtSessionsRemaining INT NOT NULL CONSTRAINT DF_GymMemberships_PtSessionsRemaining DEFAULT 0;
+        ]]></sql>
+        <sql splitStatements="false"><![CDATA[
+            UPDATE app.GymMemberships SET PtSessionsRemaining = IncludedPtSessions;
+            ALTER TABLE app.GymMemberships ADD CONSTRAINT CK_GymMemberships_PtSessionsRemaining CHECK (PtSessionsRemaining >= 0 AND PtSessionsRemaining <= IncludedPtSessions);
+        ]]></sql>
+        <sql splitStatements="false"><![CDATA[
+            CREATE TABLE app.PtSessions
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                MemberProfileId UNIQUEIDENTIFIER NOT NULL,
+                TrainerProfileId UNIQUEIDENTIFIER NOT NULL,
+                ScheduledStartUtc DATETIME2 NOT NULL,
+                ScheduledEndUtc DATETIME2 NOT NULL,
+                CompletedOn DATE NOT NULL,
+                CompletedAtUtc DATETIME2 NULL,
+                Status NVARCHAR(16) NOT NULL,
+                Notes NVARCHAR(1000) NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_PtSessions PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_PtSessions_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_PtSessions_MemberProfiles FOREIGN KEY (MemberProfileId) REFERENCES app.MemberProfiles (Id),
+                CONSTRAINT FK_PtSessions_TrainerProfiles FOREIGN KEY (TrainerProfileId) REFERENCES app.TrainerProfiles (Id),
+                CONSTRAINT CK_PtSessions_Status CHECK (Status IN (N'Scheduled', N'Completed', N'Cancelled', N'Missed')),
+                CONSTRAINT CK_PtSessions_Times CHECK (ScheduledEndUtc >= ScheduledStartUtc)
+            );
+            CREATE INDEX IX_PtSessions_TenantId_Trainer_CompletedOn ON app.PtSessions (TenantId, TrainerProfileId, CompletedOn) WHERE DeletedAt IS NULL AND Status = N'Completed';
+        ]]></sql>
+        <sql splitStatements="false"><![CDATA[
+            CREATE TABLE app.PtSessionConsumptions
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                PtSessionId UNIQUEIDENTIFIER NOT NULL,
+                GymMembershipId UNIQUEIDENTIFIER NULL,
+                MemberPtAssignmentId UNIQUEIDENTIFIER NULL,
+                SessionsConsumed INT NOT NULL,
+                Status NVARCHAR(16) NOT NULL,
+                ConsumedAtUtc DATETIME2 NOT NULL,
+                ReversedAtUtc DATETIME2 NULL,
+                ReversalReason NVARCHAR(500) NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_PtSessionConsumptions PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_PtSessionConsumptions_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_PtSessionConsumptions_PtSessions FOREIGN KEY (PtSessionId) REFERENCES app.PtSessions (Id),
+                CONSTRAINT FK_PtSessionConsumptions_GymMemberships FOREIGN KEY (GymMembershipId) REFERENCES app.GymMemberships (Id),
+                CONSTRAINT FK_PtSessionConsumptions_MemberPtAssignments FOREIGN KEY (MemberPtAssignmentId) REFERENCES app.MemberPtAssignments (Id),
+                CONSTRAINT CK_PtSessionConsumptions_Source CHECK ((GymMembershipId IS NOT NULL AND MemberPtAssignmentId IS NULL) OR (GymMembershipId IS NULL AND MemberPtAssignmentId IS NOT NULL)),
+                CONSTRAINT CK_PtSessionConsumptions_Count CHECK (SessionsConsumed = 1),
+                CONSTRAINT CK_PtSessionConsumptions_Status CHECK (Status IN (N'Consumed', N'Reversed'))
+            );
+            CREATE UNIQUE INDEX UX_PtSessionConsumptions_Session ON app.PtSessionConsumptions (PtSessionId) WHERE DeletedAt IS NULL;
+            CREATE INDEX IX_PtSessionConsumptions_TenantId_Membership ON app.PtSessionConsumptions (TenantId, GymMembershipId) WHERE DeletedAt IS NULL AND GymMembershipId IS NOT NULL;
+            CREATE INDEX IX_PtSessionConsumptions_TenantId_Assignment ON app.PtSessionConsumptions (TenantId, MemberPtAssignmentId) WHERE DeletedAt IS NULL AND MemberPtAssignmentId IS NOT NULL;
+            CREATE INDEX IX_MemberPtAssignments_TenantId_Trainer_Start ON app.MemberPtAssignments (TenantId, TrainerProfileId, StartDate) WHERE DeletedAt IS NULL AND TrainerProfileId IS NOT NULL;
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DROP INDEX IX_MemberPtAssignments_TenantId_Trainer_Start ON app.MemberPtAssignments;
+                DROP TABLE app.PtSessionConsumptions;
+                DROP TABLE app.PtSessions;
+                ALTER TABLE app.GymMemberships DROP CONSTRAINT CK_GymMemberships_PtSessionsRemaining;
+                ALTER TABLE app.GymMemberships DROP CONSTRAINT DF_GymMemberships_PtSessionsRemaining;
+                ALTER TABLE app.GymMemberships DROP COLUMN PtSessionsRemaining;
+                ALTER TABLE app.MemberPtAssignments DROP CONSTRAINT CK_MemberPtAssignments_Status;
+                ALTER TABLE app.MemberPtAssignments ADD CONSTRAINT CK_MemberPtAssignments_Status CHECK (Status = N'Active');
+                ALTER TABLE app.MemberPtAssignments DROP CONSTRAINT DF_MemberPtAssignments_ValidityDays;
+                ALTER TABLE app.MemberPtAssignments DROP CONSTRAINT DF_MemberPtAssignments_PackageName;
+                ALTER TABLE app.MemberPtAssignments DROP COLUMN CancellationReason, CancelledAt, ValidityDays, PackageName;
+                ALTER TABLE app.PtPackages DROP CONSTRAINT CK_PtPackages_CatalogueStatus;
+                ALTER TABLE app.PtPackages DROP CONSTRAINT DF_PtPackages_CatalogueStatus;
+                ALTER TABLE app.PtPackages DROP COLUMN CatalogueStatus;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

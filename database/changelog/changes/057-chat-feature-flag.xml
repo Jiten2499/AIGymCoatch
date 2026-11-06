@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0076" author="lifefit-architecture">
+        <comment>Ticket: LF-0076. Enable GYM_CHAT on business plans, including Business Free, so chat stays a plan feature flag. Index review: updates existing PlanFeatures rows by PlanId and FeatureCode. Performance note: one catalog update per business plan.</comment>
+        <sql splitStatements="false"><![CDATA[
+            SET QUOTED_IDENTIFIER ON;
+            DECLARE @Now DATETIME2 = SYSUTCDATETIME();
+
+            UPDATE pf
+            SET pf.[Enabled] = 1,
+                pf.UpdatedAt = @Now
+            FROM app.PlanFeatures pf
+            INNER JOIN app.Plans p ON p.Id = pf.PlanId
+            WHERE pf.FeatureCode = N'GYM_CHAT'
+              AND p.Code IN (N'BUSINESS_FREE', N'BASIC', N'PRO', N'ENTERPRISE')
+              AND pf.[Enabled] = 0;
+
+            INSERT INTO app.PlanFeatures (Id, PlanId, FeatureCode, [Enabled], CreatedAt, UpdatedAt)
+            SELECT NEWID(), p.Id, N'GYM_CHAT', 1, @Now, @Now
+            FROM app.Plans p
+            WHERE p.Code IN (N'BUSINESS_FREE', N'BASIC', N'PRO', N'ENTERPRISE')
+              AND NOT EXISTS (
+                  SELECT 1 FROM app.PlanFeatures existing
+                  WHERE existing.PlanId = p.Id AND existing.FeatureCode = N'GYM_CHAT');
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                UPDATE pf
+                SET pf.[Enabled] = 0, pf.UpdatedAt = SYSUTCDATETIME()
+                FROM app.PlanFeatures pf
+                INNER JOIN app.Plans p ON p.Id = pf.PlanId
+                WHERE pf.FeatureCode = N'GYM_CHAT' AND p.Code = N'BUSINESS_FREE';
+            ]]></sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

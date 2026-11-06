@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0080" author="lifefit-architecture">
+        <comment>
+            Ticket: LF-0080. Platform-wide email provider configuration and delivery logs for Super Admin Email &amp; Delivery.
+            Secrets live only in ProtectedPassword (Data Protection ciphertext). Index review: PK_EmailProviderConfigurations;
+            UX_EmailProviderConfigurations_IsActive one active row; IX_EmailDeliveryLogs_CreatedAtUtc for recent lists;
+            IX_EmailDeliveryLogs_Status_CreatedAtUtc for filtered admin logs; UX_EmailDeliveryLogs_IdempotencyKey for duplicate prevention;
+            IX_EmailDeliveryLogs_TenantId_CreatedAtUtc for tenant-scoped queries. Performance note: workers read the single active
+            configuration row; log queries are bounded by page size and status/date filters.
+        </comment>
+        <sql splitStatements="false"><![CDATA[
+            CREATE TABLE app.EmailProviderConfigurations
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                Provider NVARCHAR(64) NOT NULL,
+                DisplayName NVARCHAR(200) NOT NULL,
+                IsEnabled BIT NOT NULL,
+                IsActive BIT NOT NULL,
+                SmtpHost NVARCHAR(255) NOT NULL,
+                SmtpPort INT NOT NULL,
+                Encryption NVARCHAR(32) NOT NULL,
+                AuthenticationEnabled BIT NOT NULL,
+                Username NVARCHAR(320) NOT NULL,
+                ProtectedPassword NVARCHAR(4000) NULL,
+                SenderName NVARCHAR(200) NOT NULL,
+                SenderEmail NVARCHAR(320) NOT NULL,
+                ReplyToEmail NVARCHAR(320) NULL,
+                ConnectionTimeoutSeconds INT NOT NULL,
+                MaxEmailsPerMinute INT NOT NULL,
+                MaxDeliveryAttempts INT NOT NULL,
+                RetryBaseDelaySeconds INT NOT NULL,
+                ConfigVersion INT NOT NULL,
+                LastTestedAt DATETIME2 NULL,
+                LastTestStatus NVARCHAR(32) NULL,
+                LastTestMessage NVARCHAR(500) NULL,
+                LastEmailSentAt DATETIME2 NULL,
+                LastEmailStatus NVARCHAR(32) NULL,
+                HealthStatus NVARCHAR(32) NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_EmailProviderConfigurations PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT CK_EmailProviderConfigurations_Provider CHECK (Provider IN (N'SmtpHostinger', N'SmtpGeneric', N'SendGrid', N'AmazonSes')),
+                CONSTRAINT CK_EmailProviderConfigurations_Encryption CHECK (Encryption IN (N'SslTls', N'StartTls')),
+                CONSTRAINT CK_EmailProviderConfigurations_Health CHECK (HealthStatus IN (N'NotTested', N'Healthy', N'Failed', N'Disabled')),
+                CONSTRAINT CK_EmailProviderConfigurations_Port CHECK (SmtpPort BETWEEN 1 AND 65535),
+                CONSTRAINT CK_EmailProviderConfigurations_Timeout CHECK (ConnectionTimeoutSeconds BETWEEN 1 AND 120),
+                CONSTRAINT CK_EmailProviderConfigurations_Rate CHECK (MaxEmailsPerMinute BETWEEN 1 AND 600),
+                CONSTRAINT CK_EmailProviderConfigurations_Attempts CHECK (MaxDeliveryAttempts BETWEEN 1 AND 20),
+                CONSTRAINT CK_EmailProviderConfigurations_Retry CHECK (RetryBaseDelaySeconds BETWEEN 5 AND 3600)
+            );
+            CREATE UNIQUE INDEX UX_EmailProviderConfigurations_IsActive
+                ON app.EmailProviderConfigurations (IsActive)
+                WHERE IsActive = 1 AND DeletedAt IS NULL;
+            CREATE INDEX IX_EmailProviderConfigurations_Provider
+                ON app.EmailProviderConfigurations (Provider)
+                WHERE DeletedAt IS NULL;
+
+            CREATE TABLE app.EmailDeliveryLogs
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                RelatedTenantId UNIQUEIDENTIFIER NULL,
+                Recipient NVARCHAR(320) NOT NULL,
+                Subject NVARCHAR(500) NOT NULL,
+                TemplateKey NVARCHAR(120) NOT NULL,
+                Provider NVARCHAR(64) NOT NULL,
+                Status NVARCHAR(32) NOT NULL,
+                Classification NVARCHAR(32) NOT NULL,
+                AttemptCount INT NOT NULL,
+                MaxAttempts INT NOT NULL,
+                ProviderMessageId NVARCHAR(200) NULL,
+                FailureReason NVARCHAR(500) NULL,
+                IdempotencyKey NVARCHAR(200) NOT NULL,
+                OutboxMessageId UNIQUEIDENTIFIER NULL,
+                CorrelationId NVARCHAR(100) NULL,
+                QueuedAt DATETIME2 NOT NULL,
+                SentAt DATETIME2 NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_EmailDeliveryLogs PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_EmailDeliveryLogs_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_EmailDeliveryLogs_RelatedTenant FOREIGN KEY (RelatedTenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT CK_EmailDeliveryLogs_Status CHECK (Status IN (
+                    N'Queued', N'Processing', N'Accepted', N'Delivered', N'Retrying', N'Failed', N'Bounced', N'Suppressed')),
+                CONSTRAINT CK_EmailDeliveryLogs_Classification CHECK (Classification IN (N'Transactional', N'Test')),
+                CONSTRAINT UX_EmailDeliveryLogs_IdempotencyKey UNIQUE (IdempotencyKey)
+            );
+            CREATE INDEX IX_EmailDeliveryLogs_CreatedAtUtc ON app.EmailDeliveryLogs (CreatedAt DESC) WHERE DeletedAt IS NULL;
+            CREATE INDEX IX_EmailDeliveryLogs_Status_CreatedAtUtc ON app.EmailDeliveryLogs (Status, CreatedAt DESC) WHERE DeletedAt IS NULL;
+            CREATE INDEX IX_EmailDeliveryLogs_TenantId_CreatedAtUtc ON app.EmailDeliveryLogs (TenantId, CreatedAt DESC) WHERE DeletedAt IS NULL;
+            CREATE INDEX IX_EmailDeliveryLogs_TemplateKey ON app.EmailDeliveryLogs (TemplateKey) WHERE DeletedAt IS NULL;
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DROP TABLE IF EXISTS app.EmailDeliveryLogs;
+                DROP TABLE IF EXISTS app.EmailProviderConfigurations;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

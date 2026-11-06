@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0070" author="lifefit-architecture">
+        <comment>Ticket: LF-0070. Store a private coach profile picture on the trainer profile. Index review: no new index; the picture is loaded with the trainer row by PK_TrainerProfiles. Performance note: the columns ride the existing trainer lookup used by the coaches page.</comment>
+        <sql splitStatements="false"><![CDATA[
+            SET QUOTED_IDENTIFIER ON;
+            IF COL_LENGTH(N'app.TrainerProfiles', N'PhotoStorageKey') IS NULL
+                ALTER TABLE app.TrainerProfiles ADD PhotoStorageKey NVARCHAR(200) NULL;
+            IF COL_LENGTH(N'app.TrainerProfiles', N'PhotoContentType') IS NULL
+                ALTER TABLE app.TrainerProfiles ADD PhotoContentType NVARCHAR(80) NULL;
+        ]]></sql>
+        <rollback>
+            <sql>IF COL_LENGTH(N'app.TrainerProfiles', N'PhotoContentType') IS NOT NULL ALTER TABLE app.TrainerProfiles DROP COLUMN PhotoContentType;</sql>
+            <sql>IF COL_LENGTH(N'app.TrainerProfiles', N'PhotoStorageKey') IS NOT NULL ALTER TABLE app.TrainerProfiles DROP COLUMN PhotoStorageKey;</sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

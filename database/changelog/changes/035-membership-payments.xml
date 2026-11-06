@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0047" author="lifefit-architecture">
+        <comment>
+            Ticket: LF-0047. Snapshot membership pricing and store membership payments separately.
+            Index review: PK on MembershipPayments.Id; IX_MembershipPayments_TenantId_MembershipId_PaymentDate for history;
+            IX_MembershipPayments_TenantId_MemberProfileId_PaymentDate for member views; IX_MembershipPayments_TenantId_Status for posted sums.
+            Backfill PackagePrice/FinalAmount/Currency from current plan so existing memberships remain collectible.
+            Performance note: every list index leads with TenantId. Soft-deleted and voided payments stay out of outstanding sums via Status.
+        </comment>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE app.GymMemberships ADD
+                PackagePrice DECIMAL(19, 4) NOT NULL CONSTRAINT DF_GymMemberships_PackagePrice DEFAULT (0),
+                DiscountAmount DECIMAL(19, 4) NOT NULL CONSTRAINT DF_GymMemberships_DiscountAmount DEFAULT (0),
+                FinalAmount DECIMAL(19, 4) NOT NULL CONSTRAINT DF_GymMemberships_FinalAmount DEFAULT (0),
+                Currency NVARCHAR(3) NOT NULL CONSTRAINT DF_GymMemberships_Currency DEFAULT (N'USD'),
+                DiscountRuleId UNIQUEIDENTIFIER NULL,
+                DiscountName NVARCHAR(200) NULL;
+
+            ALTER TABLE app.GymMemberships ADD CONSTRAINT FK_GymMemberships_DiscountRules
+                FOREIGN KEY (DiscountRuleId) REFERENCES app.DiscountRules (Id);
+
+            EXEC(N'
+                UPDATE m
+                SET PackagePrice = p.Price,
+                    DiscountAmount = 0,
+                    FinalAmount = p.Price,
+                    Currency = p.Currency
+                FROM app.GymMemberships m
+                INNER JOIN app.MembershipPlans p ON p.Id = m.MembershipPlanId
+                WHERE m.PackagePrice = 0 AND m.FinalAmount = 0;
+            ');
+
+            CREATE TABLE app.MembershipPayments
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                MemberProfileId UNIQUEIDENTIFIER NOT NULL,
+                GymMembershipId UNIQUEIDENTIFIER NOT NULL,
+                Amount DECIMAL(19, 4) NOT NULL,
+                Currency NVARCHAR(3) NOT NULL,
+                PaymentMethod NVARCHAR(32) NOT NULL,
+                PaymentDate DATE NOT NULL,
+                ReferenceNumber NVARCHAR(100) NULL,
+                Notes NVARCHAR(2000) NULL,
+                Status NVARCHAR(16) NOT NULL,
+                ReceivedByUserId UNIQUEIDENTIFIER NOT NULL,
+                VoidedAt DATETIME2 NULL,
+                VoidedByUserId UNIQUEIDENTIFIER NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_MembershipPayments PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_MembershipPayments_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_MembershipPayments_MemberProfiles FOREIGN KEY (MemberProfileId) REFERENCES app.MemberProfiles (Id),
+                CONSTRAINT FK_MembershipPayments_GymMemberships FOREIGN KEY (GymMembershipId) REFERENCES app.GymMemberships (Id),
+                CONSTRAINT FK_MembershipPayments_ReceivedByUsers FOREIGN KEY (ReceivedByUserId) REFERENCES app.Users (Id),
+                CONSTRAINT FK_MembershipPayments_VoidedByUsers FOREIGN KEY (VoidedByUserId) REFERENCES app.Users (Id),
+                CONSTRAINT CK_MembershipPayments_Amount CHECK (Amount > 0),
+                CONSTRAINT CK_MembershipPayments_Status CHECK (Status IN (N'Posted', N'Voided')),
+                CONSTRAINT CK_MembershipPayments_PaymentMethod CHECK (PaymentMethod IN (
+                    N'Cash', N'Upi', N'DebitCard', N'CreditCard', N'BankTransfer', N'OnlinePayment', N'Cheque', N'Other'))
+            );
+
+            CREATE INDEX IX_MembershipPayments_TenantId_GymMembershipId_PaymentDate
+                ON app.MembershipPayments (TenantId, GymMembershipId, PaymentDate DESC)
+                WHERE DeletedAt IS NULL;
+            CREATE INDEX IX_MembershipPayments_TenantId_MemberProfileId_PaymentDate
+                ON app.MembershipPayments (TenantId, MemberProfileId, PaymentDate DESC)
+                WHERE DeletedAt IS NULL;
+            CREATE INDEX IX_MembershipPayments_TenantId_Status
+                ON app.MembershipPayments (TenantId, Status)
+                WHERE DeletedAt IS NULL;
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DROP TABLE app.MembershipPayments;
+                ALTER TABLE app.GymMemberships DROP CONSTRAINT FK_GymMemberships_DiscountRules;
+                ALTER TABLE app.GymMemberships DROP CONSTRAINT DF_GymMemberships_PackagePrice;
+                ALTER TABLE app.GymMemberships DROP CONSTRAINT DF_GymMemberships_DiscountAmount;
+                ALTER TABLE app.GymMemberships DROP CONSTRAINT DF_GymMemberships_FinalAmount;
+                ALTER TABLE app.GymMemberships DROP CONSTRAINT DF_GymMemberships_Currency;
+                ALTER TABLE app.GymMemberships DROP COLUMN PackagePrice, DiscountAmount, FinalAmount, Currency, DiscountRuleId, DiscountName;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="LF-0048" author="lifefit-architecture">
+        <comment>Ticket: LF-0048. Enable GYM_PAYMENT_MANAGEMENT and grant payment permissions. Index review: catalog inserts only.</comment>
+        <sql splitStatements="false"><![CDATA[
+            DECLARE @Now DATETIME2 = SYSUTCDATETIME();
+            INSERT INTO app.FeatureDefinitions (Id, Code, Name, Description, Category, IsActive, Scope, ConsumesLicense, CreatedAt, UpdatedAt)
+            VALUES ('a2222222-2222-4222-8222-222222222004', N'GYM_PAYMENT_MANAGEMENT', N'Payment Management', N'Record and void membership payments for the gym workspace.', N'Platform', 1, N'Tenant', 0, @Now, @Now);
+
+            INSERT INTO app.PlanFeatures (Id, PlanId, FeatureCode, [Enabled], CreatedAt, UpdatedAt)
+            SELECT NEWID(), p.Id, N'GYM_PAYMENT_MANAGEMENT',
+                CASE WHEN p.Code IN (N'BASIC', N'PRO', N'ENTERPRISE') THEN 1 ELSE 0 END,
+                @Now, @Now
+            FROM app.Plans p;
+
+            INSERT INTO app.Permissions (Id, Code, Name, Description, CreatedAt, UpdatedAt)
+            VALUES
+                ('22222222-2222-4222-8222-222222222080', N'PAYMENT_READ', N'Read payments', N'View membership payments and balances.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222081', N'PAYMENT_CREATE', N'Create payments', N'Record membership payments.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222082', N'PAYMENT_VOID', N'Void payments', N'Void posted membership payments.', @Now, @Now);
+
+            INSERT INTO app.RolePermissions (RoleId, PermissionId)
+            SELECT r.Id, p.Id
+            FROM app.Roles r
+            JOIN app.Permissions p ON p.Code IN (N'PAYMENT_READ', N'PAYMENT_CREATE', N'PAYMENT_VOID')
+            WHERE r.Name IN (N'SuperAdmin', N'GymOwner', N'GymManager');
+
+            INSERT INTO app.RolePermissions (RoleId, PermissionId)
+            SELECT r.Id, p.Id
+            FROM app.Roles r
+            JOIN app.Permissions p ON p.Code IN (N'PAYMENT_READ', N'PAYMENT_CREATE')
+            WHERE r.Name = N'Receptionist';
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DELETE FROM app.RolePermissions WHERE PermissionId IN (
+                    '22222222-2222-4222-8222-222222222080',
+                    '22222222-2222-4222-8222-222222222081',
+                    '22222222-2222-4222-8222-222222222082');
+                DELETE FROM app.Permissions WHERE Code IN (N'PAYMENT_READ', N'PAYMENT_CREATE', N'PAYMENT_VOID');
+                DELETE FROM app.PlanFeatures WHERE FeatureCode = N'GYM_PAYMENT_MANAGEMENT';
+                DELETE FROM app.FeatureDefinitions WHERE Code = N'GYM_PAYMENT_MANAGEMENT';
+            ]]></sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

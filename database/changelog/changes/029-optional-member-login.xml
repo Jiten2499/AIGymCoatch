@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0039" author="lifefit-architecture">
+        <comment>Ticket: LF-0039. A gym customer can exist without a LifeFit login. Copy the current account name onto the member profile, then allow MemberProfiles.UserId to be null. Index review: drop UX_MemberProfiles_TenantId_UserId before the column becomes nullable, then recreate it filtered to rows that have a user so two customers without a login are allowed and one login still maps to one profile. No new name index; member search stays on IX_MemberProfiles_TenantId_Status. Performance note: the backfill updates existing member rows by their user foreign key.</comment>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE app.MemberProfiles ADD
+                FirstName NVARCHAR(100) NOT NULL CONSTRAINT DF_MemberProfiles_FirstName DEFAULT N'',
+                LastName NVARCHAR(100) NOT NULL CONSTRAINT DF_MemberProfiles_LastName DEFAULT N'',
+                Phone NVARCHAR(32) NULL;
+        ]]></sql>
+        <sql splitStatements="false"><![CDATA[
+            UPDATE profile
+            SET profile.FirstName = account.FirstName,
+                profile.LastName = account.LastName,
+                profile.Phone = account.Phone
+            FROM app.MemberProfiles profile
+            INNER JOIN app.Users account ON account.Id = profile.UserId;
+
+            ALTER TABLE app.MemberProfiles DROP CONSTRAINT DF_MemberProfiles_FirstName;
+            ALTER TABLE app.MemberProfiles DROP CONSTRAINT DF_MemberProfiles_LastName;
+            DROP INDEX UX_MemberProfiles_TenantId_UserId ON app.MemberProfiles;
+            ALTER TABLE app.MemberProfiles ALTER COLUMN UserId UNIQUEIDENTIFIER NULL;
+            CREATE UNIQUE INDEX UX_MemberProfiles_TenantId_UserId
+                ON app.MemberProfiles (TenantId, UserId) WHERE UserId IS NOT NULL AND DeletedAt IS NULL;
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DELETE FROM app.MemberProfiles WHERE UserId IS NULL;
+                DROP INDEX UX_MemberProfiles_TenantId_UserId ON app.MemberProfiles;
+                ALTER TABLE app.MemberProfiles ALTER COLUMN UserId UNIQUEIDENTIFIER NOT NULL;
+                CREATE UNIQUE INDEX UX_MemberProfiles_TenantId_UserId
+                    ON app.MemberProfiles (TenantId, UserId) WHERE DeletedAt IS NULL;
+                ALTER TABLE app.MemberProfiles DROP COLUMN FirstName, LastName, Phone;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

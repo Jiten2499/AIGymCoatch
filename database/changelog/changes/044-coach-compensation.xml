@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0061" author="lifefit-architecture">
+        <comment>Ticket: LF-0061. Named coach targets plus commission rules, performance incentives, and calculation history. Index review: PK on each id; IX by tenant and trainer; UX_TrainerCompensationCalculations_Open blocks a second open calculation for the same rule and period. Performance note: coach detail reads filter TenantId and TrainerProfileId. Paid status is not stored because no payout table exists.</comment>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE app.TrainerTargets ADD Name NVARCHAR(120) NULL;
+            ALTER TABLE app.TrainerTargets ADD IsActive BIT NOT NULL CONSTRAINT DF_TrainerTargets_IsActive DEFAULT 1;
+
+            CREATE TABLE app.TrainerCommissionRules
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                TrainerProfileId UNIQUEIDENTIFIER NOT NULL,
+                Name NVARCHAR(120) NOT NULL,
+                Kind NVARCHAR(40) NOT NULL,
+                [Percent] DECIMAL(9, 4) NULL,
+                FixedAmount DECIMAL(19, 4) NULL,
+                EffectiveStart DATE NOT NULL,
+                EffectiveEnd DATE NULL,
+                IsActive BIT NOT NULL,
+                RequiresApproval BIT NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_TrainerCommissionRules PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_TrainerCommissionRules_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_TrainerCommissionRules_TrainerProfiles FOREIGN KEY (TrainerProfileId) REFERENCES app.TrainerProfiles (Id),
+                CONSTRAINT CK_TrainerCommissionRules_Kind CHECK (Kind IN (N'PercentOfEligiblePtRevenue', N'FixedPerPtPackage'))
+            );
+            CREATE INDEX IX_TrainerCommissionRules_Trainer ON app.TrainerCommissionRules (TenantId, TrainerProfileId) WHERE DeletedAt IS NULL;
+
+            CREATE TABLE app.TrainerPerformanceIncentives
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                TrainerProfileId UNIQUEIDENTIFIER NOT NULL,
+                Name NVARCHAR(120) NOT NULL,
+                Metric NVARCHAR(32) NOT NULL,
+                Threshold DECIMAL(19, 4) NOT NULL,
+                RewardKind NVARCHAR(40) NOT NULL,
+                FixedAmount DECIMAL(19, 4) NULL,
+                [Percent] DECIMAL(9, 4) NULL,
+                EffectiveStart DATE NOT NULL,
+                EffectiveEnd DATE NULL,
+                IsActive BIT NOT NULL,
+                RequiresApproval BIT NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_TrainerPerformanceIncentives PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_TrainerPerformanceIncentives_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_TrainerPerformanceIncentives_TrainerProfiles FOREIGN KEY (TrainerProfileId) REFERENCES app.TrainerProfiles (Id),
+                CONSTRAINT CK_TrainerPerformanceIncentives_Metric CHECK (Metric IN (N'PtRevenue', N'PtSessions', N'NewPtClients')),
+                CONSTRAINT CK_TrainerPerformanceIncentives_Reward CHECK (RewardKind IN (N'FixedOnAchievement', N'PercentOfEligibleRevenue'))
+            );
+            CREATE INDEX IX_TrainerPerformanceIncentives_Trainer ON app.TrainerPerformanceIncentives (TenantId, TrainerProfileId) WHERE DeletedAt IS NULL;
+
+            CREATE TABLE app.TrainerCompensationCalculations
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                TrainerProfileId UNIQUEIDENTIFIER NOT NULL,
+                Kind NVARCHAR(16) NOT NULL,
+                RuleId UNIQUEIDENTIFIER NOT NULL,
+                PeriodStart DATE NOT NULL,
+                PeriodEnd DATE NOT NULL,
+                SourceKey NVARCHAR(80) NOT NULL,
+                Amount DECIMAL(19, 4) NOT NULL,
+                Status NVARCHAR(20) NOT NULL,
+                Basis NVARCHAR(300) NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_TrainerCompensationCalculations PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_TrainerCompensationCalculations_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_TrainerCompensationCalculations_TrainerProfiles FOREIGN KEY (TrainerProfileId) REFERENCES app.TrainerProfiles (Id),
+                CONSTRAINT CK_TrainerCompensationCalculations_Kind CHECK (Kind IN (N'Commission', N'Incentive')),
+                CONSTRAINT CK_TrainerCompensationCalculations_Status CHECK (Status IN (N'Calculated', N'PendingApproval', N'Approved', N'Rejected', N'Cancelled'))
+            );
+            CREATE UNIQUE INDEX UX_TrainerCompensationCalculations_Open
+                ON app.TrainerCompensationCalculations (TenantId, TrainerProfileId, RuleId, PeriodStart, PeriodEnd)
+                WHERE Status IN (N'Calculated', N'PendingApproval', N'Approved') AND DeletedAt IS NULL;
+            CREATE INDEX IX_TrainerCompensationCalculations_Trainer
+                ON app.TrainerCompensationCalculations (TenantId, TrainerProfileId, PeriodStart) WHERE DeletedAt IS NULL;
+        ]]></sql>
+        <rollback>
+            <sql>
+                DROP TABLE app.TrainerCompensationCalculations;
+                DROP TABLE app.TrainerPerformanceIncentives;
+                DROP TABLE app.TrainerCommissionRules;
+                ALTER TABLE app.TrainerTargets DROP CONSTRAINT DF_TrainerTargets_IsActive;
+                ALTER TABLE app.TrainerTargets DROP COLUMN IsActive;
+                ALTER TABLE app.TrainerTargets DROP COLUMN Name;
+            </sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

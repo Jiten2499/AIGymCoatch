@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0042" author="lifefit-architecture">
+        <comment>Ticket: LF-0042. Tenant business configuration: one operational config row per gym, member categories, discount rules, and CRM source/lost-reason catalogs. Index review: UX_TenantBusinessConfigs_TenantId enforces one config per tenant; UX_MemberCategories_TenantId_Name and UX_DiscountRules_TenantId_Name keep names unique; IX_DiscountRules_TenantId_IsActive serves active discount lists; UX_CrmLeadSources_TenantId_Name and UX_CrmLostReasons_TenantId_Name keep CRM catalogs unique. Performance note: every list index leads with TenantId.</comment>
+        <sql splitStatements="false"><![CDATA[
+            CREATE TABLE app.TenantBusinessConfigs
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                AllowOverlappingMemberships BIT NOT NULL,
+                AllowEarlyRenewal BIT NOT NULL,
+                DefaultStartOnJoinDate BIT NOT NULL,
+                GracePeriodDays INT NOT NULL,
+                AutoExpireEnabled BIT NOT NULL,
+                MaxFreezeDays INT NOT NULL,
+                MinFreezeDays INT NOT NULL,
+                MaxFreezeOccurrences INT NOT NULL,
+                FreezeRequiresApproval BIT NOT NULL,
+                MaxExtensionDays INT NOT NULL,
+                ExtensionRequiresApproval BIT NOT NULL,
+                DuplicateCheckInMinutes INT NOT NULL,
+                OpeningTime TIME(0) NULL,
+                ClosingTime TIME(0) NULL,
+                CheckInGraceMinutes INT NOT NULL,
+                DefaultCheckInMethod NVARCHAR(32) NOT NULL,
+                DefaultTrialDays INT NOT NULL,
+                FollowUpReminderHours INT NOT NULL,
+                DefaultFollowUpDays INT NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_TenantBusinessConfigs PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_TenantBusinessConfigs_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT CK_TenantBusinessConfigs_GracePeriodDays CHECK (GracePeriodDays >= 0),
+                CONSTRAINT CK_TenantBusinessConfigs_FreezeDays CHECK (MaxFreezeDays >= 0 AND MinFreezeDays >= 0 AND MaxFreezeDays >= MinFreezeDays),
+                CONSTRAINT CK_TenantBusinessConfigs_MaxFreezeOccurrences CHECK (MaxFreezeOccurrences >= 0),
+                CONSTRAINT CK_TenantBusinessConfigs_MaxExtensionDays CHECK (MaxExtensionDays >= 0),
+                CONSTRAINT CK_TenantBusinessConfigs_DuplicateCheckInMinutes CHECK (DuplicateCheckInMinutes >= 0),
+                CONSTRAINT CK_TenantBusinessConfigs_CheckInGraceMinutes CHECK (CheckInGraceMinutes >= 0),
+                CONSTRAINT CK_TenantBusinessConfigs_DefaultTrialDays CHECK (DefaultTrialDays >= 0),
+                CONSTRAINT CK_TenantBusinessConfigs_FollowUpReminderHours CHECK (FollowUpReminderHours >= 0),
+                CONSTRAINT CK_TenantBusinessConfigs_DefaultFollowUpDays CHECK (DefaultFollowUpDays >= 0),
+                CONSTRAINT CK_TenantBusinessConfigs_DefaultCheckInMethod CHECK (DefaultCheckInMethod IN (N'QR', N'Reception', N'Manual', N'Other'))
+            );
+            CREATE UNIQUE INDEX UX_TenantBusinessConfigs_TenantId ON app.TenantBusinessConfigs (TenantId) WHERE DeletedAt IS NULL;
+
+            CREATE TABLE app.MemberCategories
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                Name NVARCHAR(100) NOT NULL,
+                Description NVARCHAR(500) NULL,
+                IsActive BIT NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_MemberCategories PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_MemberCategories_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id)
+            );
+            CREATE UNIQUE INDEX UX_MemberCategories_TenantId_Name ON app.MemberCategories (TenantId, Name) WHERE DeletedAt IS NULL;
+            CREATE INDEX IX_MemberCategories_TenantId_IsActive ON app.MemberCategories (TenantId, IsActive) WHERE DeletedAt IS NULL;
+
+            CREATE TABLE app.DiscountRules
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                Name NVARCHAR(100) NOT NULL,
+                Description NVARCHAR(500) NULL,
+                DiscountType NVARCHAR(32) NOT NULL,
+                Value DECIMAL(19, 4) NOT NULL,
+                AppliesTo NVARCHAR(32) NOT NULL,
+                PackageId UNIQUEIDENTIFIER NULL,
+                PackageCategory NVARCHAR(32) NULL,
+                MemberCategoryId UNIQUEIDENTIFIER NULL,
+                MinimumPackagePrice DECIMAL(19, 4) NULL,
+                MinimumDurationDays INT NULL,
+                MaximumDiscountAmount DECIMAL(19, 4) NULL,
+                StartDate DATE NULL,
+                EndDate DATE NULL,
+                IsActive BIT NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_DiscountRules PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_DiscountRules_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_DiscountRules_MembershipPlans FOREIGN KEY (PackageId) REFERENCES app.MembershipPlans (Id),
+                CONSTRAINT FK_DiscountRules_MemberCategories FOREIGN KEY (MemberCategoryId) REFERENCES app.MemberCategories (Id),
+                CONSTRAINT CK_DiscountRules_DiscountType CHECK (DiscountType IN (N'Percentage', N'FixedAmount')),
+                CONSTRAINT CK_DiscountRules_AppliesTo CHECK (AppliesTo IN (N'AllPackages', N'SpecificPackage', N'PackageCategory', N'MemberCategory')),
+                CONSTRAINT CK_DiscountRules_Value CHECK (Value > 0),
+                CONSTRAINT CK_DiscountRules_Dates CHECK (EndDate IS NULL OR StartDate IS NULL OR EndDate >= StartDate)
+            );
+            CREATE UNIQUE INDEX UX_DiscountRules_TenantId_Name ON app.DiscountRules (TenantId, Name) WHERE DeletedAt IS NULL;
+            CREATE INDEX IX_DiscountRules_TenantId_IsActive ON app.DiscountRules (TenantId, IsActive) WHERE DeletedAt IS NULL;
+
+            CREATE TABLE app.CrmLeadSources
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                Name NVARCHAR(100) NOT NULL,
+                Code NVARCHAR(32) NULL,
+                IsSystem BIT NOT NULL,
+                IsActive BIT NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_CrmLeadSources PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_CrmLeadSources_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id)
+            );
+            CREATE UNIQUE INDEX UX_CrmLeadSources_TenantId_Name ON app.CrmLeadSources (TenantId, Name) WHERE DeletedAt IS NULL;
+
+            CREATE TABLE app.CrmLostReasons
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                Name NVARCHAR(100) NOT NULL,
+                Code NVARCHAR(32) NULL,
+                IsSystem BIT NOT NULL,
+                IsActive BIT NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_CrmLostReasons PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_CrmLostReasons_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id)
+            );
+            CREATE UNIQUE INDEX UX_CrmLostReasons_TenantId_Name ON app.CrmLostReasons (TenantId, Name) WHERE DeletedAt IS NULL;
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DROP TABLE app.DiscountRules;
+                DROP TABLE app.CrmLostReasons;
+                DROP TABLE app.CrmLeadSources;
+                DROP TABLE app.MemberCategories;
+                DROP TABLE app.TenantBusinessConfigs;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="LF-0043" author="lifefit-architecture">
+        <comment>Ticket: LF-0043. Enable GYM_CONFIGURATION on business plans and grant configuration permissions to owner and manager. Index review: catalog inserts only. Performance note: fixed permission set.</comment>
+        <sql splitStatements="false"><![CDATA[
+            DECLARE @Now DATETIME2 = SYSUTCDATETIME();
+            INSERT INTO app.FeatureDefinitions (Id, Code, Name, Description, Category, IsActive, Scope, ConsumesLicense, CreatedAt, UpdatedAt)
+            VALUES ('a2222222-2222-4222-8222-222222222003', N'GYM_CONFIGURATION', N'Business configuration', N'Configure membership, discounts, categories, freeze, attendance, and CRM defaults for the gym.', N'Platform', 1, N'Tenant', 0, @Now, @Now);
+
+            INSERT INTO app.PlanFeatures (Id, PlanId, FeatureCode, [Enabled], CreatedAt, UpdatedAt)
+            SELECT NEWID(), p.Id, N'GYM_CONFIGURATION',
+                CASE WHEN p.Code IN (N'BASIC', N'PRO', N'ENTERPRISE') THEN 1 ELSE 0 END,
+                @Now, @Now
+            FROM app.Plans p;
+
+            INSERT INTO app.Permissions (Id, Code, Name, Description, CreatedAt, UpdatedAt)
+            VALUES
+                ('22222222-2222-4222-8222-222222222070', N'CONFIGURATION_READ', N'Read configuration', N'Read business operational configuration.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222071', N'CONFIGURATION_MANAGE', N'Manage configuration', N'Update business operational configuration, discounts, and categories.', @Now, @Now);
+
+            INSERT INTO app.RolePermissions (RoleId, PermissionId)
+            SELECT r.Id, p.Id
+            FROM app.Roles r
+            JOIN app.Permissions p ON p.Code IN (N'CONFIGURATION_READ', N'CONFIGURATION_MANAGE')
+            WHERE r.Name IN (N'SuperAdmin', N'GymOwner', N'GymManager');
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DELETE FROM app.RolePermissions WHERE PermissionId IN (
+                    '22222222-2222-4222-8222-222222222070',
+                    '22222222-2222-4222-8222-222222222071');
+                DELETE FROM app.Permissions WHERE Code IN (N'CONFIGURATION_READ', N'CONFIGURATION_MANAGE');
+                DELETE FROM app.PlanFeatures WHERE FeatureCode = N'GYM_CONFIGURATION';
+                DELETE FROM app.FeatureDefinitions WHERE Code = N'GYM_CONFIGURATION';
+            ]]></sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

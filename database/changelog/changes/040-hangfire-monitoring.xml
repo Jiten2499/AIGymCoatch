@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0055" author="lifefit-architecture">
+        <comment>
+            Ticket: LF-0055. Install the official Hangfire SQL Server schema. Hangfire owns job execution state.
+            Index review: Hangfire's own primary keys and state/queue indexes. No application job-status table.
+            Performance note: monitoring queries read HangFire.Job, State, and JobParameter.
+        </comment>
+        <sqlFile path="../hangfire/install.sql" relativeToChangelogFile="true" splitStatements="false" />
+        <rollback>
+            <sql>DROP TABLE IF EXISTS HangFire.AggregatedCounter, HangFire.Counter, HangFire.Hash, HangFire.JobParameter, HangFire.JobQueue, HangFire.List, HangFire.Schema, HangFire.Server, HangFire.Set, HangFire.State, HangFire.Job;</sql>
+            <sql>IF EXISTS (SELECT 1 FROM sys.schemas WHERE name = N'HangFire') DROP SCHEMA HangFire;</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="LF-0056" author="lifefit-architecture">
+        <comment>Ticket: LF-0056. Grant background job monitoring to SuperAdmin only. Index review: catalog inserts only.</comment>
+        <sql splitStatements="false"><![CDATA[
+            DECLARE @Now DATETIME2 = SYSUTCDATETIME();
+            INSERT INTO app.Permissions (Id, Code, Name, Description, CreatedAt, UpdatedAt)
+            VALUES
+                ('22222222-2222-4222-8222-222222222110', N'BACKGROUND_JOB_READ', N'View background jobs', N'View background job status across authorized tenants.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222111', N'BACKGROUND_JOB_MANAGE', N'Manage background jobs', N'Retry or cancel background jobs.', @Now, @Now);
+
+            INSERT INTO app.RolePermissions (RoleId, PermissionId)
+            SELECT r.Id, p.Id
+            FROM app.Roles r
+            JOIN app.Permissions p ON p.Code IN (N'BACKGROUND_JOB_READ', N'BACKGROUND_JOB_MANAGE')
+            WHERE r.Name = N'SuperAdmin'
+              AND NOT EXISTS (
+                SELECT 1 FROM app.RolePermissions existing
+                WHERE existing.RoleId = r.Id AND existing.PermissionId = p.Id);
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DELETE FROM app.RolePermissions
+                WHERE PermissionId IN (SELECT Id FROM app.Permissions WHERE Code IN (N'BACKGROUND_JOB_READ', N'BACKGROUND_JOB_MANAGE'));
+                DELETE FROM app.Permissions WHERE Code IN (N'BACKGROUND_JOB_READ', N'BACKGROUND_JOB_MANAGE');
+            ]]></sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

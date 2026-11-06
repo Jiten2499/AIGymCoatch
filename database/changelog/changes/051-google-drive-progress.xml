@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0068" author="lifefit-architecture">
+        <comment>Ticket: LF-0068. Remember whether a connected Drive account should receive progress photos, and which folder is the destination. Index review: no new index; the existing unique tenant-provider index still loads the one connection. Performance note: the columns are read with the connection row already fetched for upload.</comment>
+        <sql splitStatements="false"><![CDATA[
+            SET QUOTED_IDENTIFIER ON;
+            IF COL_LENGTH(N'app.TenantStorageConnections', N'StoreProgressPhotos') IS NULL
+                ALTER TABLE app.TenantStorageConnections ADD StoreProgressPhotos BIT NOT NULL CONSTRAINT DF_TenantStorageConnections_StoreProgressPhotos DEFAULT (1);
+            IF COL_LENGTH(N'app.TenantStorageConnections', N'ProgressFolderId') IS NULL
+                ALTER TABLE app.TenantStorageConnections ADD ProgressFolderId NVARCHAR(128) NULL;
+            IF COL_LENGTH(N'app.TenantStorageConnections', N'ProgressFolderName') IS NULL
+                ALTER TABLE app.TenantStorageConnections ADD ProgressFolderName NVARCHAR(200) NULL;
+        ]]></sql>
+        <rollback>
+            <sql>IF COL_LENGTH(N'app.TenantStorageConnections', N'ProgressFolderName') IS NOT NULL ALTER TABLE app.TenantStorageConnections DROP COLUMN ProgressFolderName;</sql>
+            <sql>IF COL_LENGTH(N'app.TenantStorageConnections', N'ProgressFolderId') IS NOT NULL ALTER TABLE app.TenantStorageConnections DROP COLUMN ProgressFolderId;</sql>
+            <sql>IF OBJECT_ID(N'DF_TenantStorageConnections_StoreProgressPhotos', N'D') IS NOT NULL ALTER TABLE app.TenantStorageConnections DROP CONSTRAINT DF_TenantStorageConnections_StoreProgressPhotos;</sql>
+            <sql>IF COL_LENGTH(N'app.TenantStorageConnections', N'StoreProgressPhotos') IS NOT NULL ALTER TABLE app.TenantStorageConnections DROP COLUMN StoreProgressPhotos;</sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

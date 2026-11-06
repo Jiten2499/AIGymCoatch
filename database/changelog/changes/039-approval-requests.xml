@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0054" author="lifefit-architecture">
+        <comment>Ticket: LF-0054. Store pending approval requests created by existing require-approval settings. Index review: PK_ApprovalRequests; UX_ApprovalRequests_PendingSource keeps one pending request per source; IX_ApprovalRequests_TenantId_Status_CreatedAt serves the inbox; IX_ApprovalRequests_TenantId_RequestType_Status filters type; IX_ApprovalRequests_TenantId_RequestedByUserId filters the requester. Performance note: every list index leads with TenantId and the pending inbox seeks status plus created time.</comment>
+        <sql splitStatements="false"><![CDATA[
+            CREATE TABLE app.ApprovalRequests
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                RequestType NVARCHAR(32) NOT NULL,
+                Status NVARCHAR(32) NOT NULL,
+                SourceId UNIQUEIDENTIFIER NOT NULL,
+                RequiredPermission NVARCHAR(64) NOT NULL,
+                Title NVARCHAR(200) NOT NULL,
+                Summary NVARCHAR(500) NOT NULL,
+                Reason NVARCHAR(500) NULL,
+                DecisionComment NVARCHAR(500) NULL,
+                RequestedByUserId UNIQUEIDENTIFIER NOT NULL,
+                RequestedByName NVARCHAR(200) NOT NULL,
+                DecidedByUserId UNIQUEIDENTIFIER NULL,
+                DecidedByName NVARCHAR(200) NULL,
+                DecidedAt DATETIME2 NULL,
+                MemberProfileId UNIQUEIDENTIFIER NULL,
+                RelatedLabel NVARCHAR(200) NOT NULL,
+                Days INT NULL,
+                OriginalEndDate DATE NULL,
+                ProposedEndDate DATE NULL,
+                Amount DECIMAL(19, 4) NULL,
+                Currency NVARCHAR(3) NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_ApprovalRequests PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_ApprovalRequests_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_ApprovalRequests_RequestedBy FOREIGN KEY (RequestedByUserId) REFERENCES app.Users (Id),
+                CONSTRAINT CK_ApprovalRequests_Status CHECK (Status IN (N'Pending', N'Approved', N'Rejected')),
+                CONSTRAINT CK_ApprovalRequests_Days CHECK (Days IS NULL OR Days > 0)
+            );
+            CREATE UNIQUE INDEX UX_ApprovalRequests_PendingSource
+                ON app.ApprovalRequests (TenantId, RequestType, SourceId)
+                WHERE Status = N'Pending' AND DeletedAt IS NULL;
+            CREATE INDEX IX_ApprovalRequests_TenantId_Status_CreatedAt
+                ON app.ApprovalRequests (TenantId, Status, CreatedAt DESC);
+            CREATE INDEX IX_ApprovalRequests_TenantId_RequestType_Status
+                ON app.ApprovalRequests (TenantId, RequestType, Status);
+            CREATE INDEX IX_ApprovalRequests_TenantId_RequestedByUserId
+                ON app.ApprovalRequests (TenantId, RequestedByUserId);
+        ]]></sql>
+        <rollback>
+            <sql>DROP TABLE app.ApprovalRequests;</sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

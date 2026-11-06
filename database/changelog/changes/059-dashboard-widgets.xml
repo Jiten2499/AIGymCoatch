@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0078" author="lifefit-architecture">
+        <comment>Ticket: LF-0078. Dashboard widget visibility is its own permission category so a role can hide a widget without losing the underlying module permission. Index review: no new indexes; inserts use UX_Permissions_Code and PK_RolePermissions. Performance note: the catalog write is a fixed set of rows.</comment>
+        <sql splitStatements="false"><![CDATA[
+            DECLARE @Now DATETIME2 = SYSUTCDATETIME();
+            IF NOT EXISTS (SELECT 1 FROM app.Permissions WHERE Code = N'DASHBOARD_WIDGET_CHECKINS')
+            BEGIN
+                INSERT INTO app.Permissions (Id, Code, Name, Description, CreatedAt, UpdatedAt)
+                VALUES
+                    ('22222222-2222-4222-8222-222222222180', N'DASHBOARD_WIDGET_CHECKINS', N'Today''s check-ins', N'Show the check-in widget.', @Now, @Now),
+                    ('22222222-2222-4222-8222-222222222181', N'DASHBOARD_WIDGET_NEW_MEMBERS', N'New members', N'Show the new-member widget.', @Now, @Now),
+                    ('22222222-2222-4222-8222-222222222182', N'DASHBOARD_WIDGET_EXPIRING', N'Memberships expiring', N'Show memberships that are about to expire.', @Now, @Now),
+                    ('22222222-2222-4222-8222-222222222183', N'DASHBOARD_WIDGET_COLLECTIONS', N'Collections', N'Show payment collections.', @Now, @Now),
+                    ('22222222-2222-4222-8222-222222222184', N'DASHBOARD_WIDGET_FOLLOWUPS', N'Lead follow-ups', N'Show leads that need a follow-up.', @Now, @Now),
+                    ('22222222-2222-4222-8222-222222222185', N'DASHBOARD_WIDGET_OPERATIONS', N'Today''s operations', N'Show today''s operations.', @Now, @Now),
+                    ('22222222-2222-4222-8222-222222222186', N'DASHBOARD_WIDGET_QUICK_ACTIONS', N'Quick actions', N'Show actions the person is allowed to start.', @Now, @Now),
+                    ('22222222-2222-4222-8222-222222222187', N'DASHBOARD_WIDGET_SESSIONS', N'Today''s sessions', N'Show the coach''s sessions.', @Now, @Now),
+                    ('22222222-2222-4222-8222-222222222188', N'DASHBOARD_WIDGET_ASSIGNED_MEMBERS', N'Assigned members', N'Show members assigned to the coach.', @Now, @Now),
+                    ('22222222-2222-4222-8222-222222222189', N'DASHBOARD_WIDGET_ASSESSMENTS', N'Pending assessments', N'Show assessments that are due.', @Now, @Now),
+                    ('22222222-2222-4222-8222-222222222190', N'DASHBOARD_WIDGET_PROGRESS', N'Progress alerts', N'Show recent member progress.', @Now, @Now),
+                    ('22222222-2222-4222-8222-222222222191', N'DASHBOARD_WIDGET_PT_TARGETS', N'PT session targets', N'Show personal training targets.', @Now, @Now),
+                    ('22222222-2222-4222-8222-222222222192', N'DASHBOARD_WIDGET_COACH_CREDITS', N'Coach credits', N'Show approved coach credits.', @Now, @Now),
+                    ('22222222-2222-4222-8222-222222222193', N'DASHBOARD_WIDGET_OUTSTANDING', N'Outstanding balances', N'Show unpaid membership balances.', @Now, @Now),
+                    ('22222222-2222-4222-8222-222222222194', N'DASHBOARD_WIDGET_FINANCIALS', N'Financial summary', N'Show the financial summary.', @Now, @Now),
+                    ('22222222-2222-4222-8222-222222222195', N'DASHBOARD_WIDGET_RECONCILIATION', N'Reconciliation', N'Show draft journal entries.', @Now, @Now),
+                    ('22222222-2222-4222-8222-222222222196', N'DASHBOARD_WIDGET_PAYROLL', N'Payroll', N'Show open payroll runs.', @Now, @Now),
+                    ('22222222-2222-4222-8222-222222222197', N'DASHBOARD_WIDGET_ATTENDANCE', N'Attendance', N'Show attendance for the permitted scope.', @Now, @Now),
+                    ('22222222-2222-4222-8222-222222222198', N'DASHBOARD_WIDGET_RENEWALS', N'Membership renewals', N'Show memberships due for renewal.', @Now, @Now),
+                    ('22222222-2222-4222-8222-222222222199', N'DASHBOARD_WIDGET_TRAINER_PERFORMANCE', N'Trainer performance', N'Show coach session totals.', @Now, @Now),
+                    ('22222222-2222-4222-8222-222222222200', N'DASHBOARD_WIDGET_LEAVE_REQUESTS', N'Leave requests', N'Show leave waiting for a decision.', @Now, @Now),
+                    ('22222222-2222-4222-8222-222222222201', N'DASHBOARD_WIDGET_SCHEDULE', N'Personal schedule', N'Show the person''s own schedule.', @Now, @Now),
+                    ('22222222-2222-4222-8222-222222222202', N'DASHBOARD_WIDGET_MY_ATTENDANCE', N'My attendance', N'Show check-ins recorded by this person.', @Now, @Now),
+                    ('22222222-2222-4222-8222-222222222203', N'DASHBOARD_WIDGET_TASKS', N'Assigned tasks', N'Show tasks assigned to this person.', @Now, @Now),
+                    ('22222222-2222-4222-8222-222222222204', N'DASHBOARD_WIDGET_LEAVE_STATUS', N'Leave status', N'Show this person''s leave status.', @Now, @Now),
+                    ('22222222-2222-4222-8222-222222222205', N'DASHBOARD_WIDGET_CIRCULARS', N'Circulars', N'Show unread circulars.', @Now, @Now),
+                    ('22222222-2222-4222-8222-222222222206', N'DASHBOARD_WIDGET_NOTIFICATIONS', N'Notifications', N'Show unread notifications.', @Now, @Now),
+                    ('22222222-2222-4222-8222-222222222207', N'DASHBOARD_WIDGET_CHATS', N'Unread chats', N'Show unread chats.', @Now, @Now);
+            END;
+
+            INSERT INTO app.RolePermissions (RoleId, PermissionId)
+            SELECT r.Id, p.Id
+            FROM app.Roles r
+            JOIN app.Permissions p ON p.Code LIKE N'DASHBOARD_WIDGET_%'
+            WHERE r.TenantId IS NULL AND r.Name IN (N'GymOwner', N'BusinessAdmin')
+              AND NOT EXISTS (SELECT 1 FROM app.RolePermissions existing WHERE existing.RoleId = r.Id AND existing.PermissionId = p.Id);
+
+            INSERT INTO app.RolePermissions (RoleId, PermissionId)
+            SELECT r.Id, p.Id
+            FROM app.Roles r
+            JOIN app.Permissions p ON p.Code IN (
+                N'DASHBOARD_WIDGET_CHECKINS', N'DASHBOARD_WIDGET_NEW_MEMBERS', N'DASHBOARD_WIDGET_EXPIRING',
+                N'DASHBOARD_WIDGET_COLLECTIONS', N'DASHBOARD_WIDGET_FOLLOWUPS', N'DASHBOARD_WIDGET_OPERATIONS',
+                N'DASHBOARD_WIDGET_QUICK_ACTIONS')
+            WHERE r.TenantId IS NULL AND r.Name = N'Receptionist'
+              AND NOT EXISTS (SELECT 1 FROM app.RolePermissions existing WHERE existing.RoleId = r.Id AND existing.PermissionId = p.Id);
+
+            INSERT INTO app.RolePermissions (RoleId, PermissionId)
+            SELECT r.Id, p.Id
+            FROM app.Roles r
+            JOIN app.Permissions p ON p.Code IN (
+                N'DASHBOARD_WIDGET_SESSIONS', N'DASHBOARD_WIDGET_ASSIGNED_MEMBERS', N'DASHBOARD_WIDGET_ASSESSMENTS',
+                N'DASHBOARD_WIDGET_PROGRESS', N'DASHBOARD_WIDGET_PT_TARGETS', N'DASHBOARD_WIDGET_COACH_CREDITS',
+                N'DASHBOARD_WIDGET_SCHEDULE')
+            WHERE r.TenantId IS NULL AND r.Name = N'Trainer'
+              AND NOT EXISTS (SELECT 1 FROM app.RolePermissions existing WHERE existing.RoleId = r.Id AND existing.PermissionId = p.Id);
+
+            INSERT INTO app.RolePermissions (RoleId, PermissionId)
+            SELECT r.Id, p.Id
+            FROM app.Roles r
+            JOIN app.Permissions p ON p.Code IN (
+                N'DASHBOARD_WIDGET_COLLECTIONS', N'DASHBOARD_WIDGET_OUTSTANDING', N'DASHBOARD_WIDGET_FINANCIALS',
+                N'DASHBOARD_WIDGET_RECONCILIATION', N'DASHBOARD_WIDGET_PAYROLL')
+            WHERE r.TenantId IS NULL AND r.Name = N'Accountant'
+              AND NOT EXISTS (SELECT 1 FROM app.RolePermissions existing WHERE existing.RoleId = r.Id AND existing.PermissionId = p.Id);
+
+            INSERT INTO app.RolePermissions (RoleId, PermissionId)
+            SELECT r.Id, p.Id
+            FROM app.Roles r
+            JOIN app.Permissions p ON p.Code IN (
+                N'DASHBOARD_WIDGET_OPERATIONS', N'DASHBOARD_WIDGET_ATTENDANCE', N'DASHBOARD_WIDGET_RENEWALS',
+                N'DASHBOARD_WIDGET_FOLLOWUPS', N'DASHBOARD_WIDGET_TRAINER_PERFORMANCE', N'DASHBOARD_WIDGET_LEAVE_REQUESTS',
+                N'DASHBOARD_WIDGET_CHECKINS', N'DASHBOARD_WIDGET_QUICK_ACTIONS')
+            WHERE r.TenantId IS NULL AND r.Name = N'GymManager'
+              AND NOT EXISTS (SELECT 1 FROM app.RolePermissions existing WHERE existing.RoleId = r.Id AND existing.PermissionId = p.Id);
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DELETE FROM app.RolePermissions WHERE PermissionId IN (SELECT Id FROM app.Permissions WHERE Code LIKE N'DASHBOARD_WIDGET_%');
+                DELETE FROM app.Permissions WHERE Code LIKE N'DASHBOARD_WIDGET_%';
+            ]]></sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

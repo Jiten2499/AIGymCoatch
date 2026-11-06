@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0034" author="lifefit-architecture">
+        <comment>Ticket: LF-0034. Add package category and calendar duration to membership plans, and store freeze periods without rewriting membership history. Index review: UX_MembershipPlans_TenantId_Name and IX_MembershipPlans_TenantId already serve plan lists; IX_GymMemberships_TenantId_Status_EndDate and IX_GymMemberships_MemberProfileId already serve membership lists and member history. UX_MembershipFreezes_Open enforces one open freeze per membership. IX_MembershipFreezes_GymMembershipId reads a membership's freeze history. Performance note: freeze lookups seek one membership, and plan lists stay tenant-scoped.</comment>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE app.MembershipPlans ADD
+                PackageCategory NVARCHAR(32) NOT NULL CONSTRAINT DF_MembershipPlans_PackageCategory DEFAULT N'Standard',
+                DurationUnit NVARCHAR(16) NOT NULL CONSTRAINT DF_MembershipPlans_DurationUnit DEFAULT N'Day',
+                DurationCount INT NOT NULL CONSTRAINT DF_MembershipPlans_DurationCount DEFAULT 1;
+        ]]></sql>
+        <sql splitStatements="false"><![CDATA[
+            UPDATE app.MembershipPlans
+            SET DurationCount = CASE MembershipType
+                    WHEN N'Monthly' THEN 1
+                    WHEN N'Quarterly' THEN 3
+                    WHEN N'HalfYearly' THEN 6
+                    WHEN N'Yearly' THEN 12
+                    ELSE DurationDays
+                END,
+                DurationUnit = CASE WHEN MembershipType = N'Custom' THEN N'Day' ELSE N'Month' END;
+        ]]></sql>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE app.MembershipPlans ADD CONSTRAINT CK_MembershipPlans_PackageCategory
+                CHECK (PackageCategory IN (N'Standard', N'Student', N'Women', N'Corporate', N'Couple'));
+        ]]></sql>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE app.MembershipPlans ADD CONSTRAINT CK_MembershipPlans_DurationUnit
+                CHECK (DurationUnit IN (N'Day', N'Month'));
+        ]]></sql>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE app.MembershipPlans ADD CONSTRAINT CK_MembershipPlans_DurationCount
+                CHECK (DurationCount > 0);
+        ]]></sql>
+        <sql splitStatements="false"><![CDATA[
+            CREATE TABLE app.MembershipFreezes
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                GymMembershipId UNIQUEIDENTIFIER NOT NULL,
+                StartDate DATE NOT NULL,
+                EndDate DATE NULL,
+                Reason NVARCHAR(500) NULL,
+                PreviousStatus NVARCHAR(32) NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                CONSTRAINT PK_MembershipFreezes PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_MembershipFreezes_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_MembershipFreezes_GymMemberships FOREIGN KEY (GymMembershipId) REFERENCES app.GymMemberships (Id),
+                CONSTRAINT CK_MembershipFreezes_Dates CHECK (EndDate IS NULL OR EndDate >= StartDate)
+            );
+            CREATE UNIQUE INDEX UX_MembershipFreezes_Open
+                ON app.MembershipFreezes (GymMembershipId) WHERE EndDate IS NULL;
+            CREATE INDEX IX_MembershipFreezes_GymMembershipId
+                ON app.MembershipFreezes (GymMembershipId, StartDate);
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DROP TABLE app.MembershipFreezes;
+                ALTER TABLE app.MembershipPlans DROP CONSTRAINT CK_MembershipPlans_DurationCount;
+                ALTER TABLE app.MembershipPlans DROP CONSTRAINT CK_MembershipPlans_DurationUnit;
+                ALTER TABLE app.MembershipPlans DROP CONSTRAINT CK_MembershipPlans_PackageCategory;
+                ALTER TABLE app.MembershipPlans DROP CONSTRAINT DF_MembershipPlans_DurationCount;
+                ALTER TABLE app.MembershipPlans DROP CONSTRAINT DF_MembershipPlans_DurationUnit;
+                ALTER TABLE app.MembershipPlans DROP CONSTRAINT DF_MembershipPlans_PackageCategory;
+                ALTER TABLE app.MembershipPlans DROP COLUMN PackageCategory, DurationUnit, DurationCount;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0049" author="lifefit-architecture">
+        <comment>
+            Ticket: LF-0049. Double-entry financial ledger for gym tenants.
+            Index review: PK on each Id; UX_FinancialAccounts_TenantId_Name; UX_LedgerAccounts_TenantId_Code;
+            UX_JournalEntries_TenantId_Source for idempotent source posting; IX_JournalEntries_TenantId_EntryDate_Status
+            for summaries; IX_JournalEntries_TenantId_FinancialAccountId_EntryDate for account history;
+            IX_JournalEntryLines_JournalEntryId and IX_JournalEntryLines_LedgerAccountId for line reads.
+            Performance note: every list index leads with TenantId. Soft-deleted rows stay filtered out.
+        </comment>
+        <sql splitStatements="false"><![CDATA[
+            CREATE TABLE app.FinancialAccounts
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                Name NVARCHAR(100) NOT NULL,
+                AccountKind NVARCHAR(32) NOT NULL,
+                Currency NVARCHAR(3) NOT NULL,
+                IsActive BIT NOT NULL,
+                LedgerAccountId UNIQUEIDENTIFIER NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_FinancialAccounts PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_FinancialAccounts_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT CK_FinancialAccounts_AccountKind CHECK (AccountKind IN (N'Cash', N'Bank', N'Upi', N'Card', N'Other'))
+            );
+            CREATE UNIQUE INDEX UX_FinancialAccounts_TenantId_Name ON app.FinancialAccounts (TenantId, Name) WHERE DeletedAt IS NULL;
+            CREATE INDEX IX_FinancialAccounts_TenantId_IsActive ON app.FinancialAccounts (TenantId, IsActive) WHERE DeletedAt IS NULL;
+
+            CREATE TABLE app.LedgerAccounts
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                Code NVARCHAR(64) NOT NULL,
+                Name NVARCHAR(200) NOT NULL,
+                AccountClass NVARCHAR(32) NOT NULL,
+                IsSystem BIT NOT NULL,
+                IsActive BIT NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_LedgerAccounts PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_LedgerAccounts_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT CK_LedgerAccounts_AccountClass CHECK (AccountClass IN (N'Asset', N'Liability', N'Revenue', N'Expense', N'Equity'))
+            );
+            CREATE UNIQUE INDEX UX_LedgerAccounts_TenantId_Code ON app.LedgerAccounts (TenantId, Code) WHERE DeletedAt IS NULL;
+
+            ALTER TABLE app.FinancialAccounts ADD CONSTRAINT FK_FinancialAccounts_LedgerAccounts
+                FOREIGN KEY (LedgerAccountId) REFERENCES app.LedgerAccounts (Id);
+
+            CREATE TABLE app.JournalEntries
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                EntryDate DATE NOT NULL,
+                Description NVARCHAR(500) NOT NULL,
+                EntryType NVARCHAR(32) NOT NULL,
+                SourceType NVARCHAR(32) NOT NULL,
+                SourceId UNIQUEIDENTIFIER NULL,
+                Category NVARCHAR(100) NULL,
+                FinancialAccountId UNIQUEIDENTIFIER NULL,
+                CounterFinancialAccountId UNIQUEIDENTIFIER NULL,
+                Amount DECIMAL(19, 4) NOT NULL,
+                Currency NVARCHAR(3) NOT NULL,
+                Status NVARCHAR(16) NOT NULL,
+                RecordedByUserId UNIQUEIDENTIFIER NOT NULL,
+                ReversalOfJournalEntryId UNIQUEIDENTIFIER NULL,
+                PostedAt DATETIME2 NULL,
+                VoidedAt DATETIME2 NULL,
+                VoidedByUserId UNIQUEIDENTIFIER NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_JournalEntries PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_JournalEntries_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_JournalEntries_FinancialAccounts FOREIGN KEY (FinancialAccountId) REFERENCES app.FinancialAccounts (Id),
+                CONSTRAINT FK_JournalEntries_CounterFinancialAccounts FOREIGN KEY (CounterFinancialAccountId) REFERENCES app.FinancialAccounts (Id),
+                CONSTRAINT FK_JournalEntries_RecordedByUsers FOREIGN KEY (RecordedByUserId) REFERENCES app.Users (Id),
+                CONSTRAINT FK_JournalEntries_VoidedByUsers FOREIGN KEY (VoidedByUserId) REFERENCES app.Users (Id),
+                CONSTRAINT FK_JournalEntries_ReversalOf FOREIGN KEY (ReversalOfJournalEntryId) REFERENCES app.JournalEntries (Id),
+                CONSTRAINT CK_JournalEntries_Amount CHECK (Amount > 0),
+                CONSTRAINT CK_JournalEntries_EntryType CHECK (EntryType IN (N'MoneyIn', N'MoneyOut', N'Transfer')),
+                CONSTRAINT CK_JournalEntries_SourceType CHECK (SourceType IN (N'MembershipPayment', N'Expense', N'Transfer', N'Reversal')),
+                CONSTRAINT CK_JournalEntries_Status CHECK (Status IN (N'Draft', N'Posted', N'Voided'))
+            );
+            CREATE UNIQUE INDEX UX_JournalEntries_TenantId_Source
+                ON app.JournalEntries (TenantId, SourceType, SourceId)
+                WHERE DeletedAt IS NULL AND SourceId IS NOT NULL AND Status IN (N'Draft', N'Posted');
+            CREATE INDEX IX_JournalEntries_TenantId_EntryDate_Status
+                ON app.JournalEntries (TenantId, EntryDate, Status) WHERE DeletedAt IS NULL;
+            CREATE INDEX IX_JournalEntries_TenantId_FinancialAccountId_EntryDate
+                ON app.JournalEntries (TenantId, FinancialAccountId, EntryDate DESC) WHERE DeletedAt IS NULL;
+            CREATE INDEX IX_JournalEntries_TenantId_EntryType_Status
+                ON app.JournalEntries (TenantId, EntryType, Status) WHERE DeletedAt IS NULL;
+
+            CREATE TABLE app.JournalEntryLines
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                JournalEntryId UNIQUEIDENTIFIER NOT NULL,
+                LedgerAccountId UNIQUEIDENTIFIER NOT NULL,
+                DebitAmount DECIMAL(19, 4) NOT NULL,
+                CreditAmount DECIMAL(19, 4) NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_JournalEntryLines PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_JournalEntryLines_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_JournalEntryLines_JournalEntries FOREIGN KEY (JournalEntryId) REFERENCES app.JournalEntries (Id),
+                CONSTRAINT FK_JournalEntryLines_LedgerAccounts FOREIGN KEY (LedgerAccountId) REFERENCES app.LedgerAccounts (Id),
+                CONSTRAINT CK_JournalEntryLines_Amounts CHECK (
+                    DebitAmount >= 0 AND CreditAmount >= 0
+                    AND ((DebitAmount > 0 AND CreditAmount = 0) OR (CreditAmount > 0 AND DebitAmount = 0)))
+            );
+            CREATE INDEX IX_JournalEntryLines_JournalEntryId ON app.JournalEntryLines (JournalEntryId) WHERE DeletedAt IS NULL;
+            CREATE INDEX IX_JournalEntryLines_TenantId_LedgerAccountId ON app.JournalEntryLines (TenantId, LedgerAccountId) WHERE DeletedAt IS NULL;
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DROP TABLE app.JournalEntryLines;
+                DROP TABLE app.JournalEntries;
+                ALTER TABLE app.FinancialAccounts DROP CONSTRAINT FK_FinancialAccounts_LedgerAccounts;
+                DROP TABLE app.FinancialAccounts;
+                DROP TABLE app.LedgerAccounts;
+            ]]></sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="LF-0050" author="lifefit-architecture">
+        <comment>Ticket: LF-0050. Enable GYM_FINANCIAL_LEDGER and grant ledger permissions. Index review: catalog inserts only.</comment>
+        <sql splitStatements="false"><![CDATA[
+            DECLARE @Now DATETIME2 = SYSUTCDATETIME();
+            INSERT INTO app.FeatureDefinitions (Id, Code, Name, Description, Category, IsActive, Scope, ConsumesLicense, CreatedAt, UpdatedAt)
+            VALUES ('a2222222-2222-4222-8222-222222222005', N'GYM_FINANCIAL_LEDGER', N'Financial Ledger', N'Double-entry ledger for membership payments, expenses, and transfers.', N'Platform', 1, N'Tenant', 0, @Now, @Now);
+
+            INSERT INTO app.PlanFeatures (Id, PlanId, FeatureCode, [Enabled], CreatedAt, UpdatedAt)
+            SELECT NEWID(), p.Id, N'GYM_FINANCIAL_LEDGER',
+                CASE WHEN p.Code IN (N'BASIC', N'PRO', N'ENTERPRISE') THEN 1 ELSE 0 END,
+                @Now, @Now
+            FROM app.Plans p;
+
+            INSERT INTO app.Permissions (Id, Code, Name, Description, CreatedAt, UpdatedAt)
+            VALUES
+                ('22222222-2222-4222-8222-222222222090', N'LEDGER_READ', N'View ledger', N'View ledger summary, balances, and transactions.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222091', N'LEDGER_CREATE', N'Record ledger transfers', N'Create transfer journal entries.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222092', N'LEDGER_ACCOUNT_MANAGE', N'Manage financial accounts', N'Create and edit money accounts.', @Now, @Now),
+                ('22222222-2222-4222-8222-222222222093', N'LEDGER_VOID', N'Void ledger entries', N'Void or reverse posted ledger entries.', @Now, @Now);
+
+            INSERT INTO app.RolePermissions (RoleId, PermissionId)
+            SELECT r.Id, p.Id
+            FROM app.Roles r
+            JOIN app.Permissions p ON p.Code IN (N'LEDGER_READ', N'LEDGER_CREATE', N'LEDGER_ACCOUNT_MANAGE', N'LEDGER_VOID')
+            WHERE r.Name IN (N'SuperAdmin', N'GymOwner', N'GymManager');
+
+            INSERT INTO app.RolePermissions (RoleId, PermissionId)
+            SELECT r.Id, p.Id
+            FROM app.Roles r
+            JOIN app.Permissions p ON p.Code IN (N'LEDGER_READ', N'LEDGER_CREATE')
+            WHERE r.Name = N'Receptionist';
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DELETE FROM app.RolePermissions WHERE PermissionId IN (
+                    '22222222-2222-4222-8222-222222222090',
+                    '22222222-2222-4222-8222-222222222091',
+                    '22222222-2222-4222-8222-222222222092',
+                    '22222222-2222-4222-8222-222222222093');
+                DELETE FROM app.Permissions WHERE Code IN (N'LEDGER_READ', N'LEDGER_CREATE', N'LEDGER_ACCOUNT_MANAGE', N'LEDGER_VOID');
+                DELETE FROM app.PlanFeatures WHERE FeatureCode = N'GYM_FINANCIAL_LEDGER';
+                DELETE FROM app.FeatureDefinitions WHERE Code = N'GYM_FINANCIAL_LEDGER';
+            ]]></sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>
