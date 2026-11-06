@@ -20,6 +20,14 @@ describe("business dashboard foundation", () => {
     expect(home).toEqual({ href: "/business", tenantId: "gym" });
   });
 
+  it("sends a custom business role to that workspace", () => {
+    const home = resolveHome([
+      { id: "platform", name: "LifeFit AI", type: "Platform", status: "Active", roles: ["PersonalMember"] },
+      { id: "gym", name: "North", type: "Gym", status: "Active", roles: ["Front desk lead"] },
+    ]);
+    expect(home).toEqual({ href: "/business", tenantId: "gym" });
+  });
+
   it("shows only capabilities the workspace has enabled", () => {
     const widgets = visibleWidgets([
       { code: "Members", enabled: true },

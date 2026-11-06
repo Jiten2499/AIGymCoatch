@@ -60,6 +60,17 @@ public static class ServiceCollectionExtensions
                 };
                 options.Events = new JwtBearerEvents
                 {
+                    OnMessageReceived = context =>
+                    {
+                        var accessToken = context.Request.Query["access_token"];
+                        var path = context.HttpContext.Request.Path;
+                        if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs/chat"))
+                        {
+                            context.Token = accessToken;
+                        }
+
+                        return Task.CompletedTask;
+                    },
                     OnAuthenticationFailed = _ =>
                     {
                         PlatformMetrics.AuthFailures.Add(1, new KeyValuePair<string, object?>("reason", "token"));
@@ -67,7 +78,10 @@ public static class ServiceCollectionExtensions
                     },
                 };
             });
+        services.AddSignalR();
         services.AddAuthorization();
+        services.AddScoped<LifeFitAI.Application.Chat.IChatNotifier, Hubs.SignalRChatNotifier>();
+        services.AddScoped<LifeFitAI.Application.Gym.Communications.ICircularNotifier, Hubs.SignalRCircularNotifier>();
         services.AddConfiguredRateLimiter(configuration);
 
         services.ConfigureHttpJsonOptions(options =>
@@ -139,7 +153,8 @@ public static class ServiceCollectionExtensions
                     "http://localhost:8081",
                     "http://127.0.0.1:8081")
                     .AllowAnyHeader()
-                    .AllowAnyMethod();
+                    .AllowAnyMethod()
+                    .AllowCredentials();
             });
 
             var allowed = configuration.GetSection("Security:AllowedOrigins").Get<string[]>() ?? [];
@@ -152,7 +167,8 @@ public static class ServiceCollectionExtensions
             {
                 policy.WithOrigins(allowed)
                     .AllowAnyHeader()
-                    .AllowAnyMethod();
+                    .AllowAnyMethod()
+                    .AllowCredentials();
             });
         });
 

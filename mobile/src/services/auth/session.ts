@@ -1,4 +1,5 @@
-import { login as loginRequest, logout as logoutRequest, refreshSession, register as registerRequest, type LoginBody, type RegisterBody } from '../../features/auth/api/auth.api';
+import { listWorkspaces, login as loginRequest, logout as logoutRequest, refreshSession, register as registerRequest, switchWorkspace, type LoginBody, type RegisterBody } from '../../features/auth/api/auth.api';
+import { trainerWorkspaceToOpen } from './trainerWorkspace';
 import { queryClient } from '../../app/providers/queryClient';
 import { useSessionStore } from '../../store/sessionStore';
 import { useWorkspaceStore } from '../../store/workspaceStore';
@@ -19,11 +20,11 @@ export function registerSessionBridge(): void {
 }
 
 export async function signIn(body: LoginBody, signal?: AbortSignal): Promise<void> {
-  await applyAuth(await loginRequest(body, signal));
+  await applyAuth(await loginRequest(body, signal), true);
 }
 
 export async function signUp(body: RegisterBody, signal?: AbortSignal): Promise<void> {
-  await applyAuth(await registerRequest(body, signal));
+  await applyAuth(await registerRequest(body, signal), true);
 }
 
 export async function restoreSession(): Promise<void> {
@@ -72,9 +73,10 @@ async function refreshOnce(): Promise<string | null> {
   }
   try {
     const response = await refreshSession(refreshToken);
-    await applyAuth(response);
+    await applyAuth(response, true);
     return response.accessToken;
-  } catch {
+  } catch (error) {
+    console.error('Session refresh failed', error instanceof Error ? error.message : 'Request failed');
     await clearSession();
     useSessionStore.getState().clearSession();
     useWorkspaceStore.getState().reset();
@@ -82,7 +84,7 @@ async function refreshOnce(): Promise<string | null> {
   }
 }
 
-export async function applyAuth(response: AuthResponse): Promise<void> {
+export async function applyAuth(response: AuthResponse, followTrainer = false): Promise<void> {
   const previousTenant = useSessionStore.getState().currentTenant?.id;
   await saveSession({
     accessToken: response.accessToken,
@@ -100,4 +102,21 @@ export async function applyAuth(response: AuthResponse): Promise<void> {
     user: response.user,
     currentTenant: response.currentTenant,
   });
+  await openTrainerWorkspace(followTrainer);
+}
+
+async function openTrainerWorkspace(followTrainer: boolean): Promise<void> {
+  try {
+    const workspaces = await listWorkspaces();
+    useWorkspaceStore.getState().setWorkspaces(workspaces);
+    if (!followTrainer) {
+      return;
+    }
+    const next = trainerWorkspaceToOpen(useSessionStore.getState().currentTenant?.id, workspaces);
+    if (next) {
+      await applyAuth(await switchWorkspace(next.id));
+    }
+  } catch {
+    useWorkspaceStore.setState({ ready: true });
+  }
 }

@@ -7,8 +7,25 @@ import { listFeatureFlags } from '../../licensing/api/licenses.api';
 import { listNotifications, markNotificationRead } from '../api/notifications.api';
 import { NotificationsScreen } from './NotificationsScreen';
 
-jest.mock('../api/notifications.api', () => ({ listNotifications: jest.fn(), markNotificationRead: jest.fn() }));
+jest.mock('../api/notifications.api', () => ({
+  listNotifications: jest.fn(),
+  markNotificationRead: jest.fn(),
+  getNotificationSummary: jest.fn(),
+  syncNotifications: jest.fn(),
+}));
+jest.mock('../../communications/api/communications.api', () => ({
+  listMemberCommunications: jest.fn(async () => ({ items: [], page: 1, pageSize: 20, totalCount: 0 })),
+  getMemberCommunication: jest.fn(),
+  markCommunicationRead: jest.fn(),
+  countUnreadCommunications: jest.fn(async () => 0),
+  getCommunicationInboxSummary: jest.fn(async () => ({ unreadCount: 0, latestActivityAt: null, serverTimeUtc: '2026-10-08T12:00:00Z' })),
+  syncInboxCommunications: jest.fn(async () => ({ items: [], unreadCount: 0, serverTimeUtc: '2026-10-08T12:00:00Z' })),
+}));
 jest.mock('../../licensing/api/licenses.api', () => ({ listFeatureFlags: jest.fn() }));
+jest.mock('@react-navigation/native', () => {
+  const actual = jest.requireActual<typeof import('@react-navigation/native')>('@react-navigation/native');
+  return { ...actual, useIsFocused: () => false, useNavigation: () => ({ navigate: jest.fn() }) };
+});
 
 const unread = { id: 'note-1', type: 'ChallengeReminder' as const, title: 'Challenge joined', message: 'October steps', isRead: false, createdAt: '2026-10-03T10:00:00Z' };
 

@@ -104,7 +104,7 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
           {formError ? <AppText accessibilityRole="alert" tone="danger">{formError}</AppText> : null}
           {addSet.isError ? <AppText accessibilityRole="alert" tone="danger">{errorText(addSet.error, t('common.offline'))}</AppText> : null}
           {addSet.isSuccess ? <AppText tone="accent">{t('journey.logged')}</AppText> : null}
-          <AppButton label={t('journey.logSet')} loading={addSet.isPending} onPress={submit} />
+          <AppButton label={t('journey.logSet')} loading={addSet.isPending} onPress={() => { void submit(); }} />
           {index < (session.data?.exercises.length ?? 0) - 1 ? (
             <AppButton label={t('journey.nextExercise')} onPress={() => setIndex(index + 1)} variant="secondary" />
           ) : null}

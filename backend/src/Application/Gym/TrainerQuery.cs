@@ -35,6 +35,6 @@ public sealed class GetTrainerQueryHandler : IRequestHandler<GetTrainerQuery, Re
         var user = trainer is null ? null : await _users.GetByIdAsync(trainer.UserId, cancellationToken).ConfigureAwait(false);
         return trainer is null || user is null
             ? Result.Failure<TrainerResponse>(GymErrors.NotFound)
-            : Result.Success(new TrainerResponse(trainer.Id, trainer.UserId, user.Email, user.FirstName, user.LastName, trainer.Bio, trainer.Specialization, trainer.ExperienceYears, trainer.Certification, trainer.ProfileImageUrl, trainer.BranchId, trainer.Status));
+            : Result.Success(TrainerMaps.ToResponse(trainer, user));
     }
 }

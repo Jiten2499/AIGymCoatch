@@ -1,4 +1,5 @@
 using FluentAssertions;
+using LifeFitAI.Application.Authorization;
 using LifeFitAI.Application.Fitness;
 using LifeFitAI.Application.Fitness.Ai;
 using LifeFitAI.Application.Fitness.Nutrition;
@@ -30,15 +31,19 @@ public sealed class TenantIsolationTests
     {
         var people = Substitute.For<IPeopleRepository>();
         people.GetMemberAsync(_tenantA, _foreignId, Arg.Any<CancellationToken>()).Returns((MemberProfile?)null);
-        var read = new GetMemberQueryHandler(Allow(), Actor(), people, Substitute.For<IUserAccountRepository>());
+        people.ReadMemberAsync(_tenantA, _foreignId, Arg.Any<CancellationToken>()).Returns((MemberResponse?)null);
+        var scope = Substitute.For<IMemberAccessScope>();
+        scope.LimitAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(MemberAccessLimit.AllowAll());
+        var read = new GetMemberQueryHandler(Allow(), Actor(), people, scope);
         var update = new UpdateMemberCommandHandler(Allow(), Actor(), people, Substitute.For<IUserAccountRepository>(), Substitute.For<IAuditLogRepository>(), Substitute.For<IUnitOfWork>(), Clock(), Substitute.For<IClientContext>());
 
         var readResult = await read.Handle(new GetMemberQuery(_foreignId), CancellationToken.None);
-        var updateResult = await update.Handle(new UpdateMemberCommand(_foreignId, null, null, null, null, null, null, null, null, ProfileStatus.Inactive), CancellationToken.None);
+        var updateResult = await update.Handle(new UpdateMemberCommand(_foreignId, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, ProfileStatus.Inactive), CancellationToken.None);
 
         readResult.IsFailure.Should().BeTrue();
         updateResult.IsFailure.Should().BeTrue();
         await people.Received(2).GetMemberAsync(_tenantA, _foreignId, Arg.Any<CancellationToken>());
+        await people.DidNotReceive().ReadMemberAsync(_tenantB, Arg.Any<Guid>(), Arg.Any<CancellationToken>());
         await people.DidNotReceive().GetMemberAsync(_tenantB, Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
 
@@ -113,7 +118,7 @@ public sealed class TenantIsolationTests
         people.GetMemberAsync(_tenantA, _foreignId, Arg.Any<CancellationToken>()).Returns((MemberProfile?)null);
         var handler = new UpdateMemberCommandHandler(Allow(), Actor(), people, Substitute.For<IUserAccountRepository>(), audit, Substitute.For<IUnitOfWork>(), Clock(), Substitute.For<IClientContext>());
 
-        await handler.Handle(new UpdateMemberCommand(_foreignId, null, null, null, null, null, null, null, null, ProfileStatus.Inactive), CancellationToken.None);
+        await handler.Handle(new UpdateMemberCommand(_foreignId, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, ProfileStatus.Inactive), CancellationToken.None);
 
         await audit.DidNotReceive().AddAsync(Arg.Is<AuditLog>(entry => entry.TenantId == _tenantB), Arg.Any<CancellationToken>());
     }

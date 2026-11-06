@@ -11,6 +11,8 @@ public interface IDashboardAccess
 {
     Task<Result<DashboardWorkspace>> OpenAsync(CancellationToken cancellationToken);
 
+    Task<Result<DashboardWorkspace>> OpenMemberAsync(CancellationToken cancellationToken);
+
     Task<Result<DashboardWorkspace>> OpenAreaAsync(string areaCode, CancellationToken cancellationToken);
 }
 
@@ -52,6 +54,22 @@ public sealed class DashboardAccess : IDashboardAccess
 
     public async Task<Result<DashboardWorkspace>> OpenAsync(CancellationToken cancellationToken)
     {
+        var opened = await OpenMemberAsync(cancellationToken).ConfigureAwait(false);
+        if (opened.IsFailure)
+        {
+            return opened;
+        }
+
+        if (!opened.Value.Permissions.Contains(PermissionCodes.ReportRead, StringComparer.Ordinal))
+        {
+            return Result.Failure<DashboardWorkspace>(IdentityErrors.Forbidden);
+        }
+
+        return opened;
+    }
+
+    public async Task<Result<DashboardWorkspace>> OpenMemberAsync(CancellationToken cancellationToken)
+    {
         if (_actor.UserId is not Guid userId || _actor.TenantId is not Guid tenantId)
         {
             return Result.Failure<DashboardWorkspace>(IdentityErrors.InvalidCredentials);
@@ -79,11 +97,6 @@ public sealed class DashboardAccess : IDashboardAccess
         }
 
         var permissions = await _roles.GetPermissionCodesAsync(userId, tenantId, cancellationToken).ConfigureAwait(false);
-        if (!permissions.Contains(PermissionCodes.ReportRead, StringComparer.Ordinal))
-        {
-            return Result.Failure<DashboardWorkspace>(IdentityErrors.Forbidden);
-        }
-
         var profile = await _profiles.GetAsync(tenantId, cancellationToken).ConfigureAwait(false);
         var zone = TimeZoneInfo.Utc;
         if (profile is not null && TimeZoneInfo.TryFindSystemTimeZoneById(profile.TimeZone, out var found))

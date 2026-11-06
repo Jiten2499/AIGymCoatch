@@ -3,6 +3,7 @@ export type UserProfile = {
   email: string;
   firstName: string;
   lastName: string;
+  hasPhoto?: boolean;
 };
 
 export type TenantSummary = {

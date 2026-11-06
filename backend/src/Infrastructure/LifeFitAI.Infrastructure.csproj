@@ -8,6 +8,8 @@
     <ProjectReference Include="..\SharedKernel\LifeFitAI.SharedKernel.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Hangfire.AspNetCore" />
+    <PackageReference Include="Hangfire.SqlServer" />
     <PackageReference Include="Microsoft.AspNetCore.DataProtection" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
       <PrivateAssets>all</PrivateAssets>

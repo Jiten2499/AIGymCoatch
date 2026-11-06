@@ -150,10 +150,16 @@ public sealed class ChallengeProgressHandler :
 
 public sealed record ListNotificationsQuery(int Page, int PageSize) : IRequest<Result<PageResult<NotificationResponse>>>;
 
+public sealed record GetNotificationSummaryQuery : IRequest<Result<NotificationSummaryResponse>>;
+
+public sealed record SyncNotificationsQuery(DateTime? SinceUtc, int Take) : IRequest<Result<NotificationSyncResponse>>;
+
 public sealed record MarkNotificationReadCommand(Guid Id) : IRequest<Result<NotificationResponse>>;
 
 public sealed class NotificationHandler :
     IRequestHandler<ListNotificationsQuery, Result<PageResult<NotificationResponse>>>,
+    IRequestHandler<GetNotificationSummaryQuery, Result<NotificationSummaryResponse>>,
+    IRequestHandler<SyncNotificationsQuery, Result<NotificationSyncResponse>>,
     IRequestHandler<MarkNotificationReadCommand, Result<NotificationResponse>>
 {
     private readonly IOperationGuard _guard;
@@ -181,6 +187,34 @@ public sealed class NotificationHandler :
 
         var page = await _challenges.ListNotificationsAsync(scope.Value.TenantId, scope.Value.UserId, new PageQuery(request.Page, request.PageSize), cancellationToken).ConfigureAwait(false);
         return Result.Success(new PageResult<NotificationResponse>(page.Items.Select(Map).ToArray(), page.Page, page.PageSize, page.TotalCount));
+    }
+
+    public async Task<Result<NotificationSummaryResponse>> Handle(GetNotificationSummaryQuery request, CancellationToken cancellationToken)
+    {
+        var scope = await Scope.Open(_guard, _actor, PermissionCodes.NotificationRead, FeatureCodes.WorkoutPlans, cancellationToken).ConfigureAwait(false);
+        if (scope.IsFailure)
+        {
+            return Result.Failure<NotificationSummaryResponse>(scope.Error);
+        }
+
+        var unread = await _challenges.CountUnreadNotificationsAsync(scope.Value.TenantId, scope.Value.UserId, cancellationToken).ConfigureAwait(false);
+        var latest = await _challenges.LatestNotificationActivityAsync(scope.Value.TenantId, scope.Value.UserId, cancellationToken).ConfigureAwait(false);
+        return Result.Success(new NotificationSummaryResponse(unread, latest, _clock.UtcNow));
+    }
+
+    public async Task<Result<NotificationSyncResponse>> Handle(SyncNotificationsQuery request, CancellationToken cancellationToken)
+    {
+        var scope = await Scope.Open(_guard, _actor, PermissionCodes.NotificationRead, FeatureCodes.WorkoutPlans, cancellationToken).ConfigureAwait(false);
+        if (scope.IsFailure)
+        {
+            return Result.Failure<NotificationSyncResponse>(scope.Error);
+        }
+
+        var since = request.SinceUtc ?? DateTime.MinValue;
+        var take = request.Take <= 0 ? 50 : request.Take;
+        var items = await _challenges.SyncNotificationsAsync(scope.Value.TenantId, scope.Value.UserId, since, take, cancellationToken).ConfigureAwait(false);
+        var unread = await _challenges.CountUnreadNotificationsAsync(scope.Value.TenantId, scope.Value.UserId, cancellationToken).ConfigureAwait(false);
+        return Result.Success(new NotificationSyncResponse(items.Select(Map).ToArray(), unread, _clock.UtcNow));
     }
 
     public async Task<Result<NotificationResponse>> Handle(MarkNotificationReadCommand request, CancellationToken cancellationToken)

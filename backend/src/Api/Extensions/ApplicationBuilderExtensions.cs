@@ -42,6 +42,7 @@ public static class ApplicationBuilderExtensions
         app.UseRateLimiter();
 
         app.MapControllers();
+        app.MapHub<Hubs.ChatHub>("/hubs/chat");
         app.MapHealthChecks("/health/live", new HealthCheckOptions
         {
             Predicate = _ => false,

@@ -81,6 +81,9 @@ public sealed class UserAccountRepository : IUserAccountRepository
     public Task<bool> PhoneExistsAsync(string phone, CancellationToken cancellationToken) =>
         _db.Users.AnyAsync(user => user.Phone == phone, cancellationToken);
 
+    public Task<UserAccount?> GetByPhoneAsync(string phone, CancellationToken cancellationToken) =>
+        _db.Users.SingleOrDefaultAsync(user => user.Phone == phone, cancellationToken);
+
     public async Task AddAsync(UserAccount user, CancellationToken cancellationToken) =>
         await _db.Users.AddAsync(user, cancellationToken).ConfigureAwait(false);
 
@@ -94,7 +97,7 @@ public sealed class UserAccountRepository : IUserAccountRepository
             join tenant in _db.Tenants.AsNoTracking() on user.TenantId equals tenant.Id into tenants
             from tenant in tenants.DefaultIfEmpty()
             orderby user.Email
-            select new { user.Id, user.Email, user.FirstName, user.LastName, user.Status, user.TenantId, TenantName = tenant == null ? string.Empty : tenant.Name, user.CreatedAt })
+            select new { user.Id, user.Email, user.FirstName, user.LastName, user.Status, user.TenantId, TenantName = tenant == null ? string.Empty : tenant.Name, user.CreatedAt, HasPhoto = user.PhotoStorageKey != null })
             .Skip(skip)
             .Take(take)
             .ToListAsync(cancellationToken)
@@ -116,7 +119,7 @@ public sealed class UserAccountRepository : IUserAccountRepository
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
         var planNames = plans.ToDictionary(row => row.UserId, row => row.Name);
-        return rows.Select(row => new PlatformUserResponse(row.Id, row.Email, row.FirstName, row.LastName, row.Status.ToString(), row.TenantId, row.TenantName, row.CreatedAt, planNames.GetValueOrDefault(row.Id) ?? string.Empty)).ToArray();
+        return rows.Select(row => new PlatformUserResponse(row.Id, row.Email, row.FirstName, row.LastName, row.Status.ToString(), row.TenantId, row.TenantName, row.CreatedAt, planNames.GetValueOrDefault(row.Id) ?? string.Empty, row.HasPhoto)).ToArray();
     }
 
     private IQueryable<UserAccount> DirectoryUsers(DirectoryScope scope)
@@ -127,8 +130,21 @@ public sealed class UserAccountRepository : IUserAccountRepository
             return users;
         }
 
-        return users.Where(user => _db.TenantMembers.Any(member =>
+        users = users.Where(user => _db.TenantMembers.Any(member =>
             member.UserId == user.Id && member.TenantId == tenantId && member.Status == MembershipStatus.Active));
+        if (!scope.StaffOnly)
+        {
+            return users;
+        }
+
+        var staffRoles = RoleNames.BusinessStaff.ToList();
+        var staffRoleIds = _db.Roles
+            .Where(role => role.IsActive && (role.TenantId == tenantId || (role.TenantId == null && staffRoles.Contains(role.Name))))
+            .Select(role => role.Id);
+        return users.Where(user => _db.UserRoles.Any(assignment =>
+            assignment.UserId == user.Id
+            && assignment.TenantId == tenantId
+            && staffRoleIds.Contains(assignment.RoleId)));
     }
 }
 

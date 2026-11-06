@@ -3,6 +3,8 @@ using LifeFitAI.Application.Authorization;
 using LifeFitAI.Application.Gym;
 using LifeFitAI.Application.Gym.Attendance;
 using LifeFitAI.Application.Gym.Branches;
+using LifeFitAI.Application.Gym.Approvals;
+using LifeFitAI.Application.Gym.Configuration;
 using LifeFitAI.Application.Gym.Memberships;
 using LifeFitAI.Application.Gym.Staffing;
 using LifeFitAI.Application.Identity;
@@ -134,16 +136,19 @@ public sealed class GymAccessTests
         membership.Cancel();
         var plans = Substitute.For<IMembershipRepository>();
         plans.GetMembershipAsync(_tenantId, membership.Id, Arg.Any<CancellationToken>()).Returns(membership);
-        var handler = new ChangeMembershipCommandHandler(Allow(), Actor(), plans, Substitute.For<IAuditLogRepository>(), Substitute.For<IUnitOfWork>(), Clock(), Substitute.For<IClientContext>());
+        plans.GetPlanAsync(_tenantId, membership.MembershipPlanId, Arg.Any<CancellationToken>()).Returns(MembershipPlan.Create(membership.MembershipPlanId, _tenantId, "Monthly", null, 30, MembershipType.Monthly, null, 10m, "USD"));
+        var handler = new ChangeMembershipCommandHandler(Allow(), Actor(), plans, Substitute.For<IBusinessConfigRepository>(), Substitute.For<IMembershipApprovalQueue>(), Substitute.For<IAuditLogRepository>(), Substitute.For<IUnitOfWork>(), Clock(), Substitute.For<IClientContext>());
 
         var renew = await handler.Handle(new ChangeMembershipCommand(membership.Id, "renew", null, false), CancellationToken.None);
         renew.Error.Code.Should().Be("gym.invalid_state");
 
         var active = Membership(Guid.NewGuid(), Guid.NewGuid(), DateOnly.FromDateTime(_now), 30);
         plans.GetMembershipAsync(_tenantId, active.Id, Arg.Any<CancellationToken>()).Returns(active);
-        var frozen = await handler.Handle(new ChangeMembershipCommand(active.Id, "freeze", "travel", false), CancellationToken.None);
+        var before = active.EndDate;
+        var frozen = await handler.Handle(new ChangeMembershipCommand(active.Id, "freeze", "travel", false, 5), CancellationToken.None);
         frozen.IsSuccess.Should().BeTrue();
         frozen.Value.Status.Should().Be(GymMembershipStatus.Frozen);
+        frozen.Value.EndDate.Should().Be(before.AddDays(5));
         await plans.Received(1).AddHistoryAsync(Arg.Is<MembershipHistoryEntry>(entry => entry.Action == MembershipAction.Frozen && entry.TenantId == _tenantId), Arg.Any<CancellationToken>());
     }
 

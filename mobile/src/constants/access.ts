@@ -27,6 +27,17 @@ export const featureCodes = {
   aiProgressInsights: 'AI_PROGRESS_INSIGHTS',
   nutrition: 'NUTRITION',
   aiNutrition: 'AI_NUTRITION',
+  memberManagement: 'MEMBER_MANAGEMENT',
+  membershipManagement: 'MEMBERSHIP_MANAGEMENT',
+  staffManagement: 'STAFF_MANAGEMENT',
+  gymCrm: 'GYM_CRM',
+  gymExpenseManagement: 'GYM_EXPENSE_MANAGEMENT',
+  gymCommunications: 'GYM_COMMUNICATIONS',
+  gymPaymentManagement: 'GYM_PAYMENT_MANAGEMENT',
+  gymFinancialLedger: 'GYM_FINANCIAL_LEDGER',
+  googleDriveStorage: 'GOOGLE_DRIVE_STORAGE',
+  staffLeave: 'STAFF_LEAVE',
+  gymChat: 'GYM_CHAT',
 } as const;
 
 export function isFeatureEnabled(flags: Readonly<Record<string, boolean>> | undefined, code: string): boolean {

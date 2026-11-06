@@ -26,6 +26,10 @@ public sealed class UserAccount : BaseEntity
 
     public DateTime? LastLoginAt { get; private set; }
 
+    public string? PhotoStorageKey { get; private set; }
+
+    public string? PhotoContentType { get; private set; }
+
     public static UserAccount Create(
         Guid id,
         Guid personalTenantId,
@@ -58,6 +62,8 @@ public sealed class UserAccount : BaseEntity
         LastName = lastName.Trim();
     }
 
+    public void ChangePhone(string? phone) => Phone = string.IsNullOrWhiteSpace(phone) ? null : phone.Trim();
+
     public void Activate() => Status = UserStatus.Active;
 
     public void ChangePassword(string passwordHash, string passwordSalt)
@@ -67,4 +73,28 @@ public sealed class UserAccount : BaseEntity
     }
 
     public void Disable() => Status = UserStatus.Disabled;
+
+    public static string PhotoKey(Guid tenantId, Guid userId, Guid photoId) =>
+        $"tenants/{tenantId:D}/users/{userId:D}/profile/{photoId:D}";
+
+    public static bool OwnsPhoto(Guid tenantId, Guid userId, string? key) =>
+        key is not null && key.StartsWith($"tenants/{tenantId:D}/users/{userId:D}/profile/", StringComparison.Ordinal);
+
+    public bool SetPhoto(string storageKey, string contentType)
+    {
+        if (!OwnsPhoto(TenantId, Id, storageKey) || contentType is not ("image/jpeg" or "image/png" or "image/webp"))
+        {
+            return false;
+        }
+
+        PhotoStorageKey = storageKey;
+        PhotoContentType = contentType;
+        return true;
+    }
+
+    public void ClearPhoto()
+    {
+        PhotoStorageKey = null;
+        PhotoContentType = null;
+    }
 }

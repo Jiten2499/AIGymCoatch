@@ -7,6 +7,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { ApiError, login } from "../../lib/api";
 import { enterWorkspace } from "../../lib/home";
+import { touchActivity } from "../../lib/session";
 
 const schema = z.object({
   email: z.string().email("Enter a valid email"),
@@ -24,6 +25,7 @@ export default function LoginPage() {
     setServerError(null);
     try {
       await login(values.email, values.password);
+      touchActivity();
       router.replace(await enterWorkspace());
     } catch (error) {
       setServerError(error instanceof ApiError ? error.message : "Sign-in failed.");

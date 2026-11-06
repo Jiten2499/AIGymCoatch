@@ -62,10 +62,34 @@ public sealed class StaffProfileConfiguration : IEntityTypeConfiguration<StaffPr
         builder.Property(entity => entity.EmployeeCode).HasMaxLength(32).IsRequired();
         builder.Property(entity => entity.StaffType).HasConversion<string>().HasMaxLength(32);
         builder.Property(entity => entity.Status).HasConversion<string>().HasMaxLength(32);
+        builder.Property(entity => entity.Designation).HasMaxLength(120);
+        builder.Property(entity => entity.Department).HasMaxLength(120);
+        builder.Property(entity => entity.EmploymentType).HasConversion<string>().HasMaxLength(32);
+        builder.Property(entity => entity.EmploymentNotes).HasMaxLength(2000);
+        builder.Property(entity => entity.JobDescription).HasMaxLength(2000);
+        builder.Property(entity => entity.Gender).HasMaxLength(32);
+        builder.Property(entity => entity.Address).HasMaxLength(300);
+        builder.Property(entity => entity.EmergencyContactName).HasMaxLength(200);
+        builder.Property(entity => entity.EmergencyContactPhone).HasMaxLength(32);
         builder.Property(entity => entity.RowVersion).IsRowVersion();
         builder.HasOne<Tenant>().WithMany().HasForeignKey(entity => entity.TenantId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<UserAccount>().WithMany().HasForeignKey(entity => entity.UserId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Branch>().WithMany().HasForeignKey(entity => entity.BranchId).IsRequired(false).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<UserAccount>().WithMany().HasForeignKey(entity => entity.ReportingManagerUserId).IsRequired(false).OnDelete(DeleteBehavior.Restrict);
+        builder.HasQueryFilter(entity => entity.DeletedAt == null);
+    }
+}
+
+public sealed class StaffBranchAccessConfiguration : IEntityTypeConfiguration<StaffBranchAccess>
+{
+    public void Configure(EntityTypeBuilder<StaffBranchAccess> builder)
+    {
+        builder.ToTable("StaffBranchAccess", "app");
+        builder.HasKey(entity => entity.Id);
+        builder.Property(entity => entity.RowVersion).IsRowVersion();
+        builder.HasOne<Tenant>().WithMany().HasForeignKey(entity => entity.TenantId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<StaffProfile>().WithMany().HasForeignKey(entity => entity.StaffProfileId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Branch>().WithMany().HasForeignKey(entity => entity.BranchId).OnDelete(DeleteBehavior.Restrict);
         builder.HasQueryFilter(entity => entity.DeletedAt == null);
     }
 }
@@ -80,6 +104,9 @@ public sealed class TrainerProfileConfiguration : IEntityTypeConfiguration<Train
         builder.Property(entity => entity.Specialization).HasMaxLength(200);
         builder.Property(entity => entity.Certification).HasMaxLength(500);
         builder.Property(entity => entity.ProfileImageUrl).HasMaxLength(500);
+        builder.Property(entity => entity.EmployeeCode).HasMaxLength(32);
+        builder.Property(entity => entity.PhotoStorageKey).HasMaxLength(200);
+        builder.Property(entity => entity.PhotoContentType).HasMaxLength(80);
         builder.Property(entity => entity.Status).HasConversion<string>().HasMaxLength(32);
         builder.Property(entity => entity.RowVersion).IsRowVersion();
         builder.HasOne<Tenant>().WithMany().HasForeignKey(entity => entity.TenantId).OnDelete(DeleteBehavior.Restrict);
@@ -96,9 +123,16 @@ public sealed class MemberProfileConfiguration : IEntityTypeConfiguration<Member
         builder.ToTable("MemberProfiles", "app");
         builder.HasKey(entity => entity.Id);
         builder.Property(entity => entity.MemberCode).HasMaxLength(32).IsRequired();
+        builder.Property(entity => entity.FirstName).HasMaxLength(100).IsRequired();
+        builder.Property(entity => entity.LastName).HasMaxLength(100).IsRequired();
+        builder.Property(entity => entity.Phone).HasMaxLength(32);
         builder.Property(entity => entity.Gender).HasMaxLength(32);
         builder.Property(entity => entity.EmergencyContactName).HasMaxLength(200);
         builder.Property(entity => entity.EmergencyContactPhone).HasMaxLength(32);
+        builder.Property(entity => entity.EmergencyContactRelationship).HasMaxLength(64);
+        builder.Property(entity => entity.FitnessGoal).HasConversion<string>().HasMaxLength(32);
+        builder.Property(entity => entity.PhotoStorageKey).HasMaxLength(200);
+        builder.Property(entity => entity.PhotoContentType).HasMaxLength(64);
         builder.Property(entity => entity.Address).HasMaxLength(300);
         builder.Property(entity => entity.City).HasMaxLength(100);
         builder.Property(entity => entity.State).HasMaxLength(100);
@@ -106,7 +140,8 @@ public sealed class MemberProfileConfiguration : IEntityTypeConfiguration<Member
         builder.Property(entity => entity.Status).HasConversion<string>().HasMaxLength(32);
         builder.Property(entity => entity.RowVersion).IsRowVersion();
         builder.HasOne<Tenant>().WithMany().HasForeignKey(entity => entity.TenantId).OnDelete(DeleteBehavior.Restrict);
-        builder.HasOne<UserAccount>().WithMany().HasForeignKey(entity => entity.UserId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<UserAccount>().WithMany().HasForeignKey(entity => entity.UserId).IsRequired(false).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<TrainerProfile>().WithMany().HasForeignKey(entity => entity.AssignedTrainerId).IsRequired(false).OnDelete(DeleteBehavior.Restrict);
         builder.HasQueryFilter(entity => entity.DeletedAt == null);
     }
 }

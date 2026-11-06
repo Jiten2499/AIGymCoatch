@@ -11,6 +11,8 @@ public interface IUserAccountRepository
 
     Task<bool> PhoneExistsAsync(string phone, CancellationToken cancellationToken);
 
+    Task<UserAccount?> GetByPhoneAsync(string phone, CancellationToken cancellationToken);
+
     Task AddAsync(UserAccount user, CancellationToken cancellationToken);
 
     Task<int> CountAsync(DirectoryScope scope, CancellationToken cancellationToken);
@@ -41,6 +43,8 @@ public interface ITenantMembershipRepository
 public interface IRoleRepository
 {
     Task<Role?> GetByNameAsync(string name, CancellationToken cancellationToken);
+
+    Task<Role?> GetAssignableAsync(Guid tenantId, string name, CancellationToken cancellationToken);
 
     Task AddAsync(UserRole assignment, CancellationToken cancellationToken);
 
@@ -74,6 +78,8 @@ public interface IPasswordResetRepository
     Task AddAsync(PasswordResetToken token, CancellationToken cancellationToken);
 
     Task<PasswordResetToken?> GetActiveByHashAsync(string tokenHash, CancellationToken cancellationToken);
+
+    Task RevokeUnusedAsync(Guid userId, DateTime utcNow, CancellationToken cancellationToken);
 }
 
 public interface IAuditLogRepository

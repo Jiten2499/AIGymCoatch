@@ -6,6 +6,7 @@ using LifeFitAI.Application.Fitness;
 using LifeFitAI.Application.Fitness.Ai;
 using LifeFitAI.Application.Gym;
 using LifeFitAI.Application.Gym.Dashboard;
+using LifeFitAI.Application.Gym.Members;
 using LifeFitAI.Application.Identity;
 using LifeFitAI.Application.Licensing;
 using MediatR;
@@ -41,6 +42,7 @@ public static class DependencyInjection
         services.AddScoped<IDashboardAccess, DashboardAccess>();
         services.AddScoped<InsightFactLoader>();
         services.AddScoped<IAccountLinker, AccountLinker>();
+        services.AddScoped<IMemberAppSeatAssigner, MemberAppSeatAssigner>();
         services.AddScoped<IAiSafetyService, AiSafetyService>();
         services.AddScoped<IAiQuotaService, AiQuotaService>();
         services.AddScoped<IAiContextBuilder, AiContextBuilder>();

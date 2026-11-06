@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useState } from "react";
 import { PageState } from "../../../../components/AdminShell";
 import { ConfirmDialog } from "../../../../components/ConfirmDialog";
+import { ScrollableGrid } from "../../../../components/ScrollableGrid";
 import { api, ApiError } from "../../../../lib/api";
 import type { Assignment, MemberOption, TenantLicense } from "../../../../lib/types";
 
@@ -57,7 +58,8 @@ export default function LicenseDetailPage() {
         </select>
         <button className="min-h-11 rounded-full bg-accent px-4 font-semibold text-background" disabled={!userId || assign.isPending} type="submit">Assign seat</button>
       </form>
-      <ul className="mt-4 grid gap-2">
+      <ScrollableGrid className="mt-4">
+      <ul className="grid w-max min-w-full gap-2">
         {(assignments.data ?? []).map((item) => (
           <li className="flex items-center justify-between gap-3" key={item.id}>
             <span>{(members.data ?? []).find((member) => member.userId === item.userId)?.email ?? item.userId} · {item.status}</span>
@@ -65,6 +67,7 @@ export default function LicenseDetailPage() {
           </li>
         ))}
       </ul>
+      </ScrollableGrid>
       {pendingSeat ? <ConfirmDialog body="Release this seat assignment?" confirmLabel="Release seat" onCancel={() => setPendingSeat(null)} onConfirm={() => revokeSeat.mutate(pendingSeat)} pending={revokeSeat.isPending} title="Release seat" /> : null}
     </PageState>
   );

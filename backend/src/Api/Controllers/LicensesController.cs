@@ -19,7 +19,6 @@ public sealed class LicensesController : ApiControllerBase
         (await Sender.Send(new GetCurrentLicenseQuery(), cancellationToken)).ToActionResult();
 
     [HttpGet("features")]
-    [RequiresPermission(PermissionCodes.FeatureRead)]
     public async Task<IActionResult> Features(CancellationToken cancellationToken) =>
         (await Sender.Send(new GetFeaturesQuery(), cancellationToken)).ToActionResult();
 }

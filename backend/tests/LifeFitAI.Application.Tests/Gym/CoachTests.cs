@@ -63,7 +63,7 @@ public sealed class CoachTests
         var createdResult = await Handler(Allow(), freshAccounts, freshPeople, freshUsers, roles).Handle(new AddCoachCommand("grace@gym.test", "Grace", "Hopper", null, "Strength", null), CancellationToken.None);
 
         createdResult.IsSuccess.Should().BeTrue();
-        createdResult.Value.TemporaryPassword.Should().NotBeNullOrWhiteSpace();
+        createdResult.Value.TemporaryPassword.Should().BeNull();
         createdResult.Value.Email.Should().Be("grace@gym.test");
         createdResult.Value.Specialization.Should().Be("Strength");
         await freshPeople.Received(1).AddTrainerAsync(Arg.Any<TrainerProfile>(), Arg.Any<CancellationToken>());
@@ -107,7 +107,8 @@ public sealed class CoachTests
             Substitute.For<IAuditLogRepository>(),
             unit,
             Clock(),
-            Substitute.For<IClientContext>());
+            Substitute.For<IClientContext>(),
+            Substitute.For<ITenantRepository>());
     }
 
     private IOperationGuard Allow()

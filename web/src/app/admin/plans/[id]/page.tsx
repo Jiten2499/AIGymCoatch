@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { PageState } from "../../../../components/AdminShell";
+import { ScrollableGrid } from "../../../../components/ScrollableGrid";
 import { api, ApiError } from "../../../../lib/api";
 import type { FeatureRow, PlanDetail } from "../../../../lib/types";
 
@@ -13,7 +14,11 @@ export default function PlanDetailPage() {
   const features = useQuery({ queryKey: ["features"], queryFn: () => api<FeatureRow[]>("/platform/features") });
   const setFeature = useMutation({
     mutationFn: (input: { code: string; enabled: boolean }) => api(`/platform/plans/${params.id}/features`, { method: "PUT", body: JSON.stringify({ featureCode: input.code, enabled: input.enabled }) }),
-    onSuccess: async () => client.invalidateQueries({ queryKey: ["plan", params.id] }),
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: ["plan", params.id] });
+      await client.invalidateQueries({ queryKey: ["features"] });
+      await client.invalidateQueries({ queryKey: ["workspace-plans"] });
+    },
   });
   const error = plan.error ?? features.error ?? setFeature.error;
   const enabled = new Map((plan.data?.features ?? []).map((feature) => [feature.featureCode, feature.enabled]));
@@ -25,7 +30,8 @@ export default function PlanDetailPage() {
       {error instanceof ApiError && !plan.isError ? <p className="mt-4" role="alert">{error.message}</p> : null}
       <h2 className="mt-8 text-xl font-semibold">Features</h2>
       <p className="mt-2 text-muted">A subscriber receives every enabled feature on this plan. There are no per-workspace overrides.</p>
-      <ul className="mt-4 grid gap-2">
+      <ScrollableGrid className="mt-4">
+      <ul className="grid w-max min-w-full gap-2">
         {(features.data ?? []).map((feature) => (
           <li key={feature.code}>
             <label className="flex min-h-11 items-center gap-3">
@@ -36,6 +42,7 @@ export default function PlanDetailPage() {
           </li>
         ))}
       </ul>
+      </ScrollableGrid>
     </PageState>
   );
 }

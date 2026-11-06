@@ -65,20 +65,20 @@ public sealed record GetFeaturesQuery : IRequest<Result<IReadOnlyList<FeatureSum
 public sealed class GetFeaturesQueryHandler : IRequestHandler<GetFeaturesQuery, Result<IReadOnlyList<FeatureSummary>>>
 {
     private readonly ICurrentActor _actor;
-    private readonly IPermissionService _permissions;
+    private readonly ITenantMembershipRepository _members;
     private readonly ISubscriptionService _subscriptions;
     private readonly IFeatureFlagService _features;
     private readonly IDateTimeProvider _clock;
 
     public GetFeaturesQueryHandler(
         ICurrentActor actor,
-        IPermissionService permissions,
+        ITenantMembershipRepository members,
         ISubscriptionService subscriptions,
         IFeatureFlagService features,
         IDateTimeProvider clock)
     {
         _actor = actor;
-        _permissions = permissions;
+        _members = members;
         _subscriptions = subscriptions;
         _features = features;
         _clock = clock;
@@ -91,9 +91,9 @@ public sealed class GetFeaturesQueryHandler : IRequestHandler<GetFeaturesQuery, 
             return Result.Failure<IReadOnlyList<FeatureSummary>>(IdentityErrors.InvalidCredentials);
         }
 
-        if (!await _permissions.HasPermissionAsync(userId, tenantId, PermissionCodes.FeatureRead, cancellationToken).ConfigureAwait(false))
+        if (await _members.GetActiveAsync(tenantId, userId, cancellationToken).ConfigureAwait(false) is null)
         {
-            return Result.Failure<IReadOnlyList<FeatureSummary>>(IdentityErrors.Forbidden);
+            return Result.Failure<IReadOnlyList<FeatureSummary>>(IdentityErrors.NotMember);
         }
 
         var subscription = await _subscriptions.GetActiveAsync(tenantId, cancellationToken).ConfigureAwait(false);

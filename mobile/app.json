@@ -3,6 +3,7 @@
     "name": "LifeFit AI",
     "slug": "lifefit-ai",
     "version": "1.0.0",
+    "scheme": "lifefit",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -24,7 +25,9 @@
     },
     "plugins": [
       "expo-secure-store",
-      "expo-localization"
+      "expo-localization",
+      "expo-status-bar",
+      "expo-image-picker"
     ]
   }
 }

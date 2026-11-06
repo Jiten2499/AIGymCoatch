@@ -123,6 +123,8 @@ public enum NotificationType
     ChallengeReminder = 3,
     AiRecommendation = 4,
     WorkoutCompleted = 5,
+    StaffLeaveUpdate = 6,
+    ChatMessage = 7,
 }
 
 public enum AiMessageRole

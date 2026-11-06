@@ -29,12 +29,16 @@ public sealed class GymDomainTests
         membership.Freeze(Today).Should().BeFalse();
         membership.Unfreeze(Today).Should().BeTrue();
         membership.Status.Should().Be(GymMembershipStatus.Active);
-        membership.Renew(Today, 30, true).Should().BeTrue();
+        var originalEnd = membership.EndDate;
+        var successor = membership.ScheduleRenewal(Today, 30, PackageDurationUnit.Day, Guid.NewGuid(), "G99999999", true, null);
+        successor.Should().NotBeNull();
+        membership.EndDate.Should().Be(originalEnd);
         membership.Status.Should().Be(GymMembershipStatus.Active);
-        membership.AutoRenew.Should().BeTrue();
-        membership.EndDate.Should().Be(Today.AddDays(49));
+        successor!.StartDate.Should().Be(originalEnd.AddDays(1));
+        successor.EndDate.Should().Be(Today.AddDays(49));
+        successor.AutoRenew.Should().BeTrue();
         membership.Cancel().Should().BeTrue();
-        membership.Renew(Today, 30, false).Should().BeFalse();
+        membership.ScheduleRenewal(Today, 30, PackageDurationUnit.Day, Guid.NewGuid(), "G88888888", false, null).Should().BeNull();
         membership.Status.Should().Be(GymMembershipStatus.Cancelled);
         membership.Id.Should().NotBeEmpty();
     }
@@ -46,9 +50,12 @@ public sealed class GymDomainTests
         membership.Expire(Today).Should().BeTrue();
         membership.CanCheckIn(Today).Should().BeFalse();
         membership.Expire(Today).Should().BeFalse();
-        membership.Renew(Today, 30, false).Should().BeTrue();
-        membership.Status.Should().Be(GymMembershipStatus.Active);
-        membership.StartDate.Should().Be(Today);
+        var originalStart = membership.StartDate;
+        var successor = membership.ScheduleRenewal(Today, 30, PackageDurationUnit.Day, Guid.NewGuid(), "G77777777", false, null);
+        membership.Status.Should().Be(GymMembershipStatus.Expired);
+        membership.StartDate.Should().Be(originalStart);
+        successor!.StartDate.Should().Be(Today);
+        successor.Status.Should().Be(GymMembershipStatus.Active);
     }
 
     [Fact]

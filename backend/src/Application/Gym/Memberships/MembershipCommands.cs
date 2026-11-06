@@ -1,4 +1,6 @@
 using FluentValidation;
+using LifeFitAI.Application.Gym.Approvals;
+using LifeFitAI.Application.Gym.Configuration;
 using LifeFitAI.Application.Identity;
 using LifeFitAI.Domain.Gym;
 using LifeFitAI.Domain.Identity;
@@ -8,7 +10,7 @@ using MediatR;
 
 namespace LifeFitAI.Application.Gym.Memberships;
 
-public sealed record CreatePlanCommand(string Name, string? Description, int DurationDays, MembershipType MembershipType, int? MaxVisits, decimal Price, string Currency) : IRequest<Result<PlanResponse>>;
+public sealed record CreatePlanCommand(string Name, string? Description, int DurationDays, MembershipType MembershipType, int? MaxVisits, decimal Price, string Currency, PackageCategory Category = PackageCategory.Standard, PackageDurationUnit DurationUnit = PackageDurationUnit.Day, int? DurationCount = null, int IncludedPtSessions = 0) : IRequest<Result<PlanResponse>>;
 
 public sealed class CreatePlanCommandValidator : AbstractValidator<CreatePlanCommand>
 {
@@ -19,6 +21,7 @@ public sealed class CreatePlanCommandValidator : AbstractValidator<CreatePlanCom
         RuleFor(command => command.Price).GreaterThanOrEqualTo(0);
         RuleFor(command => command.Currency).NotEmpty().Length(3);
         RuleFor(command => command.MaxVisits).GreaterThan(0).When(command => command.MaxVisits is not null);
+        RuleFor(command => command.IncludedPtSessions).GreaterThanOrEqualTo(0);
     }
 }
 
@@ -56,34 +59,39 @@ public sealed class CreatePlanCommandHandler : IRequestHandler<CreatePlanCommand
             return Result.Failure<PlanResponse>(GymErrors.Conflict);
         }
 
-        var plan = MembershipPlan.Create(Guid.NewGuid(), tenantId, request.Name.Trim(), request.Description, request.DurationDays, request.MembershipType, request.MaxVisits, request.Price, request.Currency.ToUpperInvariant());
+        var duration = MembershipCalendar.Resolve(request.MembershipType, request.DurationDays, request.DurationUnit, request.DurationCount);
+        var plan = MembershipPlan.Create(Guid.NewGuid(), tenantId, request.Name.Trim(), request.Description, request.DurationDays, request.MembershipType, request.MaxVisits, request.Price, request.Currency.ToUpperInvariant(), request.Category, duration.Unit, duration.Count, request.IncludedPtSessions);
         await _plans.AddPlanAsync(plan, cancellationToken).ConfigureAwait(false);
-        await _audit.AddAsync(AuditLog.Create(Guid.NewGuid(), tenantId, _actor.UserId, "CreatePlan", "MembershipPlan", plan.Id, null, plan.Name, _client.IpAddress, _client.UserAgent, _clock.UtcNow), cancellationToken).ConfigureAwait(false);
+        await _audit.AddAsync(AuditLog.Create(Guid.NewGuid(), tenantId, _actor.UserId, "PackageCreated", "MembershipPlan", plan.Id, null, plan.Name, _client.IpAddress, _client.UserAgent, _clock.UtcNow), cancellationToken).ConfigureAwait(false);
         await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return Result.Success(Map(plan));
     }
 
     internal static PlanResponse Map(MembershipPlan plan) =>
-        new(plan.Id, plan.Name, plan.Description, plan.DurationDays, plan.MembershipType, plan.MaxVisits, plan.Price, plan.Currency, plan.IsActive);
+        new(plan.Id, plan.Name, plan.Description, plan.DurationDays, plan.MembershipType, plan.MaxVisits, plan.Price, plan.Currency, plan.IsActive, plan.Category, plan.DurationUnit, plan.DurationCount, plan.IncludedPtSessions);
 }
 
-public sealed record ChangeMembershipCommand(Guid Id, string Action, string? Reason, bool AutoRenew) : IRequest<Result<GymMembershipResponse>>;
+public sealed record ChangeMembershipCommand(Guid Id, string Action, string? Reason, bool AutoRenew, int Days = 0) : IRequest<Result<GymMembershipResponse>>;
 
 public sealed class ChangeMembershipCommandHandler : IRequestHandler<ChangeMembershipCommand, Result<GymMembershipResponse>>
 {
     private readonly IOperationGuard _guard;
     private readonly ICurrentActor _actor;
     private readonly IMembershipRepository _memberships;
+    private readonly IBusinessConfigRepository _configs;
+    private readonly IMembershipApprovalQueue _approvals;
     private readonly IAuditLogRepository _audit;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDateTimeProvider _clock;
     private readonly IClientContext _client;
 
-    public ChangeMembershipCommandHandler(IOperationGuard guard, ICurrentActor actor, IMembershipRepository memberships, IAuditLogRepository audit, IUnitOfWork unitOfWork, IDateTimeProvider clock, IClientContext client)
+    public ChangeMembershipCommandHandler(IOperationGuard guard, ICurrentActor actor, IMembershipRepository memberships, IBusinessConfigRepository configs, IMembershipApprovalQueue approvals, IAuditLogRepository audit, IUnitOfWork unitOfWork, IDateTimeProvider clock, IClientContext client)
     {
         _guard = guard;
         _actor = actor;
         _memberships = memberships;
+        _configs = configs;
+        _approvals = approvals;
         _audit = audit;
         _unitOfWork = unitOfWork;
         _clock = clock;
@@ -94,7 +102,7 @@ public sealed class ChangeMembershipCommandHandler : IRequestHandler<ChangeMembe
     {
         var permission = request.Action switch
         {
-            "renew" => PermissionCodes.MembershipRenew,
+            "renew" or "extend" => PermissionCodes.MembershipRenew,
             "freeze" or "unfreeze" => PermissionCodes.MembershipFreeze,
             "cancel" or "expire" => PermissionCodes.MembershipCancel,
             _ => null,
@@ -118,12 +126,46 @@ public sealed class ChangeMembershipCommandHandler : IRequestHandler<ChangeMembe
 
         var today = DateOnly.FromDateTime(_clock.UtcNow);
         var previous = membership.Status;
-        var plan = await _memberships.GetPlanAsync(tenantId, membership.MembershipPlanId, cancellationToken).ConfigureAwait(false);
+        if (request.Action == "renew")
+        {
+            return await RenewAsync(membership, tenantId, today, request, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (request.Action == "freeze")
+        {
+            return await FreezeAsync(membership, tenantId, today, previous, request, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (request.Action == "unfreeze")
+        {
+            return await UnfreezeAsync(membership, tenantId, today, previous, request.Reason, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (request.Action == "extend")
+        {
+            var extensionConfig = await _configs.GetConfigAsync(tenantId, cancellationToken).ConfigureAwait(false);
+            if (extensionConfig is { ExtensionRequiresApproval: true })
+            {
+                if (request.Days <= 0 || (extensionConfig.MaxExtensionDays > 0 && request.Days > extensionConfig.MaxExtensionDays))
+                {
+                    return Result.Failure<GymMembershipResponse>(GymErrors.ExtensionOutsideLimits);
+                }
+
+                if (_actor.UserId is not Guid actorId)
+                {
+                    return Result.Failure<GymMembershipResponse>(IdentityErrors.Forbidden);
+                }
+
+                var queued = await _approvals.QueueExtensionAsync(tenantId, actorId, membership, request.Days, request.Reason, cancellationToken).ConfigureAwait(false);
+                return queued.IsFailure
+                    ? Result.Failure<GymMembershipResponse>(queued.Error)
+                    : Result.Success(CreateMembershipCommandHandler.Map(membership, today) with { ApprovalRequestId = queued.Value });
+            }
+        }
+
         var changed = request.Action switch
         {
-            "renew" when plan is not null => membership.Renew(today, plan.DurationDays, request.AutoRenew),
-            "freeze" => membership.Freeze(today),
-            "unfreeze" => membership.Unfreeze(today),
+            "extend" => membership.Extend(request.Days),
             "cancel" => membership.Cancel(),
             "expire" => membership.Expire(today),
             _ => false,
@@ -135,15 +177,123 @@ public sealed class ChangeMembershipCommandHandler : IRequestHandler<ChangeMembe
 
         var action = request.Action switch
         {
-            "renew" => MembershipAction.Renewed,
-            "freeze" => MembershipAction.Frozen,
-            "unfreeze" => MembershipAction.Unfrozen,
+            "extend" => MembershipAction.Extended,
             "cancel" => MembershipAction.Cancelled,
             _ => MembershipAction.Expired,
         };
-        await _memberships.AddHistoryAsync(MembershipHistoryEntry.Create(Guid.NewGuid(), tenantId, membership.Id, action, previous, membership.Status, today, request.Reason, _actor.UserId, _clock.UtcNow), cancellationToken).ConfigureAwait(false);
-        await _audit.AddAsync(AuditLog.Create(Guid.NewGuid(), tenantId, _actor.UserId, action.ToString(), "GymMembership", membership.Id, previous.ToString(), membership.Status.ToString(), _client.IpAddress, _client.UserAgent, _clock.UtcNow), cancellationToken).ConfigureAwait(false);
+        await RecordAsync(tenantId, membership, action, previous, today, request.Reason, cancellationToken).ConfigureAwait(false);
+        return Result.Success(CreateMembershipCommandHandler.Map(membership, today));
+    }
+
+    private async Task<Result<GymMembershipResponse>> RenewAsync(GymMembership membership, Guid tenantId, DateOnly today, ChangeMembershipCommand request, CancellationToken cancellationToken)
+    {
+        var plan = await _memberships.GetPlanAsync(tenantId, membership.MembershipPlanId, cancellationToken).ConfigureAwait(false);
+        if (plan is null || !plan.IsActive)
+        {
+            return Result.Failure<GymMembershipResponse>(plan is null ? GymErrors.NotFound : GymErrors.InvalidState);
+        }
+
+        var successor = membership.ScheduleRenewal(today, plan.DurationCount > 0 ? plan.DurationCount : plan.DurationDays, plan.DurationUnit, Guid.NewGuid(), $"G{Guid.NewGuid():N}"[..9].ToUpperInvariant(), request.AutoRenew, request.Reason);
+        if (successor is null)
+        {
+            return Result.Failure<GymMembershipResponse>(GymErrors.InvalidState);
+        }
+
+        successor.SetPricing(plan.Price, 0m, plan.Price, plan.Currency, null, null);
+        if (await _memberships.OverlapsMembershipAsync(tenantId, membership.MemberProfileId, successor.StartDate, successor.EndDate, membership.Id, cancellationToken).ConfigureAwait(false))
+        {
+            return Result.Failure<GymMembershipResponse>(GymErrors.Conflict);
+        }
+
+        await _memberships.AddMembershipAsync(successor, cancellationToken).ConfigureAwait(false);
+        await RecordAsync(tenantId, successor, MembershipAction.Renewed, null, today, request.Reason, cancellationToken).ConfigureAwait(false);
+        return Result.Success(CreateMembershipCommandHandler.Map(successor, today));
+    }
+
+    private async Task<Result<GymMembershipResponse>> FreezeAsync(GymMembership membership, Guid tenantId, DateOnly today, GymMembershipStatus previous, ChangeMembershipCommand request, CancellationToken cancellationToken)
+    {
+        var config = await _configs.GetConfigAsync(tenantId, cancellationToken).ConfigureAwait(false);
+        var count = await _memberships.CountFreezesAsync(tenantId, membership.Id, cancellationToken).ConfigureAwait(false);
+        var policy = FreezeRules.Check(config, request.Days, count);
+        if (policy is not null)
+        {
+            return Result.Failure<GymMembershipResponse>(policy);
+        }
+
+        if (config is { FreezeRequiresApproval: true })
+        {
+            if (_actor.UserId is not Guid actorId)
+            {
+                return Result.Failure<GymMembershipResponse>(IdentityErrors.Forbidden);
+            }
+
+            var queued = await _approvals.QueueFreezeAsync(tenantId, actorId, membership, request.Days, request.Reason, cancellationToken).ConfigureAwait(false);
+            return queued.IsFailure
+                ? Result.Failure<GymMembershipResponse>(queued.Error)
+                : Result.Success(CreateMembershipCommandHandler.Map(membership, today) with { ApprovalRequestId = queued.Value });
+        }
+
+        if (await _memberships.FreezeOverlapsAsync(tenantId, membership.Id, today, cancellationToken).ConfigureAwait(false) || !membership.Freeze(today))
+        {
+            return Result.Failure<GymMembershipResponse>(GymErrors.InvalidState);
+        }
+
+        var planned = request.Days > 0 ? request.Days : (int?)null;
+        if (planned is int days && !membership.ExtendForFreeze(days))
+        {
+            return Result.Failure<GymMembershipResponse>(GymErrors.InvalidState);
+        }
+
+        await _memberships.AddFreezeAsync(MembershipFreeze.Open(Guid.NewGuid(), tenantId, membership.Id, today, previous, request.Reason, _clock.UtcNow, planned), cancellationToken).ConfigureAwait(false);
+        await RecordAsync(tenantId, membership, MembershipAction.Frozen, previous, today, request.Reason, cancellationToken).ConfigureAwait(false);
+        return Result.Success(CreateMembershipCommandHandler.Map(membership, today));
+    }
+
+    private async Task<Result<GymMembershipResponse>> UnfreezeAsync(GymMembership membership, Guid tenantId, DateOnly today, GymMembershipStatus previous, string? reason, CancellationToken cancellationToken)
+    {
+        var freeze = await _memberships.GetOpenFreezeAsync(tenantId, membership.Id, cancellationToken).ConfigureAwait(false);
+        if (freeze is null)
+        {
+            if (!membership.Unfreeze(today))
+            {
+                return Result.Failure<GymMembershipResponse>(GymErrors.InvalidState);
+            }
+
+            await RecordAsync(tenantId, membership, MembershipAction.Unfrozen, previous, today, reason, cancellationToken).ConfigureAwait(false);
+            return Result.Success(CreateMembershipCommandHandler.Map(membership, today));
+        }
+
+        if (today < freeze.StartDate)
+        {
+            return Result.Failure<GymMembershipResponse>(GymErrors.InvalidState);
+        }
+
+        var frozenDays = today.DayNumber - freeze.StartDate.DayNumber;
+        var lastFrozenDay = frozenDays == 0 ? freeze.StartDate : today.AddDays(-1);
+        var config = await _configs.GetConfigAsync(tenantId, cancellationToken).ConfigureAwait(false);
+        var extension = FreezeRules.ExtensionDays(config, frozenDays, freeze.PlannedDays);
+        if (!freeze.Close(lastFrozenDay) || !membership.ExtendForFreeze(extension) || !membership.Unfreeze(today))
+        {
+            return Result.Failure<GymMembershipResponse>(GymErrors.InvalidState);
+        }
+
+        await RecordAsync(tenantId, membership, MembershipAction.Unfrozen, previous, today, reason, cancellationToken).ConfigureAwait(false);
+        return Result.Success(CreateMembershipCommandHandler.Map(membership, today));
+    }
+
+    private async Task RecordAsync(Guid tenantId, GymMembership membership, MembershipAction action, GymMembershipStatus? previous, DateOnly today, string? reason, CancellationToken cancellationToken)
+    {
+        var audit = action switch
+        {
+            MembershipAction.Renewed => "MembershipRenewed",
+            MembershipAction.Frozen => "MembershipFrozen",
+            MembershipAction.Unfrozen => "MembershipUnfrozen",
+            MembershipAction.Extended => "MembershipExtended",
+            MembershipAction.Cancelled => "MembershipCancelled",
+            _ => action.ToString(),
+        };
+        await _memberships.AddHistoryAsync(MembershipHistoryEntry.Create(Guid.NewGuid(), tenantId, membership.Id, action, previous, membership.Status, today, reason, _actor.UserId, _clock.UtcNow), cancellationToken).ConfigureAwait(false);
+        await _audit.AddAsync(AuditLog.Create(Guid.NewGuid(), tenantId, _actor.UserId, audit, "GymMembership", membership.Id, previous?.ToString(), membership.Status.ToString(), _client.IpAddress, _client.UserAgent, _clock.UtcNow), cancellationToken).ConfigureAwait(false);
         await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        return Result.Success(new GymMembershipResponse(membership.Id, membership.MemberProfileId, membership.BranchId, membership.MembershipPlanId, membership.MembershipNumber, membership.StartDate, membership.EndDate, membership.Status, membership.AutoRenew, membership.Notes));
     }
 }

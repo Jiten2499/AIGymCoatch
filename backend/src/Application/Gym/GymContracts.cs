@@ -47,7 +47,7 @@ public sealed record BranchResponse(
 
 public sealed record MemberResponse(
     Guid Id,
-    Guid UserId,
+    Guid? UserId,
     string MemberCode,
     string Email,
     string FirstName,
@@ -62,7 +62,30 @@ public sealed record MemberResponse(
     string? State,
     string? PostalCode,
     DateOnly JoinDate,
-    ProfileStatus Status);
+    ProfileStatus Status,
+    string? EmergencyContactRelationship,
+    LifeFitAI.Domain.Fitness.FitnessGoalType? FitnessGoal,
+    Guid? AssignedTrainerId,
+    string? AssignedTrainerName,
+    bool HasPhoto,
+    string? TemporaryPassword = null);
+
+public sealed record MemberMatchItem(
+    Guid Id,
+    string FullName,
+    string? Phone,
+    string? Email,
+    string MemberCode,
+    ProfileStatus Status,
+    DateOnly JoinDate);
+
+public sealed record MemberListItem(
+    Guid Id,
+    string FullName,
+    string? Mobile,
+    bool HasPhoto,
+    ProfileStatus Status,
+    DateOnly JoinDate);
 
 public sealed record StaffResponse(
     Guid Id,
@@ -88,7 +111,13 @@ public sealed record TrainerResponse(
     string? Certification,
     string? ProfileImageUrl,
     Guid? BranchId,
-    ProfileStatus Status);
+    ProfileStatus Status,
+    int AssignedMembers = 0,
+    string? EmployeeCode = null,
+    string? Phone = null,
+    DateOnly? JoiningDate = null,
+    bool CommissionEligible = false,
+    bool HasPhoto = false);
 
 public sealed record PlanResponse(
     Guid Id,
@@ -99,19 +128,37 @@ public sealed record PlanResponse(
     int? MaxVisits,
     decimal Price,
     string Currency,
-    bool IsActive);
+    bool IsActive,
+    PackageCategory Category = PackageCategory.Standard,
+    PackageDurationUnit DurationUnit = PackageDurationUnit.Day,
+    int DurationCount = 0,
+    int IncludedPtSessions = 0);
 
 public sealed record GymMembershipResponse(
     Guid Id,
     Guid MemberProfileId,
-    Guid BranchId,
+    Guid? BranchId,
     Guid MembershipPlanId,
     string MembershipNumber,
     DateOnly StartDate,
     DateOnly EndDate,
     GymMembershipStatus Status,
     bool AutoRenew,
-    string? Notes);
+    string? Notes,
+    string? MemberName = null,
+    string? PlanName = null,
+    decimal PackagePrice = 0,
+    decimal DiscountAmount = 0,
+    decimal FinalAmount = 0,
+    string Currency = "USD",
+    Guid? DiscountRuleId = null,
+    string? DiscountName = null,
+    decimal TotalPaid = 0,
+    decimal Outstanding = 0,
+    MembershipSettlementStatus SettlementStatus = MembershipSettlementStatus.Unpaid,
+    Guid? ApprovalRequestId = null,
+    int IncludedPtSessions = 0,
+    int PtSessionsRemaining = 0);
 
 public sealed record MembershipHistoryResponse(
     Guid Id,

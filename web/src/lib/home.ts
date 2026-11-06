@@ -1,7 +1,7 @@
 import { api } from "./api";
 import { getSession, setSession, type AdminSession, type WorkspaceSummary } from "./session";
 
-const businessRoles = ["GymOwner", "GymManager", "Trainer", "Receptionist"];
+const accountRoles = new Set(["PersonalMember", "PersonalOwner", "Member", "SuperAdmin"]);
 
 export type HomeDestination = {
   href: "/admin" | "/business";
@@ -14,7 +14,7 @@ export function resolveHome(workspaces: WorkspaceSummary[]): HomeDestination {
   }
 
   const business = workspaces.find(
-    (workspace) => workspace.type !== "Platform" && workspace.status === "Active" && workspace.roles.some((role) => businessRoles.includes(role)),
+    (workspace) => workspace.type !== "Platform" && workspace.status === "Active" && workspace.roles.some((role) => !accountRoles.has(role)),
   );
   return { href: "/business", tenantId: business?.id ?? null };
 }

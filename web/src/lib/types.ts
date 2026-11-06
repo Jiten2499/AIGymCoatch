@@ -2,7 +2,7 @@ export type Page<T> = { items: T[]; page: number; pageSize: number; totalCount: 
 
 export type PlatformTenant = { id: string; name: string; tenantType: string; status: string };
 
-export type PlatformUser = { id: string; email: string; firstName: string; lastName: string; status: string; personalTenantId: string; personalTenantName: string; createdAt: string; plan: string };
+export type PlatformUser = { id: string; email: string; firstName: string; lastName: string; status: string; personalTenantId: string; personalTenantName: string; createdAt: string; plan: string; hasPhoto?: boolean };
 
 export type WorkspaceUser = {
   id: string;
@@ -14,6 +14,7 @@ export type WorkspaceUser = {
   isOwner: boolean;
   createdAt: string;
   plan: string;
+  hasPhoto?: boolean;
 };
 
 export type WorkspacePlan = {
@@ -38,6 +39,10 @@ export type CreatedWorkspaceUser = {
   lastName: string;
   role: string;
   temporaryPassword: string | null;
+  staffProfileId?: string | null;
+  invitationToken?: string | null;
+  status?: string;
+  employeeCode?: string | null;
 };
 
 export type LlmConnection = {
@@ -69,6 +74,63 @@ export type LlmModel = {
 };
 
 export type LlmTest = { succeeded: boolean; healthStatus: string; latencyMs: number | null; models: string[]; message: string | null };
+
+export type EmailProviderOption = { provider: string; displayName: string; implemented: boolean };
+
+export type EmailConfiguration = {
+  id: string | null;
+  provider: string;
+  displayName: string;
+  isEnabled: boolean;
+  isActive: boolean;
+  smtpHost: string;
+  smtpPort: number;
+  encryption: string;
+  authenticationEnabled: boolean;
+  username: string;
+  passwordConfigured: boolean;
+  senderName: string;
+  senderEmail: string;
+  replyToEmail: string | null;
+  connectionTimeoutSeconds: number;
+  maxEmailsPerMinute: number;
+  maxDeliveryAttempts: number;
+  retryBaseDelaySeconds: number;
+  configVersion: number;
+  lastTestedAt: string | null;
+  lastTestStatus: string | null;
+  lastTestMessage: string | null;
+  lastEmailSentAt: string | null;
+  lastEmailStatus: string | null;
+  healthStatus: string;
+  updatedAt: string | null;
+  updatedByName: string | null;
+  availableProviders: EmailProviderOption[];
+  rateLimitWarning: string | null;
+};
+
+export type EmailTestResult = { succeeded: boolean; healthStatus: string; message: string; testedAt: string };
+
+export type EmailDeliveryLog = {
+  id: string;
+  tenantId: string;
+  relatedTenantId: string | null;
+  recipient: string;
+  subject: string;
+  templateKey: string;
+  provider: string;
+  status: string;
+  classification: string;
+  attemptCount: number;
+  maxAttempts: number;
+  providerMessageId: string | null;
+  failureReason: string | null;
+  queuedAt: string;
+  sentAt: string | null;
+  canRetry: boolean;
+};
+
+export type EmailDeliveryPage = { items: EmailDeliveryLog[]; page: number; pageSize: number; totalCount: number };
 
 export type Plan = { id: string; code: string; name: string; status: string; appliesTo: string; baseCapacity: number };
 
@@ -117,6 +179,12 @@ export type Coach = {
   profileImageUrl: string | null;
   branchId: string | null;
   status: string;
+  assignedMembers?: number;
+  employeeCode?: string | null;
+  phone?: string | null;
+  joiningDate?: string | null;
+  commissionEligible?: boolean;
+  hasPhoto?: boolean;
 };
 
 export type CreatedCoach = {

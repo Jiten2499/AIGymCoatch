@@ -57,7 +57,7 @@ export function LoginScreen({ navigation }: Props) {
         )}
       />
       {formError ? <AppText accessibilityRole="alert" tone="danger">{formError}</AppText> : null}
-      <AppButton label={t('auth.signIn')} loading={formState.isSubmitting} onPress={submit} />
+      <AppButton label={t('auth.signIn')} loading={formState.isSubmitting} onPress={() => { void submit(); }} />
       <Pressable accessibilityLabel={t('auth.forgot')} accessibilityRole="button" onPress={() => navigation.navigate('ForgotPassword')} style={{ minHeight: theme.control.minTouch, justifyContent: 'center' }}>
         <AppText tone="accent">{t('auth.forgot')}</AppText>
       </Pressable>

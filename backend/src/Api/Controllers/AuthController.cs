@@ -1,5 +1,6 @@
 using LifeFitAI.Api.Contracts;
 using LifeFitAI.Api.Endpoints;
+using LifeFitAI.Application.Email;
 using LifeFitAI.Application.Identity.Login;
 using LifeFitAI.Application.Identity.Password;
 using LifeFitAI.Application.Identity.Refresh;
@@ -39,6 +40,11 @@ public sealed class AuthController : ApiControllerBase
     [EnableRateLimiting("auth")]
     public async Task<IActionResult> ForgotPassword(ForgotPasswordRequest request, CancellationToken cancellationToken) =>
         (await Sender.Send(new ForgotPasswordCommand(request.Email), cancellationToken)).ToActionResult();
+
+    [HttpPost("auth/activation/preview")]
+    [EnableRateLimiting("auth")]
+    public async Task<IActionResult> PreviewActivation(ActivationPreviewRequest request, CancellationToken cancellationToken) =>
+        (await Sender.Send(new GetActivationPreviewQuery(request.Token), cancellationToken)).ToActionResult();
 
     [HttpPost("auth/reset-password")]
     [EnableRateLimiting("auth")]

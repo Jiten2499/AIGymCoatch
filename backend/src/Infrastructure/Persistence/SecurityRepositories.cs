@@ -19,7 +19,18 @@ public sealed class RoleRepository : IRoleRepository
     }
 
     public Task<Role?> GetByNameAsync(string name, CancellationToken cancellationToken) =>
-        _db.Roles.SingleOrDefaultAsync(role => role.Name == name, cancellationToken);
+        _db.Roles.SingleOrDefaultAsync(role => role.TenantId == null && role.Name == name && role.IsActive, cancellationToken);
+
+    public Task<Role?> GetAssignableAsync(Guid tenantId, string name, CancellationToken cancellationToken)
+    {
+        var trimmed = name.Trim();
+        var templates = RoleNames.BusinessTemplates.Append(RoleNames.Member).ToList();
+        return _db.Roles.SingleOrDefaultAsync(
+            role => role.Name == trimmed
+                && role.IsActive
+                && ((role.TenantId == null && templates.Contains(role.Name)) || role.TenantId == tenantId),
+            cancellationToken);
+    }
 
     public async Task AddAsync(UserRole assignment, CancellationToken cancellationToken)
     {
@@ -32,15 +43,31 @@ public sealed class RoleRepository : IRoleRepository
         Guid tenantId,
         CancellationToken cancellationToken)
     {
-        return await (
+        var fromRoles = await (
             from assignment in _db.UserRoles
-            join link in _db.RolePermissions on assignment.RoleId equals link.RoleId
+            join role in _db.Roles on assignment.RoleId equals role.Id
+            join link in _db.RolePermissions on role.Id equals link.RoleId
             join permission in _db.Permissions on link.PermissionId equals permission.Id
-            where assignment.UserId == userId && assignment.TenantId == tenantId
+            where assignment.UserId == userId && assignment.TenantId == tenantId && role.IsActive
             select permission.Code)
             .Distinct()
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
+        var granted = await (
+            from overrideRow in _db.UserPermissionOverrides.AsNoTracking()
+            join permission in _db.Permissions.AsNoTracking() on overrideRow.PermissionId equals permission.Id
+            where overrideRow.TenantId == tenantId && overrideRow.UserId == userId && overrideRow.Granted
+            select permission.Code)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        var denied = await (
+            from overrideRow in _db.UserPermissionOverrides.AsNoTracking()
+            join permission in _db.Permissions.AsNoTracking() on overrideRow.PermissionId equals permission.Id
+            where overrideRow.TenantId == tenantId && overrideRow.UserId == userId && !overrideRow.Granted
+            select permission.Code)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        return fromRoles.Concat(granted).Distinct(StringComparer.Ordinal).Where(code => !denied.Contains(code, StringComparer.Ordinal)).ToArray();
     }
 
     public async Task<IReadOnlyList<string>> GetRoleNamesAsync(Guid userId, Guid tenantId, CancellationToken cancellationToken)
@@ -145,6 +172,18 @@ public sealed class PasswordResetRepository : IPasswordResetRepository
             .ConfigureAwait(false);
 
         return token is not null && token.IsActive(_clock.UtcNow) ? token : null;
+    }
+
+    public async Task RevokeUnusedAsync(Guid userId, DateTime utcNow, CancellationToken cancellationToken)
+    {
+        var active = await _db.PasswordResetTokens
+            .Where(token => token.UserId == userId && token.UsedAt == null && token.ExpiresAt > utcNow)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        foreach (var token in active)
+        {
+            token.MarkUsed(utcNow);
+        }
     }
 }
 

@@ -18,6 +18,18 @@ public enum ProfileStatus
 {
     Active = 1,
     Inactive = 2,
+    Draft = 3,
+    PendingInvitation = 4,
+    Suspended = 5,
+}
+
+public enum EmploymentType
+{
+    FullTime = 1,
+    PartTime = 2,
+    Contract = 3,
+    Temporary = 4,
+    Intern = 5,
 }
 
 public enum MembershipType
@@ -27,6 +39,21 @@ public enum MembershipType
     HalfYearly = 3,
     Yearly = 4,
     Custom = 5,
+}
+
+public enum PackageCategory
+{
+    Standard = 1,
+    Student = 2,
+    Women = 3,
+    Corporate = 4,
+    Couple = 5,
+}
+
+public enum PackageDurationUnit
+{
+    Day = 1,
+    Month = 2,
 }
 
 public enum GymMembershipStatus
@@ -55,4 +82,5 @@ public enum MembershipAction
     Unfrozen = 4,
     Cancelled = 5,
     Expired = 6,
+    Extended = 7,
 }

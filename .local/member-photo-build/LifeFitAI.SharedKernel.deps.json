@@ -1,0 +1,23 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v9.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v9.0": {
+      "LifeFitAI.SharedKernel/1.0.0": {
+        "runtime": {
+          "LifeFitAI.SharedKernel.dll": {}
+        }
+      }
+    }
+  },
+  "libraries": {
+    "LifeFitAI.SharedKernel/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

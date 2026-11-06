@@ -7,9 +7,9 @@ using MediatR;
 
 namespace LifeFitAI.Application.Platform;
 
-public sealed record PlatformUserResponse(Guid Id, string Email, string FirstName, string LastName, string Status, Guid PersonalTenantId, string PersonalTenantName, DateTime CreatedAt, string Plan);
+public sealed record PlatformUserResponse(Guid Id, string Email, string FirstName, string LastName, string Status, Guid PersonalTenantId, string PersonalTenantName, DateTime CreatedAt, string Plan, bool HasPhoto = false);
 
-public sealed record DirectoryScope(bool PlatformWide, Guid? TenantId);
+public sealed record DirectoryScope(bool PlatformWide, Guid? TenantId, bool StaffOnly = false);
 
 public static class DirectoryRules
 {

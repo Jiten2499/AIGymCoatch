@@ -93,6 +93,43 @@ public sealed class ChallengeRepository : IChallengeRepository
         return new PageResult<Notification>(items, page.NormalizedPage, page.NormalizedSize, total);
     }
 
+    public Task<int> CountUnreadNotificationsAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken) =>
+        _db.Notifications.AsNoTracking().CountAsync(item => item.TenantId == tenantId && item.UserId == userId && !item.IsRead, cancellationToken);
+
+    public async Task<DateTime?> LatestNotificationActivityAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken)
+    {
+        var latestCreated = await _db.Notifications.AsNoTracking()
+            .Where(item => item.TenantId == tenantId && item.UserId == userId)
+            .MaxAsync(item => (DateTime?)item.CreatedAt, cancellationToken)
+            .ConfigureAwait(false);
+        var latestRead = await _db.Notifications.AsNoTracking()
+            .Where(item => item.TenantId == tenantId && item.UserId == userId && item.ReadAt != null)
+            .MaxAsync(item => item.ReadAt, cancellationToken)
+            .ConfigureAwait(false);
+        if (latestCreated is null)
+        {
+            return latestRead;
+        }
+
+        if (latestRead is null)
+        {
+            return latestCreated;
+        }
+
+        return latestCreated >= latestRead ? latestCreated : latestRead;
+    }
+
+    public async Task<IReadOnlyList<Notification>> SyncNotificationsAsync(Guid tenantId, Guid userId, DateTime sinceUtc, int take, CancellationToken cancellationToken)
+    {
+        var limit = Math.Clamp(take, 1, 100);
+        return await _db.Notifications.AsNoTracking()
+            .Where(item => item.TenantId == tenantId && item.UserId == userId && (item.CreatedAt > sinceUtc || (item.ReadAt != null && item.ReadAt > sinceUtc)))
+            .OrderBy(item => item.CreatedAt)
+            .Take(limit)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     public Task<Notification?> GetNotificationAsync(Guid tenantId, Guid userId, Guid id, CancellationToken cancellationToken) =>
         _db.Notifications.FirstOrDefaultAsync(item => item.TenantId == tenantId && item.UserId == userId && item.Id == id, cancellationToken);
 

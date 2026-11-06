@@ -92,9 +92,10 @@ public sealed class RefreshCommandHandler : IRequestHandler<RefreshCommand, Resu
         }
 
         var replacementId = Guid.NewGuid();
+        var response = await _sessions.IssueAsync(user, tenant, replacementId, cancellationToken).ConfigureAwait(false);
         existing.Revoke(now, _client.IpAddress, replacementId);
         await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        return Result.Success(await _sessions.IssueAsync(user, tenant, replacementId, cancellationToken).ConfigureAwait(false));
+        return Result.Success(response);
     }
 }
 

@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using StackExchange.Redis;
 
 namespace LifeFitAI.Infrastructure.Platform;
@@ -25,6 +26,24 @@ public sealed class EnvironmentSecretProvider : ISecretProvider
 
 public sealed class LocalFileStorage : IFileStorage
 {
+    private readonly string _root;
+
+    public LocalFileStorage()
+        : this(new StorageOptions())
+    {
+    }
+
+    public LocalFileStorage(IOptions<StorageOptions> options)
+        : this(options.Value)
+    {
+    }
+
+    public LocalFileStorage(StorageOptions options)
+    {
+        var root = string.IsNullOrWhiteSpace(options.RootPath) ? "storage" : options.RootPath;
+        _root = Path.GetFullPath(root);
+    }
+
     public bool IsSafeKey(string key)
     {
         if (string.IsNullOrWhiteSpace(key) || key.Length > 200)
@@ -38,6 +57,54 @@ public sealed class LocalFileStorage : IFileStorage
         }
 
         return !key.Contains("://", StringComparison.Ordinal) && !key.StartsWith("http", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public async Task SaveAsync(string key, ReadOnlyMemory<byte> content, CancellationToken cancellationToken)
+    {
+        var path = Resolve(key);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        await File.WriteAllBytesAsync(path, content.ToArray(), cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<byte[]?> ReadAsync(string key, CancellationToken cancellationToken)
+    {
+        if (!TryResolve(key, out var path) || !File.Exists(path))
+        {
+            return null;
+        }
+
+        return await File.ReadAllBytesAsync(path, cancellationToken).ConfigureAwait(false);
+    }
+
+    public Task DeleteAsync(string key, CancellationToken cancellationToken)
+    {
+        if (TryResolve(key, out var path) && File.Exists(path))
+        {
+            File.Delete(path);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private string Resolve(string key) => TryResolve(key, out var path) ? path : throw new InvalidOperationException("The storage key is not valid.");
+
+    private bool TryResolve(string key, out string path)
+    {
+        path = string.Empty;
+        if (!IsSafeKey(key))
+        {
+            return false;
+        }
+
+        var combined = Path.GetFullPath(Path.Combine(_root, key.Replace('/', Path.DirectorySeparatorChar)));
+        var root = _root.EndsWith(Path.DirectorySeparatorChar) ? _root : _root + Path.DirectorySeparatorChar;
+        if (!combined.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        path = combined;
+        return true;
     }
 }
 

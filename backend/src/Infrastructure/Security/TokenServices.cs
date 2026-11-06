@@ -57,6 +57,9 @@ public sealed class NoopPasswordResetNotifier : IPasswordResetNotifier
 {
     public Task NotifyAsync(string email, string rawToken, CancellationToken cancellationToken) =>
         Task.CompletedTask;
+
+    public Task NotifyAsync(string email, string rawToken, string templateKey, Guid? relatedTenantId, CancellationToken cancellationToken) =>
+        Task.CompletedTask;
 }
 
 public sealed class AnonymousActor : ICurrentActor

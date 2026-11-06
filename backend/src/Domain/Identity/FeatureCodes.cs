@@ -20,6 +20,16 @@ public static class FeatureCodes
     public const string AiWorkoutGeneration = "AI_WORKOUT_GENERATION";
     public const string AiNutrition = "AI_NUTRITION";
     public const string AiProgressInsights = "AI_PROGRESS_INSIGHTS";
+    public const string GymCrm = "GYM_CRM";
+    public const string GymExpenseManagement = "GYM_EXPENSE_MANAGEMENT";
+    public const string GymConfiguration = "GYM_CONFIGURATION";
+    public const string GymCommunications = "GYM_COMMUNICATIONS";
+    public const string GymPaymentManagement = "GYM_PAYMENT_MANAGEMENT";
+    public const string GymFinancialLedger = "GYM_FINANCIAL_LEDGER";
+    public const string GoogleDriveStorage = "GOOGLE_DRIVE_STORAGE";
+    public const string GymStaffPayroll = "GYM_STAFF_PAYROLL";
+    public const string StaffLeave = "STAFF_LEAVE";
+    public const string GymChat = "GYM_CHAT";
 
     public static readonly string[] All =
     [
@@ -41,5 +51,15 @@ public static class FeatureCodes
         AiWorkoutGeneration,
         AiNutrition,
         AiProgressInsights,
+        GymCrm,
+        GymExpenseManagement,
+        GymConfiguration,
+        GymCommunications,
+        GymPaymentManagement,
+        GymFinancialLedger,
+        GoogleDriveStorage,
+        GymStaffPayroll,
+        StaffLeave,
+        GymChat,
     ];
 }

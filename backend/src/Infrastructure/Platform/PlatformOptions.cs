@@ -65,6 +65,8 @@ public sealed class EmailOptions
     public string Password { get; set; } = string.Empty;
 
     public string FromAddress { get; set; } = string.Empty;
+
+    public string PublicAppBaseUrl { get; set; } = "http://localhost:3000";
 }
 
 public sealed class ObservabilityOptions

@@ -2,7 +2,7 @@ using LifeFitAI.SharedKernel.Primitives;
 
 namespace LifeFitAI.Domain.Gym;
 
-public sealed class MembershipPlan : BaseEntity
+public sealed partial class MembershipPlan : BaseEntity
 {
     private MembershipPlan()
     {
@@ -15,6 +15,12 @@ public sealed class MembershipPlan : BaseEntity
     public string? Description { get; private set; }
 
     public int DurationDays { get; private set; }
+
+    public int DurationCount { get; private set; }
+
+    public PackageDurationUnit DurationUnit { get; private set; } = PackageDurationUnit.Day;
+
+    public PackageCategory Category { get; private set; } = PackageCategory.Standard;
 
     public MembershipType MembershipType { get; private set; }
 
@@ -35,22 +41,34 @@ public sealed class MembershipPlan : BaseEntity
         MembershipType membershipType,
         int? maxVisits,
         decimal price,
-        string currency)
+        string currency,
+        PackageCategory category = PackageCategory.Standard,
+        PackageDurationUnit durationUnit = PackageDurationUnit.Day,
+        int? durationCount = null,
+        int includedPtSessions = 0)
     {
-        return new MembershipPlan
+        var count = durationCount ?? durationDays;
+        var plan = new MembershipPlan
         {
             Id = id,
             TenantId = tenantId,
             Name = name,
             Description = description,
             DurationDays = durationDays,
+            DurationCount = count,
+            DurationUnit = durationUnit,
+            Category = category,
             MembershipType = membershipType,
             MaxVisits = maxVisits,
             Price = price,
             Currency = currency,
             IsActive = true,
         };
+        plan.SetIncludedPtSessions(includedPtSessions);
+        return plan;
     }
+
+    public DateOnly InclusiveEnd(DateOnly start) => MembershipCalendar.InclusiveEnd(start, DurationCount > 0 ? DurationCount : DurationDays, DurationUnit);
 
     public void Update(
         string name,
@@ -59,21 +77,31 @@ public sealed class MembershipPlan : BaseEntity
         MembershipType membershipType,
         int? maxVisits,
         decimal price,
-        string currency)
+        string currency,
+        PackageCategory category = PackageCategory.Standard,
+        PackageDurationUnit durationUnit = PackageDurationUnit.Day,
+        int? durationCount = null,
+        int includedPtSessions = 0)
     {
         Name = name;
         Description = description;
         DurationDays = durationDays;
+        DurationCount = durationCount ?? durationDays;
+        DurationUnit = durationUnit;
+        Category = category;
         MembershipType = membershipType;
         MaxVisits = maxVisits;
         Price = price;
         Currency = currency;
+        SetIncludedPtSessions(includedPtSessions);
     }
+
+    public void Activate() => IsActive = true;
 
     public void Deactivate() => IsActive = false;
 }
 
-public sealed class GymMembership : BaseEntity
+public sealed partial class GymMembership : BaseEntity
 {
     private GymMembership()
     {
@@ -83,7 +111,7 @@ public sealed class GymMembership : BaseEntity
 
     public Guid MemberProfileId { get; private set; }
 
-    public Guid BranchId { get; private set; }
+    public Guid? BranchId { get; private set; }
 
     public Guid MembershipPlanId { get; private set; }
 
@@ -99,20 +127,45 @@ public sealed class GymMembership : BaseEntity
 
     public string? Notes { get; private set; }
 
+    public decimal PackagePrice { get; private set; }
+
+    public decimal DiscountAmount { get; private set; }
+
+    public decimal FinalAmount { get; private set; }
+
+    public string Currency { get; private set; } = "USD";
+
+    public Guid? DiscountRuleId { get; private set; }
+
+    public string? DiscountName { get; private set; }
+
     public static GymMembership Create(
         Guid id,
         Guid tenantId,
         Guid memberProfileId,
-        Guid branchId,
+        Guid? branchId,
         Guid membershipPlanId,
         string membershipNumber,
         DateOnly startDate,
         int durationDays,
         DateOnly today,
         bool autoRenew,
+        string? notes) =>
+        Create(id, tenantId, memberProfileId, branchId, membershipPlanId, membershipNumber, startDate, MembershipCalendar.InclusiveEnd(startDate, durationDays, PackageDurationUnit.Day), today, autoRenew, notes);
+
+    public static GymMembership Create(
+        Guid id,
+        Guid tenantId,
+        Guid memberProfileId,
+        Guid? branchId,
+        Guid membershipPlanId,
+        string membershipNumber,
+        DateOnly startDate,
+        DateOnly endDate,
+        DateOnly today,
+        bool autoRenew,
         string? notes)
     {
-        var end = startDate.AddDays(durationDays - 1);
         return new GymMembership
         {
             Id = id,
@@ -122,34 +175,76 @@ public sealed class GymMembership : BaseEntity
             MembershipPlanId = membershipPlanId,
             MembershipNumber = membershipNumber,
             StartDate = startDate,
-            EndDate = end,
+            EndDate = endDate,
             Status = startDate > today ? GymMembershipStatus.Pending : GymMembershipStatus.Active,
             AutoRenew = autoRenew,
             Notes = notes,
+            PackagePrice = 0m,
+            DiscountAmount = 0m,
+            FinalAmount = 0m,
+            Currency = "USD",
         };
+    }
+
+    public void SetPricing(decimal packagePrice, decimal discountAmount, decimal finalAmount, string currency, Guid? discountRuleId, string? discountName)
+    {
+        if (packagePrice < 0 || discountAmount < 0 || finalAmount < 0 || discountAmount > packagePrice || finalAmount > packagePrice)
+        {
+            throw new ArgumentOutOfRangeException(nameof(finalAmount), "Membership pricing values are invalid.");
+        }
+
+        PackagePrice = packagePrice;
+        DiscountAmount = discountAmount;
+        FinalAmount = finalAmount;
+        Currency = currency.ToUpperInvariant();
+        DiscountRuleId = discountRuleId;
+        DiscountName = string.IsNullOrWhiteSpace(discountName) ? null : discountName.Trim();
+    }
+
+    public bool AcceptsPayments =>
+        Status is GymMembershipStatus.Pending or GymMembershipStatus.Active or GymMembershipStatus.Frozen or GymMembershipStatus.Expired;
+
+    public GymMembership? ScheduleRenewal(DateOnly today, int count, PackageDurationUnit unit, Guid newId, string membershipNumber, bool autoRenew, string? notes)
+    {
+        if (Status is GymMembershipStatus.Cancelled or GymMembershipStatus.Suspended or GymMembershipStatus.Pending)
+        {
+            return null;
+        }
+
+        var expired = Status == GymMembershipStatus.Expired || EndDate < today;
+        if (!expired && Status is not (GymMembershipStatus.Active or GymMembershipStatus.Frozen))
+        {
+            return null;
+        }
+
+        var start = expired ? today : EndDate.AddDays(1);
+        var next = Create(newId, TenantId, MemberProfileId, BranchId, MembershipPlanId, membershipNumber, start, MembershipCalendar.InclusiveEnd(start, count, unit), today, autoRenew, notes);
+        next.ApplyIncludedSessions(IncludedPtSessions);
+        return next;
     }
 
     public bool CanCheckIn(DateOnly today) =>
         Status == GymMembershipStatus.Active && StartDate <= today && EndDate >= today;
 
-    public bool Renew(DateOnly today, int durationDays, bool autoRenew)
+    public bool Extend(int days)
     {
-        if (Status is GymMembershipStatus.Cancelled or GymMembershipStatus.Suspended or GymMembershipStatus.Pending)
+        if (days <= 0 || Status is GymMembershipStatus.Cancelled or GymMembershipStatus.Suspended or GymMembershipStatus.Expired)
         {
             return false;
         }
 
-        var stillCurrent = (Status is GymMembershipStatus.Active or GymMembershipStatus.Frozen) && EndDate >= today;
-        var baseDate = stillCurrent ? EndDate.AddDays(1) : today;
-        if (Status == GymMembershipStatus.Expired)
+        EndDate = EndDate.AddDays(days);
+        return true;
+    }
+
+    public bool ExtendForFreeze(int days)
+    {
+        if (days < 0 || Status != GymMembershipStatus.Frozen)
         {
-            StartDate = today;
+            return false;
         }
 
-        EndDate = baseDate.AddDays(durationDays - 1);
-
-        Status = GymMembershipStatus.Active;
-        AutoRenew = autoRenew;
+        EndDate = EndDate.AddDays(days);
         return true;
     }
 
@@ -200,59 +295,5 @@ public sealed class GymMembership : BaseEntity
 
         Status = GymMembershipStatus.Expired;
         return true;
-    }
-}
-
-public sealed class MembershipHistoryEntry
-{
-    private MembershipHistoryEntry()
-    {
-    }
-
-    public Guid Id { get; private set; }
-
-    public Guid TenantId { get; private set; }
-
-    public Guid GymMembershipId { get; private set; }
-
-    public MembershipAction Action { get; private set; }
-
-    public GymMembershipStatus? PreviousStatus { get; private set; }
-
-    public GymMembershipStatus NewStatus { get; private set; }
-
-    public DateOnly EffectiveDate { get; private set; }
-
-    public string? Reason { get; private set; }
-
-    public Guid? PerformedByUserId { get; private set; }
-
-    public DateTime CreatedAt { get; private set; }
-
-    public static MembershipHistoryEntry Create(
-        Guid id,
-        Guid tenantId,
-        Guid gymMembershipId,
-        MembershipAction action,
-        GymMembershipStatus? previousStatus,
-        GymMembershipStatus newStatus,
-        DateOnly effectiveDate,
-        string? reason,
-        Guid? performedByUserId,
-        DateTime createdAt)
-    {
-        return new MembershipHistoryEntry
-        {
-            Id = id,
-            TenantId = tenantId,
-            GymMembershipId = gymMembershipId,
-            Action = action,
-            PreviousStatus = previousStatus,
-            NewStatus = newStatus,
-            EffectiveDate = effectiveDate,
-            Reason = reason,
-            PerformedByUserId = performedByUserId,
-            CreatedAt = createdAt,
-        };
     }
 }

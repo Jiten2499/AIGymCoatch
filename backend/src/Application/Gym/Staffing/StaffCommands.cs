@@ -1,4 +1,6 @@
 using FluentValidation;
+using LifeFitAI.Application.Email;
+using LifeFitAI.Application.Gym;
 using LifeFitAI.Application.Identity;
 using LifeFitAI.Domain.Gym;
 using LifeFitAI.Domain.Identity;
@@ -35,8 +37,10 @@ public sealed class AddStaffCommandHandler : IRequestHandler<AddStaffCommand, Re
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDateTimeProvider _clock;
     private readonly IClientContext _client;
+    private readonly IUserAccountRepository _users;
+    private readonly IAccountActivationMailer? _activation;
 
-    public AddStaffCommandHandler(IOperationGuard guard, ICurrentActor actor, IAccountLinker accounts, ITenantRepository tenants, ITenantMembershipRepository memberships, IRoleRepository roles, IPeopleRepository people, IBranchRepository branches, IAuditLogRepository audit, IUnitOfWork unitOfWork, IDateTimeProvider clock, IClientContext client)
+    public AddStaffCommandHandler(IOperationGuard guard, ICurrentActor actor, IAccountLinker accounts, ITenantRepository tenants, ITenantMembershipRepository memberships, IRoleRepository roles, IPeopleRepository people, IBranchRepository branches, IAuditLogRepository audit, IUnitOfWork unitOfWork, IDateTimeProvider clock, IClientContext client, IUserAccountRepository users, IAccountActivationMailer? activation = null)
     {
         _guard = guard;
         _actor = actor;
@@ -50,6 +54,8 @@ public sealed class AddStaffCommandHandler : IRequestHandler<AddStaffCommand, Re
         _unitOfWork = unitOfWork;
         _clock = clock;
         _client = client;
+        _users = users;
+        _activation = activation;
     }
 
     public async Task<Result<StaffResponse>> Handle(AddStaffCommand request, CancellationToken cancellationToken)
@@ -86,6 +92,7 @@ public sealed class AddStaffCommandHandler : IRequestHandler<AddStaffCommand, Re
         {
             await _unitOfWork.ExecuteInTransactionAsync(async ct =>
             {
+                var existingAccount = await _users.GetByEmailAsync(request.Email.Trim().ToLowerInvariant(), ct).ConfigureAwait(false) is not null;
                 var linked = await _accounts.ResolveAsync(request.Email, request.Password, request.FirstName, request.LastName, request.Phone, ct).ConfigureAwait(false);
                 if (linked.IsFailure)
                 {
@@ -120,6 +127,12 @@ public sealed class AddStaffCommandHandler : IRequestHandler<AddStaffCommand, Re
 
                 await _audit.AddAsync(AuditLog.Create(Guid.NewGuid(), tenantId, _actor.UserId, "AddStaff", "StaffProfile", staff.Id, null, staff.EmployeeCode, _client.IpAddress, _client.UserAgent, _clock.UtcNow), ct).ConfigureAwait(false);
                 await _unitOfWork.SaveChangesAsync(ct).ConfigureAwait(false);
+                if (_activation is not null)
+                {
+                    var business = await _tenants.GetAsync(tenantId, ct).ConfigureAwait(false);
+                    await _activation.SendAsync(new AccountActivationNotice(user.Id, user.Email, user.FirstName, user.LastName, roleName, tenantId, business?.Name ?? "LifeFit AI", existingAccount), ct).ConfigureAwait(false);
+                }
+
                 response = new StaffResponse(staff.Id, user.Id, staff.EmployeeCode, user.Email, user.FirstName, user.LastName, staff.BranchId, staff.StaffType, staff.JoiningDate, staff.Status);
             }, cancellationToken).ConfigureAwait(false);
         }
@@ -138,22 +151,16 @@ public sealed class RemoveStaffCommandHandler : IRequestHandler<RemoveStaffComma
 {
     private readonly IOperationGuard _guard;
     private readonly ICurrentActor _actor;
-    private readonly IPeopleRepository _people;
-    private readonly ITenantRepository _tenants;
-    private readonly IRoleRepository _roles;
-    private readonly IAuditLogRepository _audit;
+    private readonly IBusinessProfileSoftDelete _profiles;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDateTimeProvider _clock;
     private readonly IClientContext _client;
 
-    public RemoveStaffCommandHandler(IOperationGuard guard, ICurrentActor actor, IPeopleRepository people, ITenantRepository tenants, IRoleRepository roles, IAuditLogRepository audit, IUnitOfWork unitOfWork, IDateTimeProvider clock, IClientContext client)
+    public RemoveStaffCommandHandler(IOperationGuard guard, ICurrentActor actor, IBusinessProfileSoftDelete profiles, IUnitOfWork unitOfWork, IDateTimeProvider clock, IClientContext client)
     {
         _guard = guard;
         _actor = actor;
-        _people = people;
-        _tenants = tenants;
-        _roles = roles;
-        _audit = audit;
+        _profiles = profiles;
         _unitOfWork = unitOfWork;
         _clock = clock;
         _client = client;
@@ -162,31 +169,15 @@ public sealed class RemoveStaffCommandHandler : IRequestHandler<RemoveStaffComma
     public async Task<Result> Handle(RemoveStaffCommand request, CancellationToken cancellationToken)
     {
         var gate = await _guard.AllowAsync(PermissionCodes.StaffRemove, FeatureCodes.StaffManagement, cancellationToken).ConfigureAwait(false);
-        if (gate.IsFailure || _actor.TenantId is not Guid tenantId)
+        if (gate.IsFailure || _actor.TenantId is not Guid tenantId || _actor.UserId is not Guid actorId)
         {
-            return gate;
+            return gate.IsFailure ? gate : Result.Failure(IdentityErrors.InvalidCredentials);
         }
 
-        var staff = await _people.GetStaffAsync(tenantId, request.Id, cancellationToken).ConfigureAwait(false);
-        var tenant = await _tenants.GetAsync(tenantId, cancellationToken).ConfigureAwait(false);
-        if (staff is null || tenant is null)
-        {
-            return Result.Failure(GymErrors.NotFound);
-        }
-
-        if (tenant.OwnerUserId == staff.UserId)
-        {
-            return Result.Failure(IdentityErrors.OwnerRemovalRejected);
-        }
-
-        var now = _clock.UtcNow;
-        staff.Remove(now);
-        var trainer = await _people.GetTrainerByUserAsync(tenantId, staff.UserId, cancellationToken).ConfigureAwait(false);
-        trainer?.Remove(now);
-        await _roles.RemoveForMemberAsync(staff.UserId, tenantId, now, cancellationToken).ConfigureAwait(false);
-        await _audit.AddAsync(AuditLog.Create(Guid.NewGuid(), tenantId, _actor.UserId, "RemoveStaff", "StaffProfile", staff.Id, null, staff.EmployeeCode, _client.IpAddress, _client.UserAgent, now), cancellationToken).ConfigureAwait(false);
-        await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        return Result.Success();
+        return await BusinessProfileDeletion.Execute(
+            _unitOfWork,
+            token => _profiles.DeleteStaffAsync(tenantId, actorId, request.Id, _clock.UtcNow, _client.IpAddress, _client.UserAgent, token),
+            cancellationToken).ConfigureAwait(false);
     }
 }
 

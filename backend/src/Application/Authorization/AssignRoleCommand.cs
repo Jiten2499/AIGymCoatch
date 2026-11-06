@@ -68,6 +68,12 @@ public sealed class AssignRoleCommandHandler : IRequestHandler<AssignRoleCommand
             return Result.Failure(IdentityErrors.SuperAdminRejected);
         }
 
+        var actorRoles = await _roles.GetRoleNamesAsync(actorId, request.TenantId, cancellationToken).ConfigureAwait(false);
+        if (!AccessRoleRules.OwnerAssignmentAllowed(request.RoleName, actorRoles))
+        {
+            return Result.Failure(IdentityErrors.OwnerAssignmentRejected);
+        }
+
         if (await _members.GetActiveAsync(request.TenantId, request.UserId, cancellationToken).ConfigureAwait(false) is null)
         {
             return Result.Failure(IdentityErrors.NotMember);

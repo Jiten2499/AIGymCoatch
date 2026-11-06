@@ -29,6 +29,6 @@ public sealed class GetCurrentUserQueryHandler : IRequestHandler<GetCurrentUserQ
             return Result.Failure<UserProfile>(IdentityErrors.InvalidCredentials);
         }
 
-        return Result.Success(new UserProfile(user.Id, user.Email, user.FirstName, user.LastName));
+        return Result.Success(UserProfiles.From(user));
     }
 }

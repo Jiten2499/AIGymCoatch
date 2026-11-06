@@ -187,6 +187,12 @@ public interface IChallengeRepository
 
     Task<PageResult<Notification>> ListNotificationsAsync(Guid tenantId, Guid userId, PageQuery page, CancellationToken cancellationToken);
 
+    Task<int> CountUnreadNotificationsAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken);
+
+    Task<DateTime?> LatestNotificationActivityAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<Notification>> SyncNotificationsAsync(Guid tenantId, Guid userId, DateTime sinceUtc, int take, CancellationToken cancellationToken);
+
     Task<Notification?> GetNotificationAsync(Guid tenantId, Guid userId, Guid id, CancellationToken cancellationToken);
 
     Task RecordWorkoutProgressAsync(Guid tenantId, Guid userId, bool firstWorkoutToday, DateTime utcNow, CancellationToken cancellationToken);

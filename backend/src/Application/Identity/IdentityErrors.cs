@@ -27,7 +27,16 @@ public static class IdentityErrors
     public static readonly Error PlatformWorkspaceRejected = new("workspace.platform_rejected", "Users are managed inside a business workspace.");
 
     public static readonly Error RoleNotFound = new("role.not_found", "The role was not found.");
+    public static readonly Error RoleProtected = new("role.protected", "The Business Owner role cannot be changed.");
+    public static readonly Error RoleSystemLocked = new("role.system_locked", "Duplicate this standard role before customizing it for this business.");
+    public static readonly Error RoleNameConflict = new("role.name_conflict", "A role with this name already exists in this business.");
+    public static readonly Error RoleStillAssigned = new("role.still_assigned", "Reassign everyone on this role before deactivating it.");
+    public static readonly Error RoleEscalation = new("role.escalation", "You can only grant permissions you already hold.");
+    public static readonly Error RoleInactive = new("role.inactive", "This role is inactive.");
+    public static readonly Error OwnerAssignmentRejected = new("role.owner_assignment", "Only a Business Owner can assign the Business Owner role.");
     public static readonly Error SuperAdminRejected = new("role.super_admin_rejected", "SuperAdmin cannot be assigned through the workspace API.");
     public static readonly Error Forbidden = new("authorization.forbidden", "You do not have permission to perform this action.");
+    public static readonly Error UserNotFound = new("identity.user_not_found", "The user was not found.");
+    public static readonly Error InvalidPhoto = new("identity.invalid_photo", "The profile picture must be a JPEG, PNG, or WebP image under 2 MB.");
     public static readonly Error LicenseNotFound = new("license.not_found", "This workspace does not have a license.");
 }

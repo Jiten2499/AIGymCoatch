@@ -1,66 +1,127 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useSyncExternalStore } from "react";
-import { getSession, setSession, subscribeSession } from "../lib/session";
-
-const groups = [
-  { title: "Overview", links: [["Dashboard", "/business"]] },
-  { title: "Directory", links: [["Users", "/business/users"], ["Coaches", "/business/coaches"]] },
-  { title: "Licensing", links: [["Plans", "/business/plans"]] },
-] as const;
+import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { AppFrame, type NavGroup } from "./AppFrame";
+import { api } from "../lib/api";
+import { canSeeBusinessLink, gymLinks } from "../lib/businessNav";
+import { enterWorkspace } from "../lib/home";
+import { useCircularRealtime } from "../lib/circularRealtime";
+import { getSession, isSessionReady, setSession, subscribeSession, type WorkspaceSummary } from "../lib/session";
+import { displayWorkspaceRole, workspaceRoleLabel } from "../lib/workspaceRole";
 
 export function BusinessShell({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
   const router = useRouter();
   const session = useSyncExternalStore(subscribeSession, getSession, () => null);
+  const sessionReady = useSyncExternalStore(subscribeSession, isSessionReady, () => false);
+  const [workspaceSettled, setWorkspaceSettled] = useState(false);
+  const onPlatform = !session?.currentTenant || session.currentTenant.type === "Platform";
+  const tenantId = onPlatform ? null : session?.currentTenant?.id ?? null;
+  useCircularRealtime(tenantId, session?.accessToken);
+  const features = useQuery({
+    queryKey: ["features", tenantId],
+    enabled: tenantId !== null,
+    staleTime: 0,
+    refetchOnMount: "always",
+    queryFn: () => api<{ featureCode: string; enabled: boolean }[]>("/features"),
+  });
+  const access = useQuery({
+    queryKey: ["my-access", tenantId],
+    enabled: tenantId !== null,
+    staleTime: 0,
+    retry: false,
+    refetchOnMount: "always",
+    queryFn: () => api<{ permissions: string[] }>("/users/me/access"),
+  });
+  const unread = useQuery({
+    queryKey: ["communication-unread", tenantId],
+    enabled: tenantId !== null,
+    retry: false,
+    queryFn: () => api<number>("/communications/inbox/unread-count"),
+  });
+  const approvals = useQuery({
+    queryKey: ["approval-count", tenantId],
+    enabled: tenantId !== null,
+    retry: false,
+    queryFn: () => api<{ pendingCount: number }>("/approval-requests/pending-count"),
+  });
+  const workspaces = useQuery({
+    queryKey: ["workspaces", session?.user.id],
+    enabled: session !== null,
+    staleTime: 60_000,
+    queryFn: () => api<WorkspaceSummary[]>("/tenants/me"),
+  });
+  const permissions = useMemo(() => {
+    const payload = access.data as { permissions?: string[]; Permissions?: string[] } | undefined;
+    const codes = payload?.permissions ?? payload?.Permissions;
+    return access.isSuccess && Array.isArray(codes) ? new Set(codes) : null;
+  }, [access.data, access.isSuccess]);
+  const enabled = useMemo(() => new Map((features.data ?? []).map((feature) => [feature.featureCode, feature.enabled])), [features.data]);
+  const visibleGymLinks = gymLinks.filter(([, href]) => canSeeBusinessLink(href, permissions, enabled));
+  const taskLabel = approvals.isSuccess && approvals.data.pendingCount > 0 ? `Tasks (${approvals.data.pendingCount})` : "Tasks";
+  const circularsLabel = unread.isSuccess && unread.data > 0 ? `Circulars (${unread.data})` : "Circulars";
+  const labeledLinks = visibleGymLinks.map(([label, href]) => [href === "/business/communications" ? circularsLabel : label, href] as [string, string]);
+  const gymNavigation: [string, string][] = approvals.isSuccess
+    ? [["Members", "/business/members"], ["Memberships", "/business/memberships"], [taskLabel, "/business/tasks"], ...labeledLinks.filter(([, href]) => href !== "/business/members" && href !== "/business/memberships")]
+    : labeledLinks;
+  const allow = (href: string) => canSeeBusinessLink(href, permissions, enabled);
+  const groups: NavGroup[] = [
+    { title: "Overview", links: allow("/business") ? ([["Dashboard", "/business"]] as const) : [] },
+    { title: "Access", links: ([["Staff & Access", "/business/users"], ["Coaches", "/business/coaches"]] as const).filter(([, href]) => allow(href)) },
+    { title: "Gym", links: gymNavigation.filter(([, href]) => allow(href)) },
+    { title: "Licensing", links: allow("/business/plans") ? ([["Plans", "/business/plans"]] as const) : [] },
+  ].filter((group) => group.links.length > 0);
 
   useEffect(() => {
-    if (!session) {
+    if (sessionReady && !session) {
       router.replace("/login");
     }
-  }, [router, session]);
+  }, [router, session, sessionReady]);
+
+  useEffect(() => {
+    if (!session || !onPlatform) {
+      return;
+    }
+
+    let cancelled = false;
+    void enterWorkspace()
+      .then((href) => {
+        if (!cancelled && href !== "/business") {
+          router.replace(href);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setWorkspaceSettled(true);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [onPlatform, router, session]);
 
   if (!session) {
     return <p className="p-8 text-muted">Checking your session.</p>;
   }
 
-  const workspace = session.currentTenant?.name ?? "Business";
+  if (onPlatform && !workspaceSettled) {
+    return <p className="p-8 text-muted">Opening your workspace.</p>;
+  }
+
+  const currentRoles = workspaces.data?.find((workspace) => workspace.id === tenantId)?.roles ?? [];
+  const role = workspaceRoleLabel(displayWorkspaceRole(currentRoles)) || "Staff";
 
   return (
-    <div className="min-h-screen sm:grid sm:grid-cols-[220px_minmax(0,1fr)]">
-      <aside className="border-b border-line p-4 sm:border-r sm:border-b-0">
-        <p className="px-3 text-xs font-semibold tracking-[0.16em] text-accent uppercase">Business</p>
-        <p className="mt-2 truncate px-3 text-sm">{workspace}</p>
-        <nav aria-label="Business" className="mt-4 grid gap-4">
-          {groups.map((group) => (
-            <div key={group.title}>
-              <p className="px-3 text-xs text-muted">{group.title}</p>
-              {group.links.map(([label, href]) => {
-                const current = href === "/business" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
-                return (
-                  <Link className={`flex min-h-11 items-center rounded-xl px-3 ${current ? "bg-surface text-accent" : ""}`} href={href} key={href}>
-                    {label}
-                  </Link>
-                );
-              })}
-            </div>
-          ))}
-        </nav>
-      </aside>
-      <div className="min-w-0">
-        <header className="flex items-center justify-between gap-4 border-b border-line px-6 py-4">
-          <p className="text-sm text-muted">{workspace}</p>
-          <div className="flex items-center gap-4">
-            <p>{session.user.firstName} {session.user.lastName}</p>
-            <button className="min-h-11 rounded-full border border-line px-4" onClick={() => { setSession(null); router.replace("/login"); }} type="button">
-              Log out
-            </button>
-          </div>
-        </header>
-        <main className="px-6 py-8">{children}</main>
-      </div>
-    </div>
+    <AppFrame
+      brand="Business"
+      groups={groups}
+      onLogout={() => { setSession(null); router.replace("/login"); }}
+      profileHref="/business/profile"
+      subtitle={role}
+      user={session.user}
+    >
+      {children}
+    </AppFrame>
   );
 }

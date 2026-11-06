@@ -27,7 +27,15 @@ public interface IPeopleRepository
 
     Task<StaffProfile?> GetStaffByUserAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken);
 
+    Task<bool> EmployeeCodeExistsAsync(Guid tenantId, string employeeCode, CancellationToken cancellationToken, Guid? excludeStaffId = null);
+
     Task AddStaffAsync(StaffProfile profile, CancellationToken cancellationToken);
+
+    Task AddStaffBranchAccessAsync(StaffBranchAccess access, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<Guid>> ListStaffBranchIdsAsync(Guid tenantId, Guid staffProfileId, CancellationToken cancellationToken);
+
+    Task ReplaceStaffBranchAccessAsync(Guid tenantId, Guid staffProfileId, IReadOnlyList<Guid> branchIds, DateTime utcNow, CancellationToken cancellationToken);
 
     Task<PageResult<StaffResponse>> ListStaffAsync(Guid tenantId, PageQuery page, CancellationToken cancellationToken);
 
@@ -37,22 +45,30 @@ public interface IPeopleRepository
 
     Task AddTrainerAsync(TrainerProfile profile, CancellationToken cancellationToken);
 
-    Task<PageResult<TrainerResponse>> ListTrainersAsync(Guid tenantId, PageQuery page, CancellationToken cancellationToken);
+    Task<PageResult<TrainerResponse>> ListTrainersAsync(Guid tenantId, PageQuery page, string? search, string? status, string? specialization, CancellationToken cancellationToken);
 
     Task<MemberProfile?> GetMemberAsync(Guid tenantId, Guid id, CancellationToken cancellationToken);
 
     Task<MemberProfile?> GetMemberByUserAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken);
 
+    Task<MemberProfile?> FindMemberWithPhotoAsync(Guid userId, Guid? preferredTenantId, CancellationToken cancellationToken);
+
     Task AddMemberAsync(MemberProfile profile, CancellationToken cancellationToken);
 
-    Task<PageResult<MemberResponse>> SearchMembersAsync(
+    Task<MemberResponse?> ReadMemberAsync(Guid tenantId, Guid id, CancellationToken cancellationToken);
+
+    Task<PageResult<MemberListItem>> SearchMembersAsync(
         Guid tenantId,
         string? term,
         ProfileStatus? status,
         Guid? branchId,
         GymMembershipStatus? membershipStatus,
         PageQuery page,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        Guid? onlyUserId = null,
+        Guid? assignedTrainerId = null);
+
+    Task<IReadOnlyList<MemberMatchItem>> FindMemberMatchesAsync(Guid tenantId, string mobile, string? email, CancellationToken cancellationToken);
 }
 
 public interface IMembershipRepository
@@ -63,13 +79,39 @@ public interface IMembershipRepository
 
     Task AddPlanAsync(MembershipPlan plan, CancellationToken cancellationToken);
 
-    Task<PageResult<PlanResponse>> ListPlansAsync(Guid tenantId, bool? activeOnly, PageQuery page, CancellationToken cancellationToken);
+    Task<PageResult<PlanResponse>> ListPlansAsync(Guid tenantId, bool? activeOnly, string? term, PackageCategory? category, PageQuery page, CancellationToken cancellationToken);
 
     Task<GymMembership?> GetMembershipAsync(Guid tenantId, Guid id, CancellationToken cancellationToken);
+
+    Task<bool> OverlapsMembershipAsync(Guid tenantId, Guid memberProfileId, DateOnly start, DateOnly end, Guid? excludeMembershipId, CancellationToken cancellationToken);
 
     Task AddMembershipAsync(GymMembership membership, CancellationToken cancellationToken);
 
     Task AddHistoryAsync(MembershipHistoryEntry entry, CancellationToken cancellationToken);
+
+    Task<MembershipFreeze?> GetOpenFreezeAsync(Guid tenantId, Guid membershipId, CancellationToken cancellationToken);
+
+    Task<bool> FreezeOverlapsAsync(Guid tenantId, Guid membershipId, DateOnly start, CancellationToken cancellationToken);
+
+    Task AddFreezeAsync(MembershipFreeze freeze, CancellationToken cancellationToken);
+
+    Task<int> CountFreezesAsync(Guid tenantId, Guid membershipId, CancellationToken cancellationToken);
+
+    Task<PageResult<GymMembershipResponse>> SearchMembershipsAsync(
+        Guid tenantId,
+        GymMembershipStatus? status,
+        Guid? planId,
+        Guid? branchId,
+        Guid? memberProfileId,
+        string? term,
+        DateOnly? startsFrom,
+        DateOnly? startsTo,
+        DateOnly? expiresFrom,
+        DateOnly? expiresTo,
+        DateOnly today,
+        string? sort,
+        PageQuery page,
+        CancellationToken cancellationToken);
 
     Task<PageResult<GymMembershipResponse>> ListMembershipsAsync(
         Guid tenantId,
@@ -122,6 +164,8 @@ public interface IDashboardAnalytics
     Task<IReadOnlyList<DateCount>> CountCheckInsByLocalDateAsync(Guid tenantId, DateTime fromUtc, DateTime toUtc, TimeZoneInfo timeZone, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<MembershipActivityCount>> CountMembershipActivityAsync(Guid tenantId, DateOnly from, DateOnly to, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<MembershipSaleCount>> CountMembershipSalesAsync(Guid tenantId, DateOnly from, DateOnly to, CancellationToken cancellationToken);
 }
 
 public interface IQrSettings

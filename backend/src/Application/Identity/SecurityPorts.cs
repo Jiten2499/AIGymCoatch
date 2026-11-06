@@ -36,6 +36,8 @@ public interface ITokenSettings
 public interface IPasswordResetNotifier
 {
     Task NotifyAsync(string email, string rawToken, CancellationToken cancellationToken);
+
+    Task NotifyAsync(string email, string rawToken, string templateKey, Guid? relatedTenantId, CancellationToken cancellationToken);
 }
 
 public interface ICurrentActor

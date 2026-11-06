@@ -37,6 +37,10 @@ public sealed record ChallengeResponse(Guid Id, string Name, string? Description
 
 public sealed record NotificationResponse(Guid Id, NotificationType Type, string Title, string Message, bool IsRead, DateTime CreatedAt);
 
+public sealed record NotificationSummaryResponse(int UnreadCount, DateTime? LatestActivityAt, DateTime ServerTimeUtc);
+
+public sealed record NotificationSyncResponse(IReadOnlyList<NotificationResponse> Items, int UnreadCount, DateTime ServerTimeUtc);
+
 public sealed record DashboardResponse(GoalResponse? CurrentGoal, MeasurementResponse? LatestMeasurement, int WeeklyWorkouts, int MonthlyWorkouts, int StreakDays, IReadOnlyList<SessionResponse> RecentWorkouts, NutritionSummaryResponse NutritionToday, ChallengeResponse? ActiveChallenge, string? MembershipStatus);
 
 public sealed record AiChatResponse(Guid ConversationId, string Message, int InputTokens, int OutputTokens);

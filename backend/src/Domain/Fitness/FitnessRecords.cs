@@ -183,6 +183,21 @@ public sealed class BodyMeasurement
             CreatedAt = utcNow,
             UpdatedAt = utcNow,
         };
+
+    public void Apply(UnitSystem unitSystem, DateOnly date, decimal? weight, decimal? bodyFat, decimal? chest, decimal? waist, decimal? hip, decimal? arm, decimal? thigh, string? notes, DateTime utcNow)
+    {
+        UnitSystem = unitSystem;
+        MeasurementDate = date;
+        Weight = weight;
+        BodyFatPercentage = bodyFat;
+        Chest = chest;
+        Waist = waist;
+        Hip = hip;
+        Arm = arm;
+        Thigh = thigh;
+        Notes = notes;
+        UpdatedAt = utcNow;
+    }
 }
 
 public sealed class BodyScanRecord

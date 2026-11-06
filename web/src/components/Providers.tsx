@@ -2,8 +2,14 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
+import { SessionKeeper } from "./SessionKeeper";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [client] = useState(() => new QueryClient({ defaultOptions: { mutations: { retry: false }, queries: { retry: false } } }));
-  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  return (
+    <QueryClientProvider client={client}>
+      <SessionKeeper />
+      {children}
+    </QueryClientProvider>
+  );
 }

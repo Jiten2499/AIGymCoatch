@@ -1,0 +1,7 @@
+{
+  "LifeFitAI.Api, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "F:\\Projects\\AIGymCoatch\\backend\\src\\Api",
+  "LifeFitAI.Application, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "F:\\Projects\\AIGymCoatch\\backend\\src\\Application",
+  "LifeFitAI.Domain, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "F:\\Projects\\AIGymCoatch\\backend\\src\\Domain",
+  "LifeFitAI.Infrastructure, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "F:\\Projects\\AIGymCoatch\\backend\\src\\Infrastructure",
+  "LifeFitAI.SharedKernel, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "F:\\Projects\\AIGymCoatch\\backend\\src\\SharedKernel"
+}

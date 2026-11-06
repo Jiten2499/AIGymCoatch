@@ -175,7 +175,7 @@ export function FitnessScreen() {
           )} />
           {profileBanner ? <AppText accessibilityRole="alert" tone="danger">{profileBanner}</AppText> : null}
           {saved ? <AppText tone="accent">{t('journey.saved')}</AppText> : null}
-          <AppButton label={t('common.save')} loading={save.isPending} onPress={submit} />
+          <AppButton label={t('common.save')} loading={save.isPending} onPress={() => { void submit(); }} />
           <AppText variant="title">{t('journey.goalTitle')}</AppText>
           {active ? <AppCard><AppText variant="label">{t('journey.activeGoal')}</AppText><AppText>{t(`journey.goalType.${active.goalType}`)}</AppText>{active.targetValue !== null ? <AppText tone="muted">{t('journey.target')}: {active.targetValue}</AppText> : null}</AppCard> : <AppText tone="muted">{t('journey.noGoal')}</AppText>}
           <AppText accessibilityLabel={`${t('journey.goalChoice')}, required`} variant="label">

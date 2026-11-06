@@ -8,6 +8,7 @@ import { AppText } from '../../../components/ui/AppText';
 import { endSession } from '../../../services/auth/session';
 import { useSessionStore } from '../../../store/sessionStore';
 import { useWorkspaceStore } from '../../../store/workspaceStore';
+import { ProfilePhotoCard } from '../ProfilePhotoCard';
 
 export function ProfileScreen() {
   const theme = useTheme();
@@ -20,6 +21,9 @@ export function ProfileScreen() {
   return (
     <ScrollView contentContainerStyle={{ gap: theme.spacing.lg, padding: theme.spacing.xl }}>
       <AppText variant="title">{t('nav.profile')}</AppText>
+      <AppCard>
+        <ProfilePhotoCard />
+      </AppCard>
       <AppCard>
         <AppText variant="label">{user ? `${user.firstName} ${user.lastName}` : t('profile.signedIn')}</AppText>
         {user ? <AppText tone="muted">{user.email}</AppText> : null}

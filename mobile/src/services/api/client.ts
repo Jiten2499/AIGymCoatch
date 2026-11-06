@@ -43,6 +43,11 @@ apiClient.interceptors.response.use(
       }
       getAuthBridge().onSessionExpired();
     }
-    return Promise.reject(toApiError(error));
+    const apiError = toApiError(error);
+    const missingPhoto = status === 404 && /\/(photo|profile-photo)$/.test(path);
+    if (typeof __DEV__ !== 'undefined' && __DEV__ && process.env.NODE_ENV !== 'test' && !missingPhoto) {
+      console.warn(`API ${config?.method ?? 'request'} ${config?.baseURL ?? ''}${path} failed: ${apiError.message}`);
+    }
+    return Promise.reject(apiError);
   },
 );

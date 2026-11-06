@@ -1,4 +1,5 @@
 using FluentValidation;
+using LifeFitAI.Application.Email;
 using LifeFitAI.Application.Gym.Members;
 using LifeFitAI.Application.Identity;
 using LifeFitAI.Application.Platform;
@@ -37,6 +38,9 @@ public sealed class UpdateTrainerCommandValidator : AbstractValidator<UpdateTrai
         RuleFor(command => command.ExperienceYears).InclusiveBetween(0, 80).When(command => command.ExperienceYears is not null);
         RuleFor(command => command.FirstName).MaximumLength(100);
         RuleFor(command => command.LastName).MaximumLength(100);
+        RuleFor(command => command.Phone).MaximumLength(32);
+        RuleFor(command => command.EmployeeCode).MaximumLength(32);
+        RuleFor(command => command.Phone).Must(phone => string.IsNullOrWhiteSpace(phone) || MemberFieldRules.Phone(phone.Trim())).When(command => command.SetPhone);
         RuleFor(command => command.Status).IsInEnum();
     }
 }
@@ -55,8 +59,10 @@ public sealed class AddCoachCommandHandler : IRequestHandler<AddCoachCommand, Re
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDateTimeProvider _clock;
     private readonly IClientContext _client;
+    private readonly ITenantRepository _tenants;
+    private readonly IAccountActivationMailer? _activation;
 
-    public AddCoachCommandHandler(IOperationGuard guard, ICurrentActor actor, IAccountLinker accounts, IUserAccountRepository users, ITenantMembershipRepository memberships, IRoleRepository roles, IPeopleRepository people, IBranchRepository branches, IAuditLogRepository audit, IUnitOfWork unitOfWork, IDateTimeProvider clock, IClientContext client)
+    public AddCoachCommandHandler(IOperationGuard guard, ICurrentActor actor, IAccountLinker accounts, IUserAccountRepository users, ITenantMembershipRepository memberships, IRoleRepository roles, IPeopleRepository people, IBranchRepository branches, IAuditLogRepository audit, IUnitOfWork unitOfWork, IDateTimeProvider clock, IClientContext client, ITenantRepository tenants, IAccountActivationMailer? activation = null)
     {
         _guard = guard;
         _actor = actor;
@@ -70,6 +76,8 @@ public sealed class AddCoachCommandHandler : IRequestHandler<AddCoachCommand, Re
         _unitOfWork = unitOfWork;
         _clock = clock;
         _client = client;
+        _tenants = tenants;
+        _activation = activation;
     }
 
     public async Task<Result<CoachCreated>> Handle(AddCoachCommand request, CancellationToken cancellationToken)
@@ -135,7 +143,13 @@ public sealed class AddCoachCommandHandler : IRequestHandler<AddCoachCommand, Re
                 await _people.AddTrainerAsync(trainer, ct).ConfigureAwait(false);
                 await _audit.AddAsync(AuditLog.Create(Guid.NewGuid(), tenantId, _actor.UserId, "AddCoach", "TrainerProfile", trainer.Id, null, user.Email, _client.IpAddress, _client.UserAgent, _clock.UtcNow), ct).ConfigureAwait(false);
                 await _unitOfWork.SaveChangesAsync(ct).ConfigureAwait(false);
-                response = new CoachCreated(trainer.Id, user.Email, user.FirstName, user.LastName, trainer.Specialization, password);
+                if (_activation is not null)
+                {
+                    var business = await _tenants.GetAsync(tenantId, ct).ConfigureAwait(false);
+                    await _activation.SendAsync(new AccountActivationNotice(user.Id, user.Email, user.FirstName, user.LastName, RoleNames.Trainer, tenantId, business?.Name ?? "LifeFit AI", existing is not null), ct).ConfigureAwait(false);
+                }
+
+                response = new CoachCreated(trainer.Id, user.Email, user.FirstName, user.LastName, trainer.Specialization, null);
             }, cancellationToken).ConfigureAwait(false);
         }
         catch (MemberOnboardingException exception)

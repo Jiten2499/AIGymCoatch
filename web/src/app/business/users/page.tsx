@@ -3,12 +3,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, useSyncExternalStore } from "react";
 import { PageState } from "../../../components/AdminShell";
-import { ConfirmDialog } from "../../../components/ConfirmDialog";
 import { DataTable } from "../../../components/DataTable";
+import { ProfileDeleteDialog } from "../../../components/ProfileDeleteDialog";
+import { UserAvatar } from "../../../components/UserAvatar";
 import { api, ApiError } from "../../../lib/api";
 import { getSession, subscribeSession } from "../../../lib/session";
 import type { CreatedWorkspaceUser, Page, WorkspaceUser } from "../../../lib/types";
-import { AddUserDialog, AssignPlanDialog, EditUserDialog, PasswordDialog } from "./UserDialogs";
+import { AssignPlanDialog, InviteResultDialog, staffRoleLabel, type StaffRoleOption } from "./UserDialogs";
+import { StaffWizard, type StaffWizardResult } from "./AddStaffWizard";
+import { EditStaffWizard } from "./EditStaffWizard";
 
 export default function BusinessUsersPage() {
   const client = useQueryClient();
@@ -19,20 +22,36 @@ export default function BusinessUsersPage() {
     enabled: tenantId !== null,
     queryFn: () => api<Page<WorkspaceUser>>("/business/users?page=1&pageSize=100"),
   });
+  const roleCatalog = useQuery({
+    queryKey: ["staff-roles", tenantId],
+    enabled: tenantId !== null,
+    queryFn: () => api<StaffRoleOption[]>("/business/users/roles"),
+  });
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deletedNotice, setDeletedNotice] = useState<string | null>(null);
   const [assigning, setAssigning] = useState(false);
   const [issued, setIssued] = useState<CreatedWorkspaceUser | null>(null);
-  const rows = users.data?.items ?? [];
+  const [photoNotice, setPhotoNotice] = useState<string | null>(null);
+  const [compensationHref, setCompensationHref] = useState<string | null>(null);
+  const roleLabels = new Map((roleCatalog.data ?? []).map((role) => [role.name, role.label]));
+  const rows = (users.data?.items ?? []).filter((row) => row.role !== "Trainer");
+  function roleLabel(roleName: string) {
+    return roleLabels.get(roleName) ?? staffRoleLabel(roleName);
+  }
   const selectedRows = rows.filter((row) => selected.has(row.id));
   const remove = useMutation({
     mutationFn: (userIds: string[]) => api("/business/users/delete", { method: "POST", body: JSON.stringify({ userIds }) }),
     onSuccess: async () => {
+      const names = selectedRows.map((row) => `${row.firstName} ${row.lastName}`).join(", ");
       setConfirmDelete(false);
       setSelected(new Set());
-      await client.invalidateQueries({ queryKey: ["workspace-users", tenantId] });
+      setDeletedNotice(`${names} ${selectedRows.length === 1 ? "was" : "were"} deleted from active business views. The records are retained as soft-deleted data.`);
+      await client.invalidateQueries({ queryKey: ["workspace-users"] });
+      await client.invalidateQueries({ queryKey: ["coaches"] });
+      await client.invalidateQueries({ queryKey: ["members"] });
     },
   });
 
@@ -65,27 +84,29 @@ export default function BusinessUsersPage() {
     <PageState error={users.error instanceof ApiError ? users.error.message : null} loading={users.isLoading} onRetry={() => void users.refetch()}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-semibold">Users</h1>
-          <p className="mt-2 max-w-3xl text-muted">People who can sign in to this workspace. Select one person, then Assign plan, to give them a seat on a plan already assigned to this workspace. {users.data ? `${users.data.totalCount} total.` : ""}</p>
+          <h1 className="text-3xl font-semibold">Staff & Access</h1>
+          <p className="mt-2 max-w-3xl text-muted">People who can sign in and run this gym: owners, admins, managers, receptionists, accountants, and custom roles. Coaches stay on the Coaches page. Gym customers stay on Members. {users.data ? `${rows.length} shown.` : ""}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button className="min-h-11 rounded-full bg-accent px-4 font-semibold text-background" onClick={() => setAdding(true)} type="button">Add user</button>
+          <button className="min-h-11 rounded-full bg-accent px-4 font-semibold text-background" onClick={() => setAdding(true)} type="button">Add staff</button>
           <button className="min-h-11 rounded-full border border-line px-4" disabled={selectedRows.length !== 1} onClick={() => setEditing(true)} type="button">Edit</button>
           <button className="min-h-11 rounded-full border border-line px-4" disabled={selectedRows.length !== 1} onClick={() => setAssigning(true)} type="button">Assign plan</button>
           <button className="min-h-11 rounded-full border border-line px-4" disabled={selectedRows.length === 0} onClick={() => setConfirmDelete(true)} type="button">Delete</button>
           <button className="min-h-11 rounded-full border border-line px-4" onClick={() => void users.refetch()} type="button">{users.isFetching ? "Refreshing..." : "Refresh"}</button>
         </div>
       </div>
-      {remove.error instanceof ApiError ? <p className="mt-4" role="alert">{remove.error.message}</p> : null}
+      {deletedNotice ? <p className="mt-4" role="status">{deletedNotice}</p> : null}
+      {photoNotice && !issued ? <p className="mt-4" role="alert">{photoNotice}</p> : null}
       <div className="mt-6">
         <DataTable
           columns={[
-            { header: "Name", cell: (row) => `${row.firstName} ${row.lastName}` },
+            { header: "Name", cell: (row) => <span className="flex items-center gap-2"><UserAvatar firstName={row.firstName} hasPhoto={row.hasPhoto} lastName={row.lastName} size={32} userId={row.id} />{row.firstName} {row.lastName}</span> },
             { header: "Email", cell: (row) => row.email },
-            { header: "Role", cell: (row) => row.role },
+            { header: "Role", cell: (row) => roleLabel(row.role) },
             { header: "Plan", cell: (row) => row.plan || "—" },
             { header: "Status", cell: (row) => row.status },
             { header: "Created", value: (row) => row.createdAt, cell: (row) => new Date(row.createdAt).toLocaleDateString() },
+            { header: "Actions", cell: (row) => <button className="min-h-11" onClick={() => { setSelected(new Set([row.id])); setConfirmDelete(true); }} type="button">Delete</button> },
           ]}
           empty="No users were returned."
           rowKey={(row) => row.id}
@@ -94,12 +115,15 @@ export default function BusinessUsersPage() {
         />
       </div>
       {adding ? (
-        <AddUserDialog
+        <StaffWizard
           onCancel={() => setAdding(false)}
-          onCreated={async (created) => {
+          onCreated={async (result: StaffWizardResult) => {
             setAdding(false);
-            setIssued(created);
+            setIssued(result.user);
+            setPhotoNotice(result.photoWarning ?? null);
+            setCompensationHref(result.compensationHref ?? null);
             await client.invalidateQueries({ queryKey: ["workspace-users", tenantId] });
+            await client.invalidateQueries({ queryKey: ["workspace-plans"] });
           }}
         />
       ) : null}
@@ -115,26 +139,38 @@ export default function BusinessUsersPage() {
         />
       ) : null}
       {editing && selectedRows[0] ? (
-        <EditUserDialog
+        <EditStaffWizard
           onCancel={() => setEditing(false)}
-          onSaved={async () => {
+          onSaved={async (result) => {
             setEditing(false);
+            if (result?.photoWarning) {
+              setPhotoNotice(result.photoWarning);
+            }
             await client.invalidateQueries({ queryKey: ["workspace-users", tenantId] });
+            await client.invalidateQueries({ queryKey: ["workspace-plans"] });
+            await client.invalidateQueries({ queryKey: ["staff-detail", tenantId, selectedRows[0]?.id] });
           }}
-          user={selectedRows[0]}
+          userId={selectedRows[0].id}
         />
       ) : null}
       {confirmDelete ? (
-        <ConfirmDialog
-          body={`Remove ${selectedRows.length} selected user${selectedRows.length === 1 ? "" : "s"} from this workspace? The workspace owner cannot be removed.`}
-          confirmLabel="Delete"
-          onCancel={() => setConfirmDelete(false)}
+        <ProfileDeleteDialog
+          error={remove.error instanceof ApiError ? remove.error.message : null}
+          name={selectedRows.map((row) => `${row.firstName} ${row.lastName}`).join(", ")}
+          onCancel={() => { setConfirmDelete(false); remove.reset(); }}
           onConfirm={() => remove.mutate(selectedRows.map((row) => row.id))}
           pending={remove.isPending}
-          title="Delete users"
+          title="Delete staff"
         />
       ) : null}
-      {issued ? <PasswordDialog created={issued} onClose={() => setIssued(null)} /> : null}
+      {issued ? (
+        <InviteResultDialog
+          compensationHref={compensationHref}
+          created={issued}
+          notice={photoNotice}
+          onClose={() => { setIssued(null); setPhotoNotice(null); setCompensationHref(null); }}
+        />
+      ) : null}
     </PageState>
   );
 }

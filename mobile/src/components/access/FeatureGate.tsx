@@ -7,7 +7,7 @@ import { errorText } from '../../services/api/problem';
 import { ScreenState } from '../feedback/ScreenState';
 import { AppText } from '../ui/AppText';
 
-export function FeatureGate({ code, children }: { code: string; children: ReactNode }) {
+export function FeatureGate({ code, alternateCode, children }: { code: string; alternateCode?: string; children: ReactNode }) {
   const theme = useTheme();
   const { t } = useTranslation();
   const features = useWorkspaceFeatures();
@@ -17,7 +17,7 @@ export function FeatureGate({ code, children }: { code: string; children: ReactN
   if (features.isError) {
     return <ScreenState error={errorText(features.error, t('common.offline'))} onRetry={() => void features.refetch()} />;
   }
-  if (features.data?.[code] !== true) {
+  if (features.data?.[code] !== true && (!alternateCode || features.data?.[alternateCode] !== true)) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', padding: theme.spacing.xl }}>
         <AppText>{t('journey.featureDisabled')}</AppText>

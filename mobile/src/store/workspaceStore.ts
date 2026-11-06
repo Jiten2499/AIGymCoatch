@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { WorkspaceSummary } from '../types/api';
 
 type WorkspaceState = {
+  ready: boolean;
   workspaces: WorkspaceSummary[];
   logoUrl: string | null;
   features: Record<string, boolean>;
@@ -12,10 +13,11 @@ type WorkspaceState = {
 };
 
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
+  ready: false,
   workspaces: [],
   logoUrl: null,
   features: {},
-  setWorkspaces: (workspaces) => set({ workspaces }),
+  setWorkspaces: (workspaces) => set({ workspaces, ready: true }),
   setLogoUrl: (tenantId, logoUrl) => {
     const current = get().workspaces.find((workspace) => workspace.id === tenantId);
     if (!current) {
@@ -24,5 +26,5 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     set({ logoUrl });
   },
   setFeatures: (features) => set({ features }),
-  reset: () => set({ workspaces: [], logoUrl: null, features: {} }),
+  reset: () => set({ ready: false, workspaces: [], logoUrl: null, features: {} }),
 }));

@@ -65,7 +65,7 @@ public sealed class SessionIssuer : ISessionIssuer
             access,
             rawRefresh,
             expiresAt,
-            new UserProfile(user.Id, user.Email, user.FirstName, user.LastName),
+            UserProfiles.From(user),
             new TenantSummary(tenant.Id, tenant.Name, tenant.TenantType, tenant.Status));
     }
 }

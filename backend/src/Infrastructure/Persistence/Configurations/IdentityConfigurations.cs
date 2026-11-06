@@ -31,6 +31,8 @@ public sealed class UserAccountConfiguration : IEntityTypeConfiguration<UserAcco
         builder.Property(entity => entity.FirstName).HasMaxLength(100).IsRequired();
         builder.Property(entity => entity.LastName).HasMaxLength(100).IsRequired();
         builder.Property(entity => entity.Status).HasConversion<string>().HasMaxLength(32);
+        builder.Property(entity => entity.PhotoStorageKey).HasMaxLength(200);
+        builder.Property(entity => entity.PhotoContentType).HasMaxLength(80);
         builder.Property(entity => entity.RowVersion).IsRowVersion();
         builder.HasQueryFilter(entity => entity.DeletedAt == null);
     }
@@ -56,7 +58,10 @@ public sealed class RoleConfiguration : IEntityTypeConfiguration<Role>
         builder.HasKey(entity => entity.Id);
         builder.Property(entity => entity.Name).HasMaxLength(64).IsRequired();
         builder.Property(entity => entity.Description).HasMaxLength(256);
+        builder.Property(entity => entity.IsSystem).IsRequired();
+        builder.Property(entity => entity.IsActive).IsRequired();
         builder.Property(entity => entity.RowVersion).IsRowVersion();
+        builder.HasOne<Tenant>().WithMany().HasForeignKey(entity => entity.TenantId).OnDelete(DeleteBehavior.Restrict);
         builder.HasQueryFilter(entity => entity.DeletedAt == null);
     }
 }
@@ -81,6 +86,49 @@ public sealed class RolePermissionConfiguration : IEntityTypeConfiguration<RoleP
     {
         builder.ToTable("RolePermissions", "app");
         builder.HasKey(entity => new { entity.RoleId, entity.PermissionId });
+        builder.HasOne<Role>().WithMany().HasForeignKey(entity => entity.RoleId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Permission>().WithMany().HasForeignKey(entity => entity.PermissionId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+public sealed class RoleResourceScopeConfiguration : IEntityTypeConfiguration<RoleResourceScope>
+{
+    public void Configure(EntityTypeBuilder<RoleResourceScope> builder)
+    {
+        builder.ToTable("RoleResourceScopes", "app");
+        builder.HasKey(entity => new { entity.RoleId, entity.Resource });
+        builder.Property(entity => entity.Resource).HasMaxLength(32).IsRequired();
+        builder.Property(entity => entity.Scope).HasMaxLength(16).IsRequired();
+        builder.HasOne<Role>().WithMany().HasForeignKey(entity => entity.RoleId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+public sealed class UserPermissionOverrideConfiguration : IEntityTypeConfiguration<UserPermissionOverride>
+{
+    public void Configure(EntityTypeBuilder<UserPermissionOverride> builder)
+    {
+        builder.ToTable("UserPermissionOverrides", "app");
+        builder.HasKey(entity => entity.Id);
+        builder.Property(entity => entity.RowVersion).IsRowVersion();
+        builder.HasOne<Tenant>().WithMany().HasForeignKey(entity => entity.TenantId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<UserAccount>().WithMany().HasForeignKey(entity => entity.UserId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Permission>().WithMany().HasForeignKey(entity => entity.PermissionId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasQueryFilter(entity => entity.DeletedAt == null);
+    }
+}
+
+public sealed class UserResourceScopeConfiguration : IEntityTypeConfiguration<UserResourceScope>
+{
+    public void Configure(EntityTypeBuilder<UserResourceScope> builder)
+    {
+        builder.ToTable("UserResourceScopes", "app");
+        builder.HasKey(entity => entity.Id);
+        builder.Property(entity => entity.Resource).HasMaxLength(64).IsRequired();
+        builder.Property(entity => entity.Scope).HasMaxLength(32).IsRequired();
+        builder.Property(entity => entity.RowVersion).IsRowVersion();
+        builder.HasOne<Tenant>().WithMany().HasForeignKey(entity => entity.TenantId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<UserAccount>().WithMany().HasForeignKey(entity => entity.UserId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasQueryFilter(entity => entity.DeletedAt == null);
     }
 }
 

@@ -44,21 +44,55 @@ public sealed record CreateMemberRequest(
     string FirstName,
     string LastName,
     string? Phone,
-    Guid BranchId,
-    Guid PlanId,
-    DateOnly StartDate,
-    bool AutoRenew);
-
-public sealed record UpdateMemberRequest(
+    Guid? BranchId,
+    Guid? PlanId,
+    DateOnly? StartDate,
+    bool AutoRenew,
     DateOnly? DateOfBirth,
     string? Gender,
     string? EmergencyContactName,
     string? EmergencyContactPhone,
+    string? EmergencyContactRelationship,
     string? Address,
     string? City,
     string? State,
     string? PostalCode,
+    DateOnly? JoinDate,
+    string? FitnessGoal,
+    Guid? AssignedTrainerId,
+    bool AssignAppAccess = false,
+    Guid? AppSubscriptionId = null,
+    bool EnableBasicAppAccess = false,
+    decimal? PaymentAmount = null,
+    LifeFitAI.Domain.Gym.MembershipPaymentMethod? PaymentMethod = null,
+    DateOnly? PaymentDate = null,
+    string? PaymentReferenceNumber = null,
+    string? PaymentNotes = null,
+    Guid? PtPackageId = null);
+
+public sealed record AssignMemberAppAccessRequest(Guid SubscriptionId, string? Email = null);
+
+public sealed record EnableMemberBasicAccessRequest(string Email);
+
+public sealed record UpdateMemberRequest(
+    string? FirstName,
+    string? LastName,
+    string? Phone,
+    DateOnly? DateOfBirth,
+    string? Gender,
+    string? EmergencyContactName,
+    string? EmergencyContactPhone,
+    string? EmergencyContactRelationship,
+    string? Address,
+    string? City,
+    string? State,
+    string? PostalCode,
+    DateOnly? JoinDate,
+    string? FitnessGoal,
+    Guid? AssignedTrainerId,
     LifeFitAI.Domain.Gym.ProfileStatus Status);
+
+public sealed record ChangeMemberStatusRequest(LifeFitAI.Domain.Gym.ProfileStatus Status);
 
 public sealed record AddStaffRequest(
     string Email,
@@ -88,7 +122,13 @@ public sealed record UpdateTrainerRequest(
     Guid? BranchId,
     LifeFitAI.Domain.Gym.ProfileStatus Status,
     string? FirstName = null,
-    string? LastName = null);
+    string? LastName = null,
+    string? Phone = null,
+    bool SetPhone = false,
+    string? EmployeeCode = null,
+    DateOnly? JoiningDate = null,
+    bool CommissionEligible = false,
+    bool SetEmployment = false);
 
 public sealed record PlanRequest(
     string Name,
@@ -97,11 +137,45 @@ public sealed record PlanRequest(
     LifeFitAI.Domain.Gym.MembershipType MembershipType,
     int? MaxVisits,
     decimal Price,
-    string Currency);
+    string Currency,
+    LifeFitAI.Domain.Gym.PackageCategory Category = LifeFitAI.Domain.Gym.PackageCategory.Standard,
+    LifeFitAI.Domain.Gym.PackageDurationUnit DurationUnit = LifeFitAI.Domain.Gym.PackageDurationUnit.Day,
+    int? DurationCount = null,
+    int IncludedPtSessions = 0);
 
-public sealed record CreateMembershipRequest(Guid MemberProfileId, Guid BranchId, Guid PlanId, DateOnly StartDate, bool AutoRenew, string? Notes);
+public sealed record CreateMembershipRequest(
+    Guid MemberProfileId,
+    Guid? BranchId,
+    Guid PlanId,
+    DateOnly StartDate,
+    bool AutoRenew,
+    string? Notes,
+    bool AssignAppAccess = false,
+    Guid? AppSubscriptionId = null,
+    Guid? DiscountRuleId = null,
+    decimal? PaymentAmount = null,
+    LifeFitAI.Domain.Gym.MembershipPaymentMethod? PaymentMethod = null,
+    DateOnly? PaymentDate = null,
+    string? PaymentReferenceNumber = null,
+    string? PaymentNotes = null);
 
-public sealed record ChangeMembershipRequest(string? Reason, bool AutoRenew);
+public sealed record ChangeMembershipRequest(string? Reason, bool AutoRenew, int Days = 0);
+
+public sealed record RenewMembershipRequest(
+    string? Reason,
+    bool AutoRenew,
+    int Days = 0,
+    Guid? PlanId = null,
+    DateOnly? StartDate = null,
+    Guid? TrainerId = null,
+    bool ClearTrainer = false,
+    Guid? PtPackageId = null,
+    Guid? DiscountRuleId = null,
+    decimal? PaymentAmount = null,
+    LifeFitAI.Domain.Gym.MembershipPaymentMethod? PaymentMethod = null,
+    DateOnly? PaymentDate = null,
+    string? PaymentReferenceNumber = null,
+    string? PaymentNotes = null);
 
 public sealed record CheckInRequest(Guid? MemberProfileId, Guid BranchId, LifeFitAI.Domain.Gym.CheckInMethod Method, string? QrToken);
 

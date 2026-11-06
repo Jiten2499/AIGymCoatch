@@ -32,6 +32,9 @@ internal sealed class CapturingNotifier : IPasswordResetNotifier
         Sent.Add((email, rawToken));
         return Task.CompletedTask;
     }
+
+    public Task NotifyAsync(string email, string rawToken, string templateKey, Guid? relatedTenantId, CancellationToken cancellationToken) =>
+        NotifyAsync(email, rawToken, cancellationToken);
 }
 
 internal sealed class IdentityStore

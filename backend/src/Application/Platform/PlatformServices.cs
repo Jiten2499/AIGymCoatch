@@ -58,6 +58,12 @@ public interface ISecretProvider
 public interface IFileStorage
 {
     bool IsSafeKey(string key);
+
+    Task SaveAsync(string key, ReadOnlyMemory<byte> content, CancellationToken cancellationToken);
+
+    Task<byte[]?> ReadAsync(string key, CancellationToken cancellationToken);
+
+    Task DeleteAsync(string key, CancellationToken cancellationToken);
 }
 
 public interface IIdempotencyStore

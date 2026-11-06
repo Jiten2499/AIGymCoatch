@@ -1,6 +1,7 @@
 using LifeFitAI.Application.Identity;
 using LifeFitAI.Domain.Gym;
 using LifeFitAI.Domain.Identity;
+using LifeFitAI.SharedKernel.Abstractions;
 using LifeFitAI.SharedKernel.Results;
 using MediatR;
 
@@ -30,7 +31,7 @@ public sealed class ListStaffQueryHandler : IRequestHandler<ListStaffQuery, Resu
     }
 }
 
-public sealed record ListTrainersQuery(int Page, int PageSize) : IRequest<Result<PageResult<TrainerResponse>>>;
+public sealed record ListTrainersQuery(int Page, int PageSize, string? Search = null, string? Status = null, string? Specialization = null) : IRequest<Result<PageResult<TrainerResponse>>>;
 
 public sealed class ListTrainersQueryHandler : IRequestHandler<ListTrainersQuery, Result<PageResult<TrainerResponse>>>
 {
@@ -50,11 +51,11 @@ public sealed class ListTrainersQueryHandler : IRequestHandler<ListTrainersQuery
         var gate = await _guard.AllowAsync(PermissionCodes.TrainerRead, FeatureCodes.StaffManagement, cancellationToken).ConfigureAwait(false);
         return gate.IsFailure || _actor.TenantId is not Guid tenantId
             ? Result.Failure<PageResult<TrainerResponse>>(gate.Error)
-            : Result.Success(await _people.ListTrainersAsync(tenantId, new PageQuery(request.Page, request.PageSize), cancellationToken).ConfigureAwait(false));
+            : Result.Success(await _people.ListTrainersAsync(tenantId, new PageQuery(request.Page, request.PageSize), request.Search, request.Status, request.Specialization, cancellationToken).ConfigureAwait(false));
     }
 }
 
-public sealed record UpdateTrainerCommand(Guid Id, string? Bio, string? Specialization, int? ExperienceYears, string? Certification, string? ProfileImageUrl, Guid? BranchId, ProfileStatus Status, string? FirstName = null, string? LastName = null) : IRequest<Result<TrainerResponse>>;
+public sealed record UpdateTrainerCommand(Guid Id, string? Bio, string? Specialization, int? ExperienceYears, string? Certification, string? ProfileImageUrl, Guid? BranchId, ProfileStatus Status, string? FirstName = null, string? LastName = null, string? Phone = null, bool SetPhone = false, string? EmployeeCode = null, DateOnly? JoiningDate = null, bool CommissionEligible = false, bool SetEmployment = false) : IRequest<Result<TrainerResponse>>;
 
 public sealed class UpdateTrainerCommandHandler : IRequestHandler<UpdateTrainerCommand, Result<TrainerResponse>>
 {
@@ -93,13 +94,23 @@ public sealed class UpdateTrainerCommandHandler : IRequestHandler<UpdateTrainerC
             user.Rename(request.FirstName, request.LastName);
         }
 
+        if (request.SetPhone)
+        {
+            user.ChangePhone(request.Phone);
+        }
+
         trainer.Update(request.Bio, request.Specialization, request.ExperienceYears, request.Certification, request.ProfileImageUrl, request.BranchId, request.Status);
+        if (request.SetEmployment)
+        {
+            trainer.SetEmployment(request.EmployeeCode, request.JoiningDate, request.CommissionEligible);
+        }
+
         await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        return Result.Success(new TrainerResponse(trainer.Id, trainer.UserId, user.Email, user.FirstName, user.LastName, trainer.Bio, trainer.Specialization, trainer.ExperienceYears, trainer.Certification, trainer.ProfileImageUrl, trainer.BranchId, trainer.Status));
+        return Result.Success(TrainerMaps.ToResponse(trainer, user));
     }
 }
 
-public sealed record ListPlansQuery(bool? ActiveOnly, int Page, int PageSize) : IRequest<Result<PageResult<PlanResponse>>>;
+public sealed record ListPlansQuery(bool? ActiveOnly, string? Term, PackageCategory? Category, int Page, int PageSize) : IRequest<Result<PageResult<PlanResponse>>>;
 
 public sealed class ListPlansQueryHandler : IRequestHandler<ListPlansQuery, Result<PageResult<PlanResponse>>>
 {
@@ -119,7 +130,7 @@ public sealed class ListPlansQueryHandler : IRequestHandler<ListPlansQuery, Resu
         var gate = await _guard.AllowAsync(PermissionCodes.MembershipPlanRead, FeatureCodes.MembershipManagement, cancellationToken).ConfigureAwait(false);
         return gate.IsFailure || _actor.TenantId is not Guid tenantId
             ? Result.Failure<PageResult<PlanResponse>>(gate.Error)
-            : Result.Success(await _plans.ListPlansAsync(tenantId, request.ActiveOnly, new PageQuery(request.Page, request.PageSize), cancellationToken).ConfigureAwait(false));
+            : Result.Success(await _plans.ListPlansAsync(tenantId, request.ActiveOnly, request.Term, request.Category, new PageQuery(request.Page, request.PageSize), cancellationToken).ConfigureAwait(false));
     }
 }
 
@@ -130,14 +141,20 @@ public sealed class DeactivatePlanCommandHandler : IRequestHandler<DeactivatePla
     private readonly IOperationGuard _guard;
     private readonly ICurrentActor _actor;
     private readonly IMembershipRepository _plans;
+    private readonly IAuditLogRepository _audit;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IDateTimeProvider _clock;
+    private readonly IClientContext _client;
 
-    public DeactivatePlanCommandHandler(IOperationGuard guard, ICurrentActor actor, IMembershipRepository plans, IUnitOfWork unitOfWork)
+    public DeactivatePlanCommandHandler(IOperationGuard guard, ICurrentActor actor, IMembershipRepository plans, IAuditLogRepository audit, IUnitOfWork unitOfWork, IDateTimeProvider clock, IClientContext client)
     {
         _guard = guard;
         _actor = actor;
         _plans = plans;
+        _audit = audit;
         _unitOfWork = unitOfWork;
+        _clock = clock;
+        _client = client;
     }
 
     public async Task<Result> Handle(DeactivatePlanCommand request, CancellationToken cancellationToken)
@@ -155,24 +172,71 @@ public sealed class DeactivatePlanCommandHandler : IRequestHandler<DeactivatePla
         }
 
         plan.Deactivate();
+        await _audit.AddAsync(AuditLog.Create(Guid.NewGuid(), tenantId, _actor.UserId, "PackageDeactivated", "MembershipPlan", plan.Id, "Active", "Inactive", _client.IpAddress, _client.UserAgent, _clock.UtcNow), cancellationToken).ConfigureAwait(false);
         await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return Result.Success();
     }
 }
 
-public sealed record ListMembershipsQuery(GymMembershipStatus? Status, Guid? PlanId, Guid? BranchId, DateOnly? ExpiresFrom, DateOnly? ExpiresTo, int Page, int PageSize) : IRequest<Result<PageResult<GymMembershipResponse>>>;
+public sealed record ActivatePlanCommand(Guid Id) : IRequest<Result>;
+
+public sealed class ActivatePlanCommandHandler : IRequestHandler<ActivatePlanCommand, Result>
+{
+    private readonly IOperationGuard _guard;
+    private readonly ICurrentActor _actor;
+    private readonly IMembershipRepository _plans;
+    private readonly IAuditLogRepository _audit;
+    private readonly IUnitOfWork _unitOfWork;
+    private readonly IDateTimeProvider _clock;
+    private readonly IClientContext _client;
+
+    public ActivatePlanCommandHandler(IOperationGuard guard, ICurrentActor actor, IMembershipRepository plans, IAuditLogRepository audit, IUnitOfWork unitOfWork, IDateTimeProvider clock, IClientContext client)
+    {
+        _guard = guard;
+        _actor = actor;
+        _plans = plans;
+        _audit = audit;
+        _unitOfWork = unitOfWork;
+        _clock = clock;
+        _client = client;
+    }
+
+    public async Task<Result> Handle(ActivatePlanCommand request, CancellationToken cancellationToken)
+    {
+        var gate = await _guard.AllowAsync(PermissionCodes.MembershipPlanManage, FeatureCodes.MembershipManagement, cancellationToken).ConfigureAwait(false);
+        if (gate.IsFailure || _actor.TenantId is not Guid tenantId)
+        {
+            return gate;
+        }
+
+        var plan = await _plans.GetPlanAsync(tenantId, request.Id, cancellationToken).ConfigureAwait(false);
+        if (plan is null)
+        {
+            return Result.Failure(GymErrors.NotFound);
+        }
+
+        plan.Activate();
+        await _audit.AddAsync(AuditLog.Create(Guid.NewGuid(), tenantId, _actor.UserId, "PackageActivated", "MembershipPlan", plan.Id, "Inactive", "Active", _client.IpAddress, _client.UserAgent, _clock.UtcNow), cancellationToken).ConfigureAwait(false);
+        await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return Result.Success();
+    }
+}
+
+public sealed record ListMembershipsQuery(GymMembershipStatus? Status, Guid? PlanId, Guid? BranchId, DateOnly? ExpiresFrom, DateOnly? ExpiresTo, Guid? MemberProfileId, string? Term, DateOnly? StartsFrom, DateOnly? StartsTo, string? Sort, int Page, int PageSize) : IRequest<Result<PageResult<GymMembershipResponse>>>;
 
 public sealed class ListMembershipsQueryHandler : IRequestHandler<ListMembershipsQuery, Result<PageResult<GymMembershipResponse>>>
 {
     private readonly IOperationGuard _guard;
     private readonly ICurrentActor _actor;
     private readonly IMembershipRepository _memberships;
+    private readonly IDateTimeProvider _clock;
 
-    public ListMembershipsQueryHandler(IOperationGuard guard, ICurrentActor actor, IMembershipRepository memberships)
+    public ListMembershipsQueryHandler(IOperationGuard guard, ICurrentActor actor, IMembershipRepository memberships, IDateTimeProvider clock)
     {
         _guard = guard;
         _actor = actor;
         _memberships = memberships;
+        _clock = clock;
     }
 
     public async Task<Result<PageResult<GymMembershipResponse>>> Handle(ListMembershipsQuery request, CancellationToken cancellationToken)
@@ -180,7 +244,7 @@ public sealed class ListMembershipsQueryHandler : IRequestHandler<ListMembership
         var gate = await _guard.AllowAsync(PermissionCodes.MembershipRead, FeatureCodes.MembershipManagement, cancellationToken).ConfigureAwait(false);
         return gate.IsFailure || _actor.TenantId is not Guid tenantId
             ? Result.Failure<PageResult<GymMembershipResponse>>(gate.Error)
-            : Result.Success(await _memberships.ListMembershipsAsync(tenantId, request.Status, request.PlanId, request.BranchId, request.ExpiresFrom, request.ExpiresTo, new PageQuery(request.Page, request.PageSize), cancellationToken).ConfigureAwait(false));
+            : Result.Success(await _memberships.SearchMembershipsAsync(tenantId, request.Status, request.PlanId, request.BranchId, request.MemberProfileId, request.Term, request.StartsFrom, request.StartsTo, request.ExpiresFrom, request.ExpiresTo, DateOnly.FromDateTime(_clock.UtcNow), request.Sort, new PageQuery(request.Page, request.PageSize), cancellationToken).ConfigureAwait(false));
     }
 }
 

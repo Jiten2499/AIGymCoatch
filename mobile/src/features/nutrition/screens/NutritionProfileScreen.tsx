@@ -100,7 +100,7 @@ export function NutritionProfileScreen() {
           </FormField>
           {save.isError ? <AppText accessibilityRole="alert" tone="danger">{errorText(save.error, t('common.offline'))}</AppText> : null}
           {save.isSuccess ? <AppText tone="accent">{t('nutrition.saved')}</AppText> : null}
-          <AppButton label={t('nutrition.saveProfile')} loading={save.isPending} onPress={submit} />
+          <AppButton label={t('nutrition.saveProfile')} loading={save.isPending} onPress={() => { void submit(); }} />
         </ScrollView>
       </ScreenState>
     </FeatureGate>

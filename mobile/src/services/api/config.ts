@@ -8,12 +8,19 @@ export function hostFromScriptUrl(scriptUrl: string | null | undefined): string 
   }
 
   const match = /^[a-zA-Z][\w+.-]*:\/\/([^/:?#]+)/.exec(scriptUrl);
-  const host = match?.[1];
-  if (!host || isLoopbackHost(host)) {
+  return usableHost(match?.[1]);
+}
+
+export function hostFromPackagerAddress(value: string | null | undefined): string | null {
+  if (!value) {
     return null;
   }
 
-  return host;
+  if (value.includes('://')) {
+    return hostFromScriptUrl(value);
+  }
+
+  return usableHost(value.split(':')[0]);
 }
 
 export function resolveApiBaseUrl(configured: string | undefined, packagerHost: string | null): string {
@@ -25,6 +32,15 @@ export function resolveApiBaseUrl(configured: string | undefined, packagerHost: 
   const url = new URL(base);
   url.hostname = packagerHost;
   return url.toString().replace(/\/$/, '');
+}
+
+function usableHost(host: string | undefined): string | null {
+  const value = host?.trim();
+  if (!value || isLoopbackHost(value)) {
+    return null;
+  }
+
+  return value;
 }
 
 function isLoopbackHost(host: string): boolean {
@@ -53,7 +69,25 @@ export function scriptUrlFromSourceCode(source: SourceCodeModule | null | undefi
   return typeof source?.scriptURL === 'string' && source.scriptURL.length > 0 ? source.scriptURL : null;
 }
 
+function readExpoHost(): string | null {
+  try {
+    const constants = require('expo-constants').default as {
+      expoConfig?: { hostUri?: string } | null;
+      experienceUrl?: string;
+      linkingUri?: string;
+    };
+    return constants.expoConfig?.hostUri ?? constants.experienceUrl ?? constants.linkingUri ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function readPackagerHost(): string | null {
+  const fromExpo = hostFromPackagerAddress(readExpoHost());
+  if (fromExpo) {
+    return fromExpo;
+  }
+
   try {
     const turbo = TurboModuleRegistry.get<SourceCodeModule>('SourceCode');
     const legacy = NativeModules.SourceCode as SourceCodeModule | undefined;
@@ -64,5 +98,9 @@ function readPackagerHost(): string | null {
 }
 
 export const apiBaseUrl = resolveApiBaseUrl(process.env.EXPO_PUBLIC_API_URL, readPackagerHost());
+
+if (typeof __DEV__ !== 'undefined' && __DEV__ && process.env.NODE_ENV !== 'test') {
+  console.log(`API base URL ${apiBaseUrl}`);
+}
 
 export const apiRoot = `${apiBaseUrl}/api/v1`;

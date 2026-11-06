@@ -117,6 +117,7 @@ SELECT @LockedId = Id FROM app.Subscriptions WITH (UPDLOCK, HOLDLOCK) WHERE Id =
 
     public async Task<SeatReservation> ReserveSeatAsync(Guid tenantId, Guid subscriptionId, Guid userId, Guid? assignedBy, DateTime utcNow, CancellationToken cancellationToken)
     {
+        await SeatAssignmentLock.AcquireAsync(_db, tenantId, userId, cancellationToken).ConfigureAwait(false);
         await LockSubscriptionAsync(subscriptionId, cancellationToken).ConfigureAwait(false);
         var subscription = await _db.Subscriptions.FirstOrDefaultAsync(item => item.Id == subscriptionId && item.TenantId == tenantId, cancellationToken).ConfigureAwait(false);
         if (subscription is null)

@@ -19,6 +19,8 @@ public readonly record struct DateCount(DateOnly Date, int Count);
 
 public readonly record struct MembershipActivityCount(DateOnly Date, string Action, int Count);
 
+public readonly record struct MembershipSaleCount(Guid PlanId, string PackageName, int Sold);
+
 public sealed record AnalyticsBucket(DateOnly Start, DateOnly End, string Label);
 
 public sealed class ResolvedAnalytics

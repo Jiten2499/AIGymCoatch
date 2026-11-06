@@ -19,6 +19,9 @@ internal sealed class FakeUsers : IUserAccountRepository
     public Task<bool> PhoneExistsAsync(string phone, CancellationToken cancellationToken) =>
         Task.FromResult(_store.VisibleUsers.Any(user => user.Phone == phone && user.DeletedAt == null));
 
+    public Task<UserAccount?> GetByPhoneAsync(string phone, CancellationToken cancellationToken) =>
+        Task.FromResult(_store.VisibleUsers.SingleOrDefault(user => user.Phone == phone && user.DeletedAt == null));
+
     public Task AddAsync(UserAccount user, CancellationToken cancellationToken)
     {
         _store.Stage(user);
@@ -43,7 +46,8 @@ internal sealed class FakeUsers : IUserAccountRepository
                 user.TenantId,
                 _store.VisibleTenants.SingleOrDefault(tenant => tenant.Id == user.TenantId)?.Name ?? string.Empty,
                 user.CreatedAt,
-                string.Empty))
+                string.Empty,
+                user.PhotoStorageKey is not null))
             .ToArray();
         return Task.FromResult(page);
     }
@@ -60,7 +64,21 @@ internal sealed class FakeUsers : IUserAccountRepository
             .Where(member => member.DeletedAt == null && member.TenantId == tenantId && member.Status == MembershipStatus.Active)
             .Select(member => member.UserId)
             .ToHashSet();
-        return users.Where(user => memberIds.Contains(user.Id));
+        users = users.Where(user => memberIds.Contains(user.Id));
+        if (!scope.StaffOnly)
+        {
+            return users;
+        }
+
+        var staffRoleIds = _store.Roles
+            .Where(role => role.DeletedAt == null && role.IsActive && (RoleNames.BusinessStaff.Contains(role.Name) || role.TenantId == tenantId))
+            .Select(role => role.Id)
+            .ToHashSet();
+        var staffUserIds = _store.VisibleUserRoles
+            .Where(assignment => assignment.DeletedAt == null && assignment.TenantId == tenantId && staffRoleIds.Contains(assignment.RoleId))
+            .Select(assignment => assignment.UserId)
+            .ToHashSet();
+        return users.Where(user => staffUserIds.Contains(user.Id));
     }
 }
 
@@ -139,6 +157,17 @@ internal sealed class FakeRoles : IRoleRepository
 
     public Task<Role?> GetByNameAsync(string name, CancellationToken cancellationToken) =>
         Task.FromResult(_store.Roles.SingleOrDefault(role => role.Name == name && role.DeletedAt == null));
+
+    public Task<Role?> GetAssignableAsync(Guid tenantId, string name, CancellationToken cancellationToken)
+    {
+        var trimmed = name.Trim();
+        var role = _store.Roles.SingleOrDefault(item =>
+            item.Name == trimmed
+            && item.DeletedAt == null
+            && item.IsActive
+            && ((item.TenantId == null && (RoleNames.BusinessTemplates.Contains(item.Name) || item.Name == RoleNames.Member)) || item.TenantId == tenantId));
+        return Task.FromResult(role);
+    }
 
     public Task AddAsync(UserRole assignment, CancellationToken cancellationToken)
     {
@@ -240,6 +269,16 @@ internal sealed class FakeResets : IPasswordResetRepository
 
     public Task<PasswordResetToken?> GetActiveByHashAsync(string tokenHash, CancellationToken cancellationToken) =>
         Task.FromResult(_store.VisibleResets.SingleOrDefault(token => token.TokenHash == tokenHash && token.IsActive(_store.Clock.UtcNow)));
+
+    public Task RevokeUnusedAsync(Guid userId, DateTime utcNow, CancellationToken cancellationToken)
+    {
+        foreach (var token in _store.VisibleResets.Where(token => token.UserId == userId && token.IsActive(utcNow)))
+        {
+            token.MarkUsed(utcNow);
+        }
+
+        return Task.CompletedTask;
+    }
 }
 
 internal sealed class FakeAudit : IAuditLogRepository

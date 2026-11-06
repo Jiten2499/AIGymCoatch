@@ -7,6 +7,12 @@ import { renderWithProviders } from '../../../test/render';
 import { ProfileScreen } from './ProfileScreen';
 
 jest.mock('../../../services/auth/session', () => ({ endSession: jest.fn(async () => undefined) }));
+jest.mock('../photo', () => ({
+  useMyProfilePhoto: () => ({ data: null }),
+  useUploadProfilePhoto: () => ({ mutateAsync: jest.fn(), isPending: false }),
+  useRemoveProfilePhoto: () => ({ mutateAsync: jest.fn(), isPending: false }),
+  pickProfilePhoto: jest.fn(),
+}));
 
 describe('ProfileScreen', () => {
   beforeEach(() => {
@@ -22,6 +28,7 @@ describe('ProfileScreen', () => {
   it('shows the signed-in person and current workspace', async () => {
     const view = await renderWithProviders(<ProfileScreen />);
     expect(view.getByText('Ada Lovelace')).toBeTruthy();
+    expect(view.getByText('AL')).toBeTruthy();
     expect(view.getByText('ada@example.com')).toBeTruthy();
     expect(view.getByText('Ada Personal')).toBeTruthy();
   });

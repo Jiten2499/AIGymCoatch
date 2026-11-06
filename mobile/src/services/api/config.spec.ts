@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
-import { hostFromScriptUrl, resolveApiBaseUrl, scriptUrlFromSourceCode } from './config';
+import { hostFromPackagerAddress, hostFromScriptUrl, resolveApiBaseUrl, scriptUrlFromSourceCode } from './config';
 
 describe('resolveApiBaseUrl', () => {
   it('points a localhost API at the computer serving Expo Go', () => {
@@ -20,6 +20,11 @@ describe('resolveApiBaseUrl', () => {
     expect(scriptUrlFromSourceCode({ getConstants: () => ({ scriptURL: scriptUrl }) })).toBe(scriptUrl);
     expect(scriptUrlFromSourceCode({ scriptURL: scriptUrl })).toBe(scriptUrl);
     expect(scriptUrlFromSourceCode(null)).toBeNull();
+  });
+
+  it('reads a host and port from the Expo packager address', () => {
+    expect(hostFromPackagerAddress('192.168.18.183:8081')).toBe('192.168.18.183');
+    expect(resolveApiBaseUrl('http://localhost:8080', '192.168.18.183')).toBe('http://192.168.18.183:8080');
   });
 
   it('ignores a loopback packager host', () => {

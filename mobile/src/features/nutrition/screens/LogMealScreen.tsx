@@ -88,7 +88,7 @@ export function LogMealScreen() {
         <TextField form={form} keyboard="decimal-pad" label={t('nutrition.fat')} name="fat" />
         {save.isError ? <AppText accessibilityRole="alert" tone="danger">{errorText(save.error, t('common.offline'))}</AppText> : null}
         {save.isSuccess ? <AppText tone="accent">{t('nutrition.saved')}</AppText> : null}
-        <AppButton label={t('nutrition.saveMeal')} loading={save.isPending} onPress={submit} />
+        <AppButton label={t('nutrition.saveMeal')} loading={save.isPending} onPress={() => { void submit(); }} />
       </ScrollView>
     </FeatureGate>
   );

@@ -3,6 +3,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { PageState } from "../../../components/AdminShell";
+import { UserAvatar } from "../../../components/UserAvatar";
 import { DataTable } from "../../../components/DataTable";
 import { api, ApiError } from "../../../lib/api";
 import type { Page, PlatformUser } from "../../../lib/types";
@@ -53,7 +54,7 @@ export default function UsersPage() {
       <div className="mt-6">
         <DataTable
           columns={[
-            { header: "Name", cell: (row) => `${row.firstName} ${row.lastName}` },
+            { header: "Name", cell: (row) => <span className="flex items-center gap-2"><UserAvatar firstName={row.firstName} hasPhoto={row.hasPhoto} lastName={row.lastName} size={32} userId={row.id} />{row.firstName} {row.lastName}</span> },
             { header: "Email", cell: (row) => row.email },
             { header: "Plan", cell: (row) => row.plan || "—" },
             { header: "Status", cell: (row) => row.status },
