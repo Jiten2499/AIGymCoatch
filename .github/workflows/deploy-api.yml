@@ -1,13 +1,6 @@
 name: Deploy LifeFit AI API
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "backend/**"
-      - "global.json"
-      - ".github/workflows/deploy-api.yml"
   workflow_dispatch:
 
 permissions:

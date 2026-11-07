@@ -24,22 +24,93 @@
                 ALTER TABLE app.MemberProgressAssessments ADD FlexibilityScore DECIMAL(4, 1) NULL;
             IF COL_LENGTH(N'app.MemberProgressAssessments', N'CoreScore') IS NULL
                 ALTER TABLE app.MemberProgressAssessments ADD CoreScore DECIMAL(4, 1) NULL;
-            IF OBJECT_ID(N'CK_MemberProgressAssessments_Height', N'C') IS NULL
-                ALTER TABLE app.MemberProgressAssessments ADD CONSTRAINT CK_MemberProgressAssessments_Height CHECK (Height IS NULL OR (Height > 0 AND Height <= 500));
-            IF OBJECT_ID(N'CK_MemberProgressAssessments_RightArm', N'C') IS NULL
-                ALTER TABLE app.MemberProgressAssessments ADD CONSTRAINT CK_MemberProgressAssessments_RightArm CHECK (RightArm IS NULL OR (RightArm > 0 AND RightArm <= 500));
-            IF OBJECT_ID(N'CK_MemberProgressAssessments_RightThigh', N'C') IS NULL
-                ALTER TABLE app.MemberProgressAssessments ADD CONSTRAINT CK_MemberProgressAssessments_RightThigh CHECK (RightThigh IS NULL OR (RightThigh > 0 AND RightThigh <= 500));
-            IF OBJECT_ID(N'CK_MemberProgressAssessments_Visceral', N'C') IS NULL
-                ALTER TABLE app.MemberProgressAssessments ADD CONSTRAINT CK_MemberProgressAssessments_Visceral CHECK (VisceralFat IS NULL OR (VisceralFat > 0 AND VisceralFat <= 60));
-            IF OBJECT_ID(N'CK_MemberProgressAssessments_Strength', N'C') IS NULL
-                ALTER TABLE app.MemberProgressAssessments ADD CONSTRAINT CK_MemberProgressAssessments_Strength CHECK (StrengthScore IS NULL OR StrengthScore BETWEEN 1 AND 10);
-            IF OBJECT_ID(N'CK_MemberProgressAssessments_Endurance', N'C') IS NULL
-                ALTER TABLE app.MemberProgressAssessments ADD CONSTRAINT CK_MemberProgressAssessments_Endurance CHECK (EnduranceScore IS NULL OR EnduranceScore BETWEEN 1 AND 10);
-            IF OBJECT_ID(N'CK_MemberProgressAssessments_Flexibility', N'C') IS NULL
-                ALTER TABLE app.MemberProgressAssessments ADD CONSTRAINT CK_MemberProgressAssessments_Flexibility CHECK (FlexibilityScore IS NULL OR FlexibilityScore BETWEEN 1 AND 10);
-            IF OBJECT_ID(N'CK_MemberProgressAssessments_Core', N'C') IS NULL
-                ALTER TABLE app.MemberProgressAssessments ADD CONSTRAINT CK_MemberProgressAssessments_Core CHECK (CoreScore IS NULL OR CoreScore BETWEEN 1 AND 10);
+            IF NOT EXISTS (
+    SELECT 1 FROM sys.check_constraints
+    WHERE name = N'CK_MemberProgressAssessments_Height'
+      AND parent_object_id = OBJECT_ID(N'app.MemberProgressAssessments')
+)
+    EXEC sys.sp_executesql N'
+        ALTER TABLE app.MemberProgressAssessments
+        ADD CONSTRAINT CK_MemberProgressAssessments_Height
+        CHECK (Height IS NULL OR (Height > 0 AND Height <= 500));
+    ';
+
+IF NOT EXISTS (
+    SELECT 1 FROM sys.check_constraints
+    WHERE name = N'CK_MemberProgressAssessments_RightArm'
+      AND parent_object_id = OBJECT_ID(N'app.MemberProgressAssessments')
+)
+    EXEC sys.sp_executesql N'
+        ALTER TABLE app.MemberProgressAssessments
+        ADD CONSTRAINT CK_MemberProgressAssessments_RightArm
+        CHECK (RightArm IS NULL OR (RightArm > 0 AND RightArm <= 500));
+    ';
+
+IF NOT EXISTS (
+    SELECT 1 FROM sys.check_constraints
+    WHERE name = N'CK_MemberProgressAssessments_RightThigh'
+      AND parent_object_id = OBJECT_ID(N'app.MemberProgressAssessments')
+)
+    EXEC sys.sp_executesql N'
+        ALTER TABLE app.MemberProgressAssessments
+        ADD CONSTRAINT CK_MemberProgressAssessments_RightThigh
+        CHECK (RightThigh IS NULL OR (RightThigh > 0 AND RightThigh <= 500));
+    ';
+
+IF NOT EXISTS (
+    SELECT 1 FROM sys.check_constraints
+    WHERE name = N'CK_MemberProgressAssessments_Visceral'
+      AND parent_object_id = OBJECT_ID(N'app.MemberProgressAssessments')
+)
+    EXEC sys.sp_executesql N'
+        ALTER TABLE app.MemberProgressAssessments
+        ADD CONSTRAINT CK_MemberProgressAssessments_Visceral
+        CHECK (VisceralFat IS NULL OR (VisceralFat > 0 AND VisceralFat <= 60));
+    ';
+
+IF NOT EXISTS (
+    SELECT 1 FROM sys.check_constraints
+    WHERE name = N'CK_MemberProgressAssessments_Strength'
+      AND parent_object_id = OBJECT_ID(N'app.MemberProgressAssessments')
+)
+    EXEC sys.sp_executesql N'
+        ALTER TABLE app.MemberProgressAssessments
+        ADD CONSTRAINT CK_MemberProgressAssessments_Strength
+        CHECK (StrengthScore IS NULL OR StrengthScore BETWEEN 1 AND 10);
+    ';
+
+IF NOT EXISTS (
+    SELECT 1 FROM sys.check_constraints
+    WHERE name = N'CK_MemberProgressAssessments_Endurance'
+      AND parent_object_id = OBJECT_ID(N'app.MemberProgressAssessments')
+)
+    EXEC sys.sp_executesql N'
+        ALTER TABLE app.MemberProgressAssessments
+        ADD CONSTRAINT CK_MemberProgressAssessments_Endurance
+        CHECK (EnduranceScore IS NULL OR EnduranceScore BETWEEN 1 AND 10);
+    ';
+
+IF NOT EXISTS (
+    SELECT 1 FROM sys.check_constraints
+    WHERE name = N'CK_MemberProgressAssessments_Flexibility'
+      AND parent_object_id = OBJECT_ID(N'app.MemberProgressAssessments')
+)
+    EXEC sys.sp_executesql N'
+        ALTER TABLE app.MemberProgressAssessments
+        ADD CONSTRAINT CK_MemberProgressAssessments_Flexibility
+        CHECK (FlexibilityScore IS NULL OR FlexibilityScore BETWEEN 1 AND 10);
+    ';
+
+IF NOT EXISTS (
+    SELECT 1 FROM sys.check_constraints
+    WHERE name = N'CK_MemberProgressAssessments_Core'
+      AND parent_object_id = OBJECT_ID(N'app.MemberProgressAssessments')
+)
+    EXEC sys.sp_executesql N'
+        ALTER TABLE app.MemberProgressAssessments
+        ADD CONSTRAINT CK_MemberProgressAssessments_Core
+        CHECK (CoreScore IS NULL OR CoreScore BETWEEN 1 AND 10);
+    ';
             IF OBJECT_ID(N'app.MemberProgressPhotos', N'U') IS NULL
             BEGIN
                 CREATE TABLE app.MemberProgressPhotos

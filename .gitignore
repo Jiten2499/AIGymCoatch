@@ -30,4 +30,9 @@ Thumbs.db
 # Logs and local files
 logs/
 *.log
-storage/
+/storage/
+# Runtime-uploaded files
+/backend/src/Api/storage/
+
+# Generated frontend test coverage
+/mobile/coverage/
