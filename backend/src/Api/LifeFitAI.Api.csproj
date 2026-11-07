@@ -3,6 +3,10 @@
     <UserSecretsId>lifefitai-api-local</UserSecretsId>
   </PropertyGroup>
   <ItemGroup>
+    <Content Update="appsettings.Development.json" CopyToPublishDirectory="Never" />
+    <Content Update="appsettings.example.json" CopyToPublishDirectory="Never" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\Application\LifeFitAI.Application.csproj" />
     <ProjectReference Include="..\Infrastructure\LifeFitAI.Infrastructure.csproj" />
     <ProjectReference Include="..\SharedKernel\LifeFitAI.SharedKernel.csproj" />

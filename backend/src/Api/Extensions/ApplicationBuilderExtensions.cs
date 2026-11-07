@@ -1,4 +1,6 @@
+using System.Net;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Serilog;
 
@@ -9,6 +11,13 @@ public static class ApplicationBuilderExtensions
     public static WebApplication UseLifeFitPlatform(this WebApplication app)
     {
         ArgumentNullException.ThrowIfNull(app);
+
+        var forwardedHeaders = new ForwardedHeadersOptions
+        {
+            ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
+        };
+        forwardedHeaders.KnownProxies.Add(IPAddress.Loopback);
+        app.UseForwardedHeaders(forwardedHeaders);
 
         app.UseMiddleware<Middleware.SecurityHeadersMiddleware>();
         app.UseMiddleware<Middleware.CorrelationIdMiddleware>();

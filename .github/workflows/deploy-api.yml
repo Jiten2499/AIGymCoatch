@@ -1,0 +1,125 @@
+name: Deploy LifeFit AI API
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/**"
+      - "global.json"
+      - ".github/workflows/deploy-api.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lifefit-api-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build, test, and deploy API
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v7
+
+      - name: Set up .NET SDK from global.json
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Restore solution
+        run: dotnet restore backend/LifeFitAI.sln
+
+      - name: Build solution
+        run: dotnet build backend/LifeFitAI.sln --configuration Release --no-restore
+
+      - name: Run tests
+        run: dotnet test backend/LifeFitAI.sln --configuration Release --no-build
+
+      - name: Publish API
+        shell: bash
+        run: |
+          publish_dir="${RUNNER_TEMP}/lifefit-api-publish"
+          rm -rf "$publish_dir"
+          dotnet publish backend/src/Api/LifeFitAI.Api.csproj \
+            --configuration Release \
+            --no-restore \
+            --output "$publish_dir"
+
+          test -f "$publish_dir/LifeFitAI.Api.dll"
+          test ! -f "$publish_dir/appsettings.Development.json"
+          test ! -f "$publish_dir/appsettings.example.json"
+
+      - name: Configure verified SSH access
+        shell: bash
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$VPS_SSH_KEY" > "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
+          ssh-keygen -y -f "$HOME/.ssh/id_ed25519" >/dev/null
+
+      - name: Verify VPS SSH connection
+        shell: bash
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          set -euo pipefail
+          ssh -i "$HOME/.ssh/id_ed25519" \
+            -o IdentitiesOnly=yes \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            "$VPS_USER@$VPS_HOST" "printf 'SSH connection OK\\n'"
+
+      - name: Create release staging directory
+        shell: bash
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          set -euo pipefail
+          ssh -i "$HOME/.ssh/id_ed25519" \
+            -o IdentitiesOnly=yes \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            "$VPS_USER@$VPS_HOST" \
+            "mkdir -p '/var/www/saas-api/incoming/${GITHUB_SHA}'"
+
+      - name: Upload published API files
+        shell: bash
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          set -euo pipefail
+          scp -i "$HOME/.ssh/id_ed25519" \
+            -o IdentitiesOnly=yes \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -r "${RUNNER_TEMP}/lifefit-api-publish/." \
+            "$VPS_USER@$VPS_HOST:/var/www/saas-api/incoming/${GITHUB_SHA}/"
+
+      - name: Activate release and verify health
+        shell: bash
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          set -euo pipefail
+          ssh -i "$HOME/.ssh/id_ed25519" \
+            -o IdentitiesOnly=yes \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            "$VPS_USER@$VPS_HOST" \
+            "sudo /usr/local/sbin/deploy-lifefit-api '${GITHUB_SHA}'"
