@@ -9,7 +9,7 @@ export class ApiError extends Error {
   }
 }
 
-const root = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8080/api/v1";
+const root = process.env.NEXT_PUBLIC_API_URL ?? "https://api.growventur.com/api/v1";
 const renewLeadMs = 2 * 60 * 1000;
 let pendingRefresh: Promise<boolean> | null = null;
 
