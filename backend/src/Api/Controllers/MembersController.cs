@@ -33,7 +33,7 @@ public sealed class MembersController : ApiControllerBase
             payment = new InitialMembershipPayment(amount, method, paymentDate, request.PaymentReferenceNumber, request.PaymentNotes);
         }
 
-        return (await Sender.Send(new CreateMemberCommand(request.Email, request.Password, request.FirstName, request.LastName, request.Phone, request.BranchId, request.PlanId, request.StartDate, request.AutoRenew, request.DateOfBirth, request.Gender, request.EmergencyContactName, request.EmergencyContactPhone, request.EmergencyContactRelationship, request.Address, request.City, request.State, request.PostalCode, request.JoinDate, request.FitnessGoal, request.AssignedTrainerId, ProfileStatus.Active, request.AssignAppAccess, request.AppSubscriptionId, request.EnableBasicAppAccess, payment, request.PtPackageId), cancellationToken)).ToActionResult();
+        return (await Sender.Send(new CreateMemberCommand(request.Email, request.Password, request.FirstName, request.LastName, request.Phone, request.BranchId, request.PlanId, request.StartDate, request.AutoRenew, request.DateOfBirth, request.Gender, request.EmergencyContactName, request.EmergencyContactPhone, request.EmergencyContactRelationship, request.Address, request.City, request.State, request.PostalCode, request.JoinDate, request.FitnessGoal, request.AssignedTrainerId, ProfileStatus.Active, request.AssignAppAccess, request.AppSubscriptionId, request.EnableBasicAppAccess, payment, request.PtPackageId, request.SendActivationLink), cancellationToken)).ToActionResult();
     }
 
     [HttpGet("members/{id:guid}")]

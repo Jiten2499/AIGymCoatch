@@ -29,6 +29,7 @@ export type MemberDraft = {
   startDate: string;
   enableBasicAppAccess: boolean;
   assignAppAccess: boolean;
+  sendActivationLink: boolean;
   appSubscriptionId: string;
   paymentAmount: string;
   paymentMethod: string;
@@ -65,6 +66,7 @@ export function emptyDraft(today: string): MemberDraft {
     startDate: today,
     enableBasicAppAccess: false,
     assignAppAccess: false,
+    sendActivationLink: false,
     appSubscriptionId: "",
     paymentAmount: "",
     paymentMethod: "Cash",

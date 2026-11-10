@@ -20,7 +20,7 @@ public sealed record SwitchTenantRequest(Guid TenantId);
 
 public sealed record CreateTenantRequest(string Name, LifeFitAI.Domain.Identity.TenantType TenantType);
 
-public sealed record CreateBusinessTenantRequest(string Name, LifeFitAI.Domain.Identity.TenantType TenantType, string OwnerEmail, string OwnerFirstName, string OwnerLastName);
+public sealed record CreateBusinessTenantRequest(string Name, LifeFitAI.Domain.Identity.TenantType TenantType, string OwnerEmail, string OwnerFirstName, string OwnerLastName, bool SendActivationLink = false);
 
 public sealed record UpdateBusinessTenantRequest(string Name, LifeFitAI.Domain.Identity.TenantType TenantType, LifeFitAI.Domain.Identity.TenantStatus Status);
 

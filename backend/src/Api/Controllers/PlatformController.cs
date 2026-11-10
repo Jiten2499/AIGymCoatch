@@ -24,7 +24,7 @@ public sealed class PlatformController : ApiControllerBase
     [HttpPost("platform/tenants")]
     [Authorize]
     public async Task<IActionResult> CreateTenant(CreateBusinessTenantRequest request, CancellationToken cancellationToken) =>
-        (await Sender.Send(new CreateBusinessTenantCommand(request.Name, request.TenantType, request.OwnerEmail, request.OwnerFirstName, request.OwnerLastName), cancellationToken)).ToActionResult();
+        (await Sender.Send(new CreateBusinessTenantCommand(request.Name, request.TenantType, request.OwnerEmail, request.OwnerFirstName, request.OwnerLastName, request.SendActivationLink), cancellationToken)).ToActionResult();
 
     [HttpPut("platform/tenants/{tenantId:guid}")]
     [Authorize]

@@ -270,7 +270,7 @@ export function ReviewStep({
       {mode === "create" ? (
         candidate && draft.linkExistingUser
           ? <p><span className="text-muted">Account:</span> Link existing user {candidate.email}</p>
-          : <p><span className="text-muted">Account:</span> Secure invitation will be sent. No password is shared with you.</p>
+          : <p><span className="text-muted">Account:</span> {draft.sendActivationLink ? "An activation link will be emailed. No password is shared with you." : "No activation email will be sent."}</p>
       ) : (
         <p><span className="text-muted">Account:</span> Existing workspace user. Email cannot be changed here.</p>
       )}

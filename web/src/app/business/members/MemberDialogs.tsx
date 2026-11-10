@@ -60,8 +60,9 @@ export function AddMemberDialog({ onCancel, onCreated }: { onCancel: () => void;
           fitnessGoal: emptyToNull(draft.fitnessGoal),
           assignedTrainerId: draft.trainerId || null,
           status: draft.status,
-          enableBasicAppAccess: draft.enableBasicAppAccess || draft.assignAppAccess || Boolean(draft.email.trim()),
+          enableBasicAppAccess: draft.enableBasicAppAccess || draft.assignAppAccess || draft.sendActivationLink,
           assignAppAccess: draft.assignAppAccess,
+          sendActivationLink: draft.sendActivationLink,
           appSubscriptionId: draft.assignAppAccess ? draft.appSubscriptionId || null : null,
           paymentAmount: draft.planId && draft.paymentAmount.trim() ? Number(draft.paymentAmount) : null,
           paymentMethod: draft.planId && draft.paymentAmount.trim() ? draft.paymentMethod : null,
@@ -146,7 +147,15 @@ export function AddMemberDialog({ onCancel, onCreated }: { onCancel: () => void;
             update={update}
           />
         ) : null}
-        {step === 5 ? <MemberReview draft={draft} plan={selected} ptPackage={selectedPt} term={term.data ?? null} trainerName={trainerName ? `${trainerName.firstName} ${trainerName.lastName}` : ""} /> : null}
+        {step === 5 ? (
+          <>
+            <MemberReview draft={draft} plan={selected} ptPackage={selectedPt} term={term.data ?? null} trainerName={trainerName ? `${trainerName.firstName} ${trainerName.lastName}` : ""} />
+            <label className="flex min-h-11 items-center gap-3 text-sm">
+              <input checked={draft.sendActivationLink} className="size-4" onChange={(event) => setDraft((current) => ({ ...current, sendActivationLink: event.target.checked }))} type="checkbox" />
+              Send activation link
+            </label>
+          </>
+        ) : null}
         {message ? <p role="alert">{message}</p> : null}
         {create.error instanceof ApiError ? <p role="alert">{create.error.message}</p> : null}
         <div className="mt-2 flex items-center justify-between gap-3">
@@ -156,7 +165,7 @@ export function AddMemberDialog({ onCancel, onCreated }: { onCancel: () => void;
             {step < 5 ? (
               <button className="min-h-11 rounded-full bg-accent px-4 font-semibold text-background" onClick={next} type="button">Next</button>
             ) : (
-              <button className="min-h-11 rounded-full bg-accent px-4 font-semibold text-background disabled:opacity-60" disabled={create.isPending} onClick={() => { const error = stepError(4, draft) ?? stepError(3, draft) ?? stepError(1, draft); if (error) { setMessage(error); return; } create.mutate(); }} type="button">{create.isPending ? "Saving..." : "Save member"}</button>
+              <button className="min-h-11 rounded-full bg-accent px-4 font-semibold text-background disabled:opacity-60" disabled={create.isPending} onClick={() => { const error = stepError(4, draft) ?? stepError(3, draft) ?? stepError(1, draft); if (error) { setMessage(error); return; } if (draft.sendActivationLink && !draft.email.trim()) { setMessage("Enter an email before sending an activation link."); return; } create.mutate(); }} type="button">{create.isPending ? "Saving..." : "Save member"}</button>
             )}
           </div>
         </div>

@@ -34,6 +34,7 @@ export default function BusinessUsersPage() {
   const [deletedNotice, setDeletedNotice] = useState<string | null>(null);
   const [assigning, setAssigning] = useState(false);
   const [issued, setIssued] = useState<CreatedWorkspaceUser | null>(null);
+  const [activationQueued, setActivationQueued] = useState(false);
   const [photoNotice, setPhotoNotice] = useState<string | null>(null);
   const [compensationHref, setCompensationHref] = useState<string | null>(null);
   const roleLabels = new Map((roleCatalog.data ?? []).map((role) => [role.name, role.label]));
@@ -120,6 +121,7 @@ export default function BusinessUsersPage() {
           onCreated={async (result: StaffWizardResult) => {
             setAdding(false);
             setIssued(result.user);
+            setActivationQueued(result.activationQueued === true);
             setPhotoNotice(result.photoWarning ?? null);
             setCompensationHref(result.compensationHref ?? null);
             await client.invalidateQueries({ queryKey: ["workspace-users", tenantId] });
@@ -166,9 +168,10 @@ export default function BusinessUsersPage() {
       {issued ? (
         <InviteResultDialog
           compensationHref={compensationHref}
+          activationQueued={activationQueued}
           created={issued}
           notice={photoNotice}
-          onClose={() => { setIssued(null); setPhotoNotice(null); setCompensationHref(null); }}
+          onClose={() => { setIssued(null); setPhotoNotice(null); setCompensationHref(null); setActivationQueued(false); }}
         />
       ) : null}
     </PageState>

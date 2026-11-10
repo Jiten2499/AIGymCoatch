@@ -240,7 +240,7 @@ public sealed class CreateMemberCommandHandler : IRequestHandler<CreateMemberCom
 
                 await _audit.AddAsync(AuditLog.Create(Guid.NewGuid(), tenantId, actorId, "MemberCreated", "MemberProfile", profile.Id, null, profile.MemberCode, _client.IpAddress, _client.UserAgent, _clock.UtcNow), ct).ConfigureAwait(false);
                 await _unitOfWork.SaveChangesAsync(ct).ConfigureAwait(false);
-                if (user is not null && (request.AssignAppAccess || request.EnableBasicAppAccess) && _activation is not null)
+                if (user is not null && request.SendActivationLink && _activation is not null)
                 {
                     await _activation.SendAsync(new AccountActivationNotice(user.Id, user.Email, user.FirstName, user.LastName, RoleNames.Member, tenantId, tenant.Name, existingAccount), ct).ConfigureAwait(false);
                 }

@@ -179,11 +179,13 @@ export function InviteResultDialog({
   created,
   notice,
   compensationHref,
+  activationQueued = false,
   onClose,
 }: {
   created: CreatedWorkspaceUser;
   notice?: string | null;
   compensationHref?: string | null;
+  activationQueued?: boolean;
   onClose: () => void;
 }) {
   const draft = created.status === "Draft";
@@ -194,9 +196,9 @@ export function InviteResultDialog({
       <p className="mt-3 text-muted">
         {draft
           ? `${created.firstName} ${created.lastName} was saved as a draft. No invitation was sent and no seat was consumed.`
-          : created.email
-            ? `A welcome email was queued for ${created.firstName} ${created.lastName}. New accounts receive a one-time activation link. Existing LifeFit AI accounts receive a business invitation and keep their password.`
-            : `No email address was available, so no welcome email was sent.`}
+            : activationQueued
+            ? `An activation link was queued for ${created.firstName} ${created.lastName}. New accounts use that link to set a password. Existing LifeFit AI accounts receive a business invitation and keep their password.`
+            : `${created.firstName} ${created.lastName} was created. No activation email was sent.`}
       </p>
       <p className="mt-4">Email: {created.email}</p>
       {created.employeeCode ? <p className="mt-2">Employee ID: {created.employeeCode}</p> : null}

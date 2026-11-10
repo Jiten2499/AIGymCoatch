@@ -68,7 +68,8 @@ public sealed record CreateMemberRequest(
     DateOnly? PaymentDate = null,
     string? PaymentReferenceNumber = null,
     string? PaymentNotes = null,
-    Guid? PtPackageId = null);
+    Guid? PtPackageId = null,
+    bool SendActivationLink = false);
 
 public sealed record AssignMemberAppAccessRequest(Guid SubscriptionId, string? Email = null);
 
@@ -111,7 +112,8 @@ public sealed record AddCoachRequest(
     string LastName,
     string? Phone,
     string? Specialization,
-    Guid? BranchId);
+    Guid? BranchId,
+    bool SendActivationLink = false);
 
 public sealed record UpdateTrainerRequest(
     string? Bio,

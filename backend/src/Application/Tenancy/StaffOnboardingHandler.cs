@@ -221,11 +221,6 @@ public sealed class StaffOnboardingHandler : IRequestHandler<CreateWorkspaceUser
 
                 await _audit.AddAsync(AuditLog.Create(Guid.NewGuid(), access.Value.TenantId, access.Value.ActorId, "CreateWorkspaceUser", "TenantMember", user.Id, null, request.RoleName, _client.IpAddress, _client.UserAgent, now), ct).ConfigureAwait(false);
                 await _unitOfWork.SaveChangesAsync(ct).ConfigureAwait(false);
-                if (!request.SaveAsDraft && _activation is not null)
-                {
-                    var business = await _tenants.GetAsync(access.Value.TenantId, ct).ConfigureAwait(false);
-                    await _activation.SendAsync(new AccountActivationNotice(user.Id, user.Email, user.FirstName, user.LastName, request.RoleName, access.Value.TenantId, business?.Name ?? "LifeFit AI", existing is not null), ct).ConfigureAwait(false);
-                }
 
                 created = new WorkspaceUserCreated(
                     user.Id,
@@ -243,6 +238,14 @@ public sealed class StaffOnboardingHandler : IRequestHandler<CreateWorkspaceUser
         catch (WorkspaceUserException exception)
         {
             return Result.Failure<WorkspaceUserCreated>(exception.Error);
+        }
+
+        if (created is not null && request.SendInvitation && !request.SaveAsDraft && _activation is not null)
+        {
+            var business = await _tenants.GetAsync(access.Value.TenantId, cancellationToken).ConfigureAwait(false);
+            await _activation.SendAsync(
+                new AccountActivationNotice(created.Id, created.Email, created.FirstName, created.LastName, request.RoleName, access.Value.TenantId, business?.Name ?? "LifeFit AI", existing is not null),
+                cancellationToken).ConfigureAwait(false);
         }
 
         return created is null

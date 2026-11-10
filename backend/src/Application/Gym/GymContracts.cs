@@ -85,7 +85,8 @@ public sealed record MemberListItem(
     string? Mobile,
     bool HasPhoto,
     ProfileStatus Status,
-    DateOnly JoinDate);
+    DateOnly JoinDate,
+    string? Email);
 
 public sealed record StaffResponse(
     Guid Id,

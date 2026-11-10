@@ -233,7 +233,8 @@ public sealed class PeopleRepository : IPeopleRepository
                 row.profile.Phone ?? (row.user == null ? null : row.user.Phone),
                 row.profile.PhotoStorageKey != null,
                 row.profile.Status,
-                row.profile.JoinDate))
+                row.profile.JoinDate,
+                row.user == null ? null : row.user.Email))
             .ToListAsync(cancellationToken).ConfigureAwait(false);
         return new PageResult<MemberListItem>(items, page.NormalizedPage, page.NormalizedSize, total);
     }

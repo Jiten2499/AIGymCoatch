@@ -34,7 +34,8 @@ public sealed record CreateMemberCommand(
     Guid? AppSubscriptionId = null,
     bool EnableBasicAppAccess = false,
     InitialMembershipPayment? InitialPayment = null,
-    Guid? PtPackageId = null) : IRequest<Result<MemberResponse>>;
+    Guid? PtPackageId = null,
+    bool SendActivationLink = false) : IRequest<Result<MemberResponse>>;
 
 public sealed class CreateMemberCommandValidator : AbstractValidator<CreateMemberCommand>
 {

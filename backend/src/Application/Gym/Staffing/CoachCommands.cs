@@ -11,7 +11,7 @@ using MediatR;
 
 namespace LifeFitAI.Application.Gym.Staffing;
 
-public sealed record AddCoachCommand(string Email, string FirstName, string LastName, string? Phone, string? Specialization, Guid? BranchId) : IRequest<Result<CoachCreated>>;
+public sealed record AddCoachCommand(string Email, string FirstName, string LastName, string? Phone, string? Specialization, Guid? BranchId, bool SendActivationLink = false) : IRequest<Result<CoachCreated>>;
 
 public sealed record CoachCreated(Guid Id, string Email, string FirstName, string LastName, string? Specialization, string? TemporaryPassword);
 
@@ -143,7 +143,7 @@ public sealed class AddCoachCommandHandler : IRequestHandler<AddCoachCommand, Re
                 await _people.AddTrainerAsync(trainer, ct).ConfigureAwait(false);
                 await _audit.AddAsync(AuditLog.Create(Guid.NewGuid(), tenantId, _actor.UserId, "AddCoach", "TrainerProfile", trainer.Id, null, user.Email, _client.IpAddress, _client.UserAgent, _clock.UtcNow), ct).ConfigureAwait(false);
                 await _unitOfWork.SaveChangesAsync(ct).ConfigureAwait(false);
-                if (_activation is not null)
+                if (request.SendActivationLink && _activation is not null)
                 {
                     var business = await _tenants.GetAsync(tenantId, ct).ConfigureAwait(false);
                     await _activation.SendAsync(new AccountActivationNotice(user.Id, user.Email, user.FirstName, user.LastName, RoleNames.Trainer, tenantId, business?.Name ?? "LifeFit AI", existing is not null), ct).ConfigureAwait(false);

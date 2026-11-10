@@ -22,6 +22,7 @@ export type StaffWizardResult = {
   user: CreatedWorkspaceUser & { staffProfileId?: string | null; invitationToken?: string | null; status?: string; employeeCode?: string | null };
   photoWarning?: string;
   compensationHref?: string;
+  activationQueued?: boolean;
 };
 
 export function StaffWizard({ onCancel, onCreated }: { onCancel: () => void; onCreated: (result: StaffWizardResult) => void }) {
@@ -85,17 +86,18 @@ export function StaffWizard({ onCancel, onCreated }: { onCancel: () => void; onC
         trainingExpertise: kind === "trainer" ? draft.trainingExpertise.trim() || null : null,
         linkExistingUser: draft.linkExistingUser,
         saveAsDraft: mode === "draft",
-        sendInvitation: mode === "invite",
+        sendInvitation: mode === "invite" && draft.sendActivationLink,
       };
       const user = await api<StaffWizardResult["user"]>("/business/users", { method: "POST", body: JSON.stringify(body) });
+      const activationQueued = mode === "invite" && draft.sendActivationLink;
       if (photo) {
         try {
           await uploadStaffPhoto(user.id, photo);
         } catch (error) {
-          return { user, photoWarning: error instanceof ApiError ? error.message : "The staff member was created, but the photo was not.", compensationHref: user.staffProfileId ? `/business/payroll?staff=${user.staffProfileId}` : undefined };
+          return { user, activationQueued, photoWarning: error instanceof ApiError ? error.message : "The staff member was created, but the photo was not.", compensationHref: user.staffProfileId ? `/business/payroll?staff=${user.staffProfileId}` : undefined };
         }
       }
-      return { user, compensationHref: user.staffProfileId ? `/business/payroll?staff=${user.staffProfileId}` : undefined };
+      return { user, activationQueued, compensationHref: user.staffProfileId ? `/business/payroll?staff=${user.staffProfileId}` : undefined };
     },
     onSuccess: (result) => onCreated(result),
   });
@@ -172,7 +174,15 @@ export function StaffWizard({ onCancel, onCreated }: { onCancel: () => void; onC
             update={update}
           />
         ) : null}
-        {step === 4 ? <ReviewStep candidate={candidate} draft={draft} kind={kind} mode="create" roleLabel={staffRoleLabel(draft.roleName)} selectedRole={selectedRole} seats={seatChoices} /> : null}
+        {step === 4 ? (
+          <>
+            <ReviewStep candidate={candidate} draft={draft} kind={kind} mode="create" roleLabel={staffRoleLabel(draft.roleName)} selectedRole={selectedRole} seats={seatChoices} />
+            <label className="flex min-h-11 items-center gap-3 text-sm">
+              <input checked={draft.sendActivationLink} className="size-4" onChange={(event) => update({ sendActivationLink: event.target.checked })} type="checkbox" />
+              Send activation link
+            </label>
+          </>
+        ) : null}
         {candidate && !candidate.alreadyInWorkspace && draft.linkExistingUser ? (
           <p className="rounded-xl border border-line px-4 py-3 text-sm">Existing LifeFit AI account found for {candidate.email}. Creating staff will link that account.</p>
         ) : null}
@@ -187,7 +197,7 @@ export function StaffWizard({ onCancel, onCreated }: { onCancel: () => void; onC
             ) : (
               <>
                 <button className="min-h-11 rounded-full border border-line px-4 disabled:opacity-60" disabled={create.isPending} onClick={() => create.mutate("draft")} type="button">{create.isPending ? "Saving..." : "Save as draft"}</button>
-                <button className="min-h-11 rounded-full bg-accent px-4 font-semibold text-background disabled:opacity-60" disabled={create.isPending || Boolean(photoError)} onClick={() => { const error = stepError(3, draft, activeBranches.length > 0) ?? stepError(2, draft, activeBranches.length > 0) ?? stepError(1, draft, false); if (error) { setMessage(error); return; } create.mutate("invite"); }} type="button">{create.isPending ? "Sending..." : "Create staff & send invitation"}</button>
+                <button className="min-h-11 rounded-full bg-accent px-4 font-semibold text-background disabled:opacity-60" disabled={create.isPending || Boolean(photoError)} onClick={() => { const error = stepError(3, draft, activeBranches.length > 0) ?? stepError(2, draft, activeBranches.length > 0) ?? stepError(1, draft, false); if (error) { setMessage(error); return; } if (draft.sendActivationLink && !draft.email.trim()) { setMessage("Enter an email before sending an activation link."); return; } create.mutate("invite"); }} type="button">{create.isPending ? "Saving..." : "Create staff"}</button>
               </>
             )}
           </div>

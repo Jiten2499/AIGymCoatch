@@ -189,6 +189,11 @@ public sealed class AccountActivationMailer : IAccountActivationMailer
             return EmailTemplateKeys.WelcomeMember;
         }
 
+        if (roleName == RoleNames.GymOwner)
+        {
+            return EmailTemplateKeys.WelcomeOwner;
+        }
+
         return EmailTemplateKeys.WelcomeStaff;
     }
 }

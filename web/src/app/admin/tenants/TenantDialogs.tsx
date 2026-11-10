@@ -30,16 +30,18 @@ export type CreatedTenant = {
   name: string;
   ownerEmail: string;
   temporaryPassword: string | null;
+  activationRequested?: boolean;
 };
 
 type CreateValues = z.infer<typeof createSchema>;
 type EditValues = z.infer<typeof editSchema>;
 
 export function AddTenantDialog({ onCancel, onCreated }: { onCancel: () => void; onCreated: (tenant: CreatedTenant) => void }) {
+  const [sendActivationLink, setSendActivationLink] = useState(false);
   const form = useForm<CreateValues>({ resolver: zodResolver(createSchema), defaultValues: { name: "", tenantType: "Gym", ownerEmail: "", ownerFirstName: "", ownerLastName: "" } });
   const create = useMutation({
-    mutationFn: (values: CreateValues) => api<CreatedTenant>("/platform/tenants", { method: "POST", body: JSON.stringify(values) }),
-    onSuccess: (tenant) => onCreated(tenant),
+    mutationFn: (values: CreateValues) => api<CreatedTenant>("/platform/tenants", { method: "POST", body: JSON.stringify({ ...values, sendActivationLink }) }),
+    onSuccess: (tenant) => onCreated({ ...tenant, activationRequested: sendActivationLink }),
   });
 
   return (
@@ -62,6 +64,10 @@ export function AddTenantDialog({ onCancel, onCreated }: { onCancel: () => void;
         <Field label="Owner last name" error={form.formState.errors.ownerLastName?.message}>
           <input className="field" {...form.register("ownerLastName")} />
         </Field>
+        <label className="flex min-h-11 items-center gap-3 text-sm">
+          <input checked={sendActivationLink} className="size-4" onChange={(event) => setSendActivationLink(event.target.checked)} type="checkbox" />
+          Send activation link
+        </label>
         {create.error instanceof ApiError ? <p role="alert">{create.error.message}</p> : null}
         <Actions cancel={onCancel} pending={create.isPending} submitLabel="Create tenant" />
       </form>
@@ -109,18 +115,21 @@ export function PasswordDialog({ created, onClose }: { created: CreatedTenant; o
 
   return (
     <Dialog title="Tenant owner sign-in" onCancel={onClose}>
-      <p className="mt-3 text-muted">Email delivery is not available yet. This password is shown only now. Give it to the owner of {created.name}.</p>
+      <p className="mt-3 text-muted">
+        {created.activationRequested
+          ? `An activation link was queued for the owner of ${created.name}. They set their own password from that link.`
+          : `No activation email was sent for ${created.name}.`}
+      </p>
       <p className="mt-4">Email: {created.ownerEmail}</p>
-      {password ? (
+      {password && !created.activationRequested ? (
         <label className="mt-3 grid gap-2">
           Password
           <input aria-label="Temporary password" className="field font-mono" readOnly value={password} />
         </label>
-      ) : (
-        <p className="mt-3">This email already has an account, so no new password was created.</p>
-      )}
+      ) : null}
+      {!password && !created.activationRequested ? <p className="mt-3">This email already has an account, so no new password was created.</p> : null}
       <div className="mt-6 flex justify-end gap-3">
-        {password ? (
+        {password && !created.activationRequested ? (
           <button className="min-h-11 rounded-full px-4" onClick={() => { void navigator.clipboard.writeText(password).then(() => setCopied(true)); }} type="button">
             {copied ? "Copied" : "Copy password"}
           </button>

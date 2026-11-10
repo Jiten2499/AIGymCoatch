@@ -78,6 +78,7 @@ export default function MembersPage() {
         <DataTable
           columns={[
             { header: "Name", cell: (row) => row.fullName },
+            { header: "Email", cell: (row) => row.email || "—" },
             { header: "Phone", cell: (row) => row.mobile || "—" },
             { header: "Status", cell: (row) => row.status },
             { header: "Joined", cell: (row) => row.joinDate },

@@ -31,7 +31,7 @@ public sealed class TrainersController : ApiControllerBase
     [HttpPost("trainers")]
     [RequiresPermission(PermissionCodes.StaffCreate)]
     public async Task<IActionResult> Add(AddCoachRequest request, CancellationToken cancellationToken) =>
-        (await Sender.Send(new AddCoachCommand(request.Email, request.FirstName, request.LastName, request.Phone, request.Specialization, request.BranchId), cancellationToken)).ToActionResult();
+        (await Sender.Send(new AddCoachCommand(request.Email, request.FirstName, request.LastName, request.Phone, request.Specialization, request.BranchId, request.SendActivationLink), cancellationToken)).ToActionResult();
 
     [HttpDelete("trainers/{id:guid}")]
     [RequiresPermission(PermissionCodes.TrainerUpdate)]

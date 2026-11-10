@@ -2,6 +2,7 @@ export type GymMember = {
   id: string;
   fullName: string;
   mobile: string | null;
+  email: string | null;
   hasPhoto: boolean;
   status: string;
   joinDate: string;

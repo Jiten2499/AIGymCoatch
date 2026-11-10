@@ -117,7 +117,8 @@ export function MemberReview({
       {ptPackage ? <p>Standalone PT package: {ptPackage.name} · {ptPackage.sessionCount} sessions · {ptPackage.validityDays} days · {ptPackage.price} {ptPackage.currency} · Unpaid</p> : <p>No standalone personal-training package.</p>}
       <p>Total available PT sessions: {sessions.total}</p>
       {draft.planId && draft.paymentAmount.trim() ? <p>Paid {draft.paymentAmount} by {draft.paymentMethod} on {draft.paymentDate}</p> : null}
-      <p>Basic LifeFit login: {draft.enableBasicAppAccess || draft.assignAppAccess || draft.email ? "Yes" : "No"}</p>
+      <p>Basic LifeFit login: {draft.enableBasicAppAccess || draft.assignAppAccess || draft.sendActivationLink || draft.email ? "Yes" : "No"}</p>
+      <p>Activation email: {draft.sendActivationLink ? "Will be sent" : "Not requested"}</p>
       <p>LifeFit app plan seat: {draft.assignAppAccess ? "Yes" : "No"}</p>
     </div>
   );

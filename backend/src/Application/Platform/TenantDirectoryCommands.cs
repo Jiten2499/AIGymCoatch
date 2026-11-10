@@ -1,5 +1,6 @@
 using FluentValidation;
 using LifeFitAI.Application.Authorization;
+using LifeFitAI.Application.Email;
 using LifeFitAI.Application.Gym;
 using LifeFitAI.Application.Identity;
 using LifeFitAI.Application.Licensing;
@@ -13,7 +14,7 @@ namespace LifeFitAI.Application.Platform;
 
 public sealed record BusinessTenantCreated(Guid Id, string Name, string TenantType, string Status, string OwnerEmail, string? TemporaryPassword);
 
-public sealed record CreateBusinessTenantCommand(string Name, TenantType TenantType, string OwnerEmail, string OwnerFirstName, string OwnerLastName) : IRequest<Result<BusinessTenantCreated>>;
+public sealed record CreateBusinessTenantCommand(string Name, TenantType TenantType, string OwnerEmail, string OwnerFirstName, string OwnerLastName, bool SendActivationLink = false) : IRequest<Result<BusinessTenantCreated>>;
 
 public sealed class CreateBusinessTenantCommandValidator : AbstractValidator<CreateBusinessTenantCommand>
 {
@@ -66,6 +67,7 @@ public sealed class TenantDirectoryHandler :
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDateTimeProvider _clock;
     private readonly IClientContext _client;
+    private readonly IAccountActivationMailer? _activation;
 
     public TenantDirectoryHandler(
         ICurrentActor actor,
@@ -81,7 +83,8 @@ public sealed class TenantDirectoryHandler :
         IAuditLogRepository audit,
         IUnitOfWork unitOfWork,
         IDateTimeProvider clock,
-        IClientContext client)
+        IClientContext client,
+        IAccountActivationMailer? activation = null)
     {
         _actor = actor;
         _roles = roles;
@@ -97,6 +100,7 @@ public sealed class TenantDirectoryHandler :
         _unitOfWork = unitOfWork;
         _clock = clock;
         _client = client;
+        _activation = activation;
     }
 
     public async Task<Result<BusinessTenantCreated>> Handle(CreateBusinessTenantCommand request, CancellationToken cancellationToken)
@@ -127,6 +131,7 @@ public sealed class TenantDirectoryHandler :
         var existing = await _users.GetByEmailAsync(email, cancellationToken).ConfigureAwait(false);
         var password = existing is null ? TemporaryPassword.Create() : null;
         BusinessTenantCreated? created = null;
+        Guid? ownerId = null;
         Result<UserAccount>? ownerFailure = null;
         try
         {
@@ -150,6 +155,7 @@ public sealed class TenantDirectoryHandler :
                 await _profiles.AddAsync(BusinessProfile.Create(Guid.NewGuid(), tenant.Id, "UTC", "USD"), ct).ConfigureAwait(false);
                 await _audit.AddAsync(AuditLog.Create(Guid.NewGuid(), tenant.Id, _actor.UserId, "CreateBusinessTenant", "Tenant", tenant.Id, null, tenant.Name, _client.IpAddress, _client.UserAgent, now), ct).ConfigureAwait(false);
                 await _unitOfWork.SaveChangesAsync(ct).ConfigureAwait(false);
+                ownerId = owner.Value.Id;
                 created = new BusinessTenantCreated(tenant.Id, tenant.Name, tenant.TenantType.ToString(), tenant.Status.ToString(), email, password);
             }, cancellationToken).ConfigureAwait(false);
         }
@@ -158,9 +164,19 @@ public sealed class TenantDirectoryHandler :
             return Result.Failure<BusinessTenantCreated>(ownerFailure?.Error ?? new Error("tenant.owner_invalid", "The owner account could not be created."));
         }
 
-        return created is null
-            ? Result.Failure<BusinessTenantCreated>(new Error("tenant.owner_invalid", "The owner account could not be created."))
-            : Result.Success(created);
+        if (created is null || ownerId is not Guid createdOwnerId)
+        {
+            return Result.Failure<BusinessTenantCreated>(new Error("tenant.owner_invalid", "The owner account could not be created."));
+        }
+
+        if (request.SendActivationLink && _activation is not null)
+        {
+            await _activation.SendAsync(
+                new AccountActivationNotice(createdOwnerId, email, request.OwnerFirstName.Trim(), request.OwnerLastName.Trim(), role.Name, created.Id, created.Name, existing is not null),
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        return Result.Success(created);
     }
 
     public async Task<Result> Handle(UpdateBusinessTenantCommand request, CancellationToken cancellationToken)

@@ -28,6 +28,7 @@ export type StaffDraft = {
   trainingExpertise: string;
   jobDescription: string;
   linkExistingUser: boolean;
+  sendActivationLink: boolean;
 };
 
 export const employmentTypes = ["FullTime", "PartTime", "Contract", "Temporary", "Intern"] as const;
@@ -65,6 +66,7 @@ export function emptyStaffDraft(today: string, roleName = "Receptionist"): Staff
     trainingExpertise: "",
     jobDescription: "",
     linkExistingUser: false,
+    sendActivationLink: false,
   };
 }
 
@@ -174,6 +176,7 @@ export function draftFromDetail(detail: StaffDetail): StaffDraft {
     trainingExpertise: detail.trainingExpertise ?? "",
     jobDescription: detail.jobDescription ?? "",
     linkExistingUser: true,
+    sendActivationLink: false,
   };
 }
 

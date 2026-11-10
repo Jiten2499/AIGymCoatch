@@ -16,7 +16,9 @@ public static class AccountEmailLayout
         var activation = templateKey.StartsWith("Account.Welcome", StringComparison.Ordinal);
         var audience = templateKey.Contains("Trainer", StringComparison.Ordinal)
             ? "trainer"
-            : templateKey.Contains("Member", StringComparison.Ordinal) ? "member" : "staff";
+            : templateKey.Contains("Owner", StringComparison.Ordinal)
+                ? "business owner"
+                : templateKey.Contains("Member", StringComparison.Ordinal) ? "member" : "staff";
         var subject = activation
             ? $"Welcome to LifeFit AI, {name}"
             : $"You're invited to {business}";

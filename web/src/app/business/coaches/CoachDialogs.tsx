@@ -52,6 +52,7 @@ export function AddCoachDialog({ onCancel, onCreated }: { onCancel: () => void; 
   const branches = useBranches();
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoMessage, setPhotoMessage] = useState<string | null>(null);
+  const [sendActivationLink, setSendActivationLink] = useState(false);
   const active = (branches.data?.items ?? []).filter((branch) => branch.status === "Active");
   const form = useForm<CreateValues>({ resolver: zodResolver(createSchema), defaultValues: { email: "", firstName: "", lastName: "", phone: "", specialization: "", branchId: "" } });
   const watched = form.watch(["firstName", "lastName"]);
@@ -70,6 +71,7 @@ export function AddCoachDialog({ onCancel, onCreated }: { onCancel: () => void; 
           phone: values.phone || null,
           specialization: values.specialization || null,
           branchId: values.branchId || null,
+          sendActivationLink,
         }),
       });
       if (photo) {
@@ -104,6 +106,10 @@ export function AddCoachDialog({ onCancel, onCreated }: { onCancel: () => void; 
           <input className="field" {...form.register("specialization")} />
         </Field>
         {active.length > 0 ? <BranchField branches={active} register={form.register("branchId")} /> : null}
+        <label className="flex min-h-11 items-center gap-3 text-sm">
+          <input checked={sendActivationLink} className="size-4" onChange={(event) => setSendActivationLink(event.target.checked)} type="checkbox" />
+          Send activation link
+        </label>
         {photoMessage ? <p role="alert">{photoMessage}</p> : null}
         {create.error instanceof ApiError ? <p role="alert">{create.error.message}</p> : null}
         <Actions cancel={onCancel} pending={create.isPending} submitLabel="Create coach" />
