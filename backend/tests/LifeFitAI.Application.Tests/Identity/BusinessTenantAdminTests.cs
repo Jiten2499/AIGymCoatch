@@ -4,6 +4,7 @@ using LifeFitAI.Application.Identity;
 using LifeFitAI.Application.Identity.Register;
 using LifeFitAI.Application.Platform;
 using LifeFitAI.Domain.Identity;
+using NSubstitute;
 
 namespace LifeFitAI.Application.Tests.Identity;
 
@@ -31,6 +32,30 @@ public sealed class BusinessTenantAdminTests
         var roles = await harness.Roles.GetRoleNamesAsync(owner.Id, created.Value.Id, CancellationToken.None);
         roles.Should().Contain(RoleNames.GymOwner);
         admin.Id.Should().NotBe(owner.Id);
+    }
+
+    [Fact]
+    public async Task SuperAdmin_TenantList_IncludesOwnerEmail()
+    {
+        var harness = new IdentityHarness();
+        await SignInSuperAdmin(harness);
+        var created = await Handler(harness).Handle(
+            new CreateBusinessTenantCommand("North Gym", TenantType.Gym, "owner@northgym.test", "North", "Owner"),
+            CancellationToken.None);
+        var list = await new PlatformAdminHandler(
+            harness.Store.Actor,
+            harness.Roles,
+            harness.Permissions,
+            harness.Tenants,
+            harness.Users,
+            harness.Audit,
+            Substitute.For<IPermissionCacheInvalidator>(),
+            harness.UnitOfWork,
+            harness.Store.Clock,
+            harness.Store.Client).Handle(new ListPlatformTenantsQuery(1, 20), CancellationToken.None);
+
+        list.IsSuccess.Should().BeTrue();
+        list.Value.Items.Should().Contain(item => item.Id == created.Value.Id && item.OwnerEmail == "owner@northgym.test");
     }
 
     [Fact]

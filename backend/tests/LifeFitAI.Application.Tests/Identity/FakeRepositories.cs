@@ -16,6 +16,14 @@ internal sealed class FakeUsers : IUserAccountRepository
     public Task<UserAccount?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
         Task.FromResult(_store.VisibleUsers.SingleOrDefault(user => user.Id == id && user.DeletedAt == null));
 
+    public Task<IReadOnlyDictionary<Guid, string>> GetEmailsByIdsAsync(IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken)
+    {
+        IReadOnlyDictionary<Guid, string> emails = _store.VisibleUsers
+            .Where(user => user.DeletedAt == null && userIds.Contains(user.Id))
+            .ToDictionary(user => user.Id, user => user.Email);
+        return Task.FromResult(emails);
+    }
+
     public Task<bool> PhoneExistsAsync(string phone, CancellationToken cancellationToken) =>
         Task.FromResult(_store.VisibleUsers.Any(user => user.Phone == phone && user.DeletedAt == null));
 

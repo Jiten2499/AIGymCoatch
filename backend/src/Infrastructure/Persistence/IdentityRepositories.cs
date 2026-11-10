@@ -78,6 +78,20 @@ public sealed class UserAccountRepository : IUserAccountRepository
     public Task<UserAccount?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
         _db.Users.SingleOrDefaultAsync(user => user.Id == id, cancellationToken);
 
+    public async Task<IReadOnlyDictionary<Guid, string>> GetEmailsByIdsAsync(IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken)
+    {
+        if (userIds.Count == 0)
+        {
+            return new Dictionary<Guid, string>();
+        }
+
+        return await _db.Users.AsNoTracking()
+            .Where(user => userIds.Contains(user.Id))
+            .Select(user => new { user.Id, user.Email })
+            .ToDictionaryAsync(user => user.Id, user => user.Email, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     public Task<bool> PhoneExistsAsync(string phone, CancellationToken cancellationToken) =>
         _db.Users.AnyAsync(user => user.Phone == phone, cancellationToken);
 

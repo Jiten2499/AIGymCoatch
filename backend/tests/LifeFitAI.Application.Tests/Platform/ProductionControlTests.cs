@@ -78,7 +78,7 @@ public sealed class ProductionControlTests
         actor.UserId.Returns(userId);
         actor.TenantId.Returns(tenantId);
         roles.GetRoleNamesAsync(userId, tenantId, Arg.Any<CancellationToken>()).Returns(new[] { RoleNames.GymOwner });
-        var handler = new PlatformAdminHandler(actor, roles, permissions, Substitute.For<ITenantRepository>(), Substitute.For<IAuditLogRepository>(), Substitute.For<IPermissionCacheInvalidator>(), Substitute.For<IUnitOfWork>(), Substitute.For<IDateTimeProvider>(), Substitute.For<IClientContext>());
+        var handler = new PlatformAdminHandler(actor, roles, permissions, Substitute.For<ITenantRepository>(), Substitute.For<IUserAccountRepository>(), Substitute.For<IAuditLogRepository>(), Substitute.For<IPermissionCacheInvalidator>(), Substitute.For<IUnitOfWork>(), Substitute.For<IDateTimeProvider>(), Substitute.For<IClientContext>());
 
         var denied = await handler.Handle(new ListPlatformTenantsQuery(1, 20), CancellationToken.None);
 

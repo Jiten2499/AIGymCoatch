@@ -1,6 +1,6 @@
 export type Page<T> = { items: T[]; page: number; pageSize: number; totalCount: number };
 
-export type PlatformTenant = { id: string; name: string; tenantType: string; status: string };
+export type PlatformTenant = { id: string; name: string; tenantType: string; status: string; ownerEmail: string | null };
 
 export type PlatformUser = { id: string; email: string; firstName: string; lastName: string; status: string; personalTenantId: string; personalTenantName: string; createdAt: string; plan: string; hasPhoto?: boolean };
 

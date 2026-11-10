@@ -9,6 +9,8 @@ public interface IUserAccountRepository
 
     Task<UserAccount?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
 
+    Task<IReadOnlyDictionary<Guid, string>> GetEmailsByIdsAsync(IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken);
+
     Task<bool> PhoneExistsAsync(string phone, CancellationToken cancellationToken);
 
     Task<UserAccount?> GetByPhoneAsync(string phone, CancellationToken cancellationToken);

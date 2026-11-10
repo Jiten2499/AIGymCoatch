@@ -8,7 +8,7 @@ using MediatR;
 
 namespace LifeFitAI.Application.Platform;
 
-public sealed record PlatformTenantResponse(Guid Id, string Name, string TenantType, string Status);
+public sealed record PlatformTenantResponse(Guid Id, string Name, string TenantType, string Status, string? OwnerEmail);
 
 public sealed record ListPlatformTenantsQuery(int Page, int PageSize) : IRequest<Result<PageResult<PlatformTenantResponse>>>;
 
@@ -24,18 +24,20 @@ public sealed class PlatformAdminHandler :
     private readonly IRoleRepository _roles;
     private readonly IPermissionService _permissions;
     private readonly ITenantRepository _tenants;
+    private readonly IUserAccountRepository _users;
     private readonly IAuditLogRepository _audit;
     private readonly IPermissionCacheInvalidator _cache;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDateTimeProvider _clock;
     private readonly IClientContext _client;
 
-    public PlatformAdminHandler(ICurrentActor actor, IRoleRepository roles, IPermissionService permissions, ITenantRepository tenants, IAuditLogRepository audit, IPermissionCacheInvalidator cache, IUnitOfWork unitOfWork, IDateTimeProvider clock, IClientContext client)
+    public PlatformAdminHandler(ICurrentActor actor, IRoleRepository roles, IPermissionService permissions, ITenantRepository tenants, IUserAccountRepository users, IAuditLogRepository audit, IPermissionCacheInvalidator cache, IUnitOfWork unitOfWork, IDateTimeProvider clock, IClientContext client)
     {
         _actor = actor;
         _roles = roles;
         _permissions = permissions;
         _tenants = tenants;
+        _users = users;
         _audit = audit;
         _cache = cache;
         _unitOfWork = unitOfWork;
@@ -64,7 +66,14 @@ public sealed class PlatformAdminHandler :
         var page = new PageQuery(request.Page, request.PageSize);
         var tenants = await _tenants.ListAsync(scope, page.Skip, page.NormalizedSize, cancellationToken).ConfigureAwait(false);
         var total = await _tenants.CountAsync(scope, cancellationToken).ConfigureAwait(false);
-        var items = tenants.Select(tenant => new PlatformTenantResponse(tenant.Id, tenant.Name, tenant.TenantType.ToString(), tenant.Status.ToString())).ToArray();
+        var ownerIds = tenants.Where(tenant => tenant.OwnerUserId is not null).Select(tenant => tenant.OwnerUserId!.Value).Distinct().ToArray();
+        var emails = await _users.GetEmailsByIdsAsync(ownerIds, cancellationToken).ConfigureAwait(false);
+        var items = tenants.Select(tenant => new PlatformTenantResponse(
+            tenant.Id,
+            tenant.Name,
+            tenant.TenantType.ToString(),
+            tenant.Status.ToString(),
+            tenant.OwnerUserId is Guid ownerId && emails.TryGetValue(ownerId, out var email) ? email : null)).ToArray();
         return Result.Success(new PageResult<PlatformTenantResponse>(items, page.NormalizedPage, page.NormalizedSize, total));
     }
 

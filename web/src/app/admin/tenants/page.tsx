@@ -81,6 +81,7 @@ export default function TenantsPage() {
         <DataTable
           columns={[
             { header: "Name", cell: (row) => row.name },
+            { header: "Email", cell: (row) => row.ownerEmail || "—" },
             { header: "Type", cell: (row) => row.tenantType },
             { header: "Plan", cell: (row) => planFor(row.id, licenses.data?.items ?? []) },
             { header: "Status", cell: (row) => row.status },
