@@ -81,6 +81,7 @@ public sealed record MemberMatchItem(
 
 public sealed record MemberListItem(
     Guid Id,
+    Guid? UserId,
     string FullName,
     string? Mobile,
     bool HasPhoto,

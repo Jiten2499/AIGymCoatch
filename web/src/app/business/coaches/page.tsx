@@ -3,7 +3,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, useSyncExternalStore } from "react";
 import { PageState } from "../../../components/AdminShell";
+import { ConfirmDialog } from "../../../components/ConfirmDialog";
 import { DataTable } from "../../../components/DataTable";
+import { GridActionButton, GridActionGroup } from "../../../components/GridActionButton";
 import { ProfileDeleteDialog } from "../../../components/ProfileDeleteDialog";
 import { api, ApiError } from "../../../lib/api";
 import { getSession, subscribeSession } from "../../../lib/session";
@@ -33,7 +35,9 @@ export default function BusinessCoachesPage() {
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [resetCoach, setResetCoach] = useState<Coach | null>(null);
   const [deletedNotice, setDeletedNotice] = useState<string | null>(null);
+  const [resetNotice, setResetNotice] = useState<string | null>(null);
   const [issued, setIssued] = useState<CreatedCoach | null>(null);
   const [photoNotice, setPhotoNotice] = useState<string | null>(null);
   const rows = coaches.data?.items ?? [];
@@ -49,6 +53,15 @@ export default function BusinessCoachesPage() {
       await client.invalidateQueries({ queryKey: ["coaches"] });
       await client.invalidateQueries({ queryKey: ["trainers"] });
       await client.invalidateQueries({ queryKey: ["members"] });
+    },
+  });
+  const sendReset = useMutation({
+    mutationFn: (userId: string) => api(`/business/users/${userId}/password-reset`, { method: "POST" }),
+    onSuccess: () => {
+      const name = resetCoach ? `${resetCoach.firstName} ${resetCoach.lastName}` : "That coach";
+      const email = resetCoach?.email ? ` (${resetCoach.email})` : "";
+      setResetNotice(`A password reset link was queued for ${name}${email}.`);
+      setResetCoach(null);
     },
   });
 
@@ -105,6 +118,8 @@ export default function BusinessCoachesPage() {
         </div>
       </div>
       {deletedNotice ? <p className="mt-4" role="status">{deletedNotice}</p> : null}
+      {resetNotice ? <p className="mt-4" role="status">{resetNotice}</p> : null}
+      {sendReset.error instanceof ApiError ? <p className="mt-4" role="alert">{sendReset.error.message}</p> : null}
       <div className="mt-4 flex flex-wrap gap-2">
         <input aria-label="Search coaches" className="field max-w-xs" onChange={(event) => setSearch(event.target.value)} placeholder="Name, email, or employee code" value={search} />
         <select aria-label="Status" className="field max-w-xs" onChange={(event) => setStatus(event.target.value)} value={status}>
@@ -126,10 +141,11 @@ export default function BusinessCoachesPage() {
             { header: "Status", cell: (row) => row.status },
             { header: "Assigned members", cell: (row) => String(row.assignedMembers ?? 0) },
             { header: "Actions", cell: (row) => (
-              <span className="flex gap-3">
-                <button className="min-h-11" onClick={() => setViewing(row.id)} type="button">View</button>
-                <button className="min-h-11" onClick={() => { setSelected(new Set([row.id])); setConfirmDelete(true); }} type="button">Delete</button>
-              </span>
+              <GridActionGroup>
+                <GridActionButton action="view" onClick={() => setViewing(row.id)} />
+                <GridActionButton action="reset" onClick={() => { setResetNotice(null); sendReset.reset(); setResetCoach(row); }} />
+                <GridActionButton action="delete" onClick={() => { setSelected(new Set([row.id])); setConfirmDelete(true); }} />
+              </GridActionGroup>
             ) },
           ]}
           empty="No coaches were returned."
@@ -170,6 +186,16 @@ export default function BusinessCoachesPage() {
           onConfirm={() => selectedRows[0] ? remove.mutate(selectedRows[0].id) : undefined}
           pending={remove.isPending}
           title="Delete coach"
+        />
+      ) : null}
+      {resetCoach ? (
+        <ConfirmDialog
+          body={`Send a password reset email to ${resetCoach.firstName} ${resetCoach.lastName} at ${resetCoach.email}? The link expires after a short time and can be used once.`}
+          confirmLabel="Send reset link"
+          onCancel={() => { setResetCoach(null); sendReset.reset(); }}
+          onConfirm={() => sendReset.mutate(resetCoach.userId)}
+          pending={sendReset.isPending}
+          title="Send password reset"
         />
       ) : null}
     </PageState>

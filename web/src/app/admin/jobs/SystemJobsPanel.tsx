@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { ConfirmDialog } from "../../../components/ConfirmDialog";
 import { DataTable } from "../../../components/DataTable";
+import { GridActionButton } from "../../../components/GridActionButton";
 import { ScrollableGrid } from "../../../components/ScrollableGrid";
 import { PageState } from "../../../components/AdminShell";
 import { api, ApiError } from "../../../lib/api";
@@ -64,7 +65,7 @@ export function SystemJobsPanel() {
             { header: "Last Run", cell: (row) => formatWhen(row.lastRunUtc) },
             { header: "Next Run", cell: (row) => formatWhen(row.nextRunUtc) },
             { header: "Last Status", cell: (row) => row.lastStatus || "—" },
-            { header: "Actions", cell: (row) => <button className="min-h-11" onClick={() => setSelected(row.jobKey)} type="button">Details</button> },
+            { header: "Actions", cell: (row) => <GridActionButton action="details" onClick={() => setSelected(row.jobKey)} /> },
           ]}
           empty="No system jobs are defined."
           rowKey={(row) => row.jobKey}

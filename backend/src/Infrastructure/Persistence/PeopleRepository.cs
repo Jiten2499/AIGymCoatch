@@ -227,6 +227,7 @@ public sealed class PeopleRepository : IPeopleRepository
         var items = await ordered.Skip(page.Skip).Take(page.NormalizedSize)
             .Select(row => new MemberListItem(
                 row.profile.Id,
+                row.profile.UserId,
                 row.profile.FirstName != "" || row.profile.LastName != ""
                     ? (row.profile.FirstName + " " + row.profile.LastName).Trim()
                     : row.user == null ? row.profile.MemberCode : row.user.FirstName + " " + row.user.LastName,

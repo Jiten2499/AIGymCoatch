@@ -5,7 +5,9 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useSyncExternalStore } from "react";
 import { PageState } from "../../../components/AdminShell";
+import { ConfirmDialog } from "../../../components/ConfirmDialog";
 import { DataTable } from "../../../components/DataTable";
+import { GridActionButton, GridActionGroup } from "../../../components/GridActionButton";
 import { ProfileDeleteDialog } from "../../../components/ProfileDeleteDialog";
 import { api, ApiError } from "../../../lib/api";
 import type { GymMember, GymMemberDetails } from "../../../lib/gym";
@@ -27,6 +29,8 @@ export default function MembersPage() {
   const [editing, setEditing] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [resetMember, setResetMember] = useState<GymMember | null>(null);
+  const [resetNotice, setResetNotice] = useState<string | null>(null);
   const [deletedNotice, setDeletedNotice] = useState<string | null>(params.get("deleted") === "1" ? "The profile was deleted from active business views. The record is retained as soft-deleted data." : null);
   const members = useQuery({
     queryKey: ["members", tenantId, term, statusFilter],
@@ -57,6 +61,15 @@ export default function MembersPage() {
       await client.invalidateQueries({ queryKey: ["member", tenantId, selected] });
     },
   });
+  const sendReset = useMutation({
+    mutationFn: (userId: string) => api(`/business/users/${userId}/password-reset`, { method: "POST" }),
+    onSuccess: () => {
+      const name = resetMember?.fullName ?? "That member";
+      const email = resetMember?.email ? ` (${resetMember.email})` : "";
+      setResetNotice(`A password reset link was queued for ${name}${email}.`);
+      setResetMember(null);
+    },
+  });
 
   return (
     <PageState error={members.error instanceof ApiError ? members.error.message : null} loading={members.isLoading} onRetry={() => void members.refetch()}>
@@ -73,6 +86,8 @@ export default function MembersPage() {
         </div>
       </div>
       {deletedNotice ? <p className="mt-4" role="status">{deletedNotice}</p> : null}
+      {resetNotice ? <p className="mt-4" role="status">{resetNotice}</p> : null}
+      {sendReset.error instanceof ApiError ? <p className="mt-4" role="alert">{sendReset.error.message}</p> : null}
       <input aria-label="Search members" className="field mt-6 max-w-sm" onChange={(event) => setTerm(event.target.value)} placeholder="Search name or phone" value={term} />
       <div className="mt-4">
         <DataTable
@@ -82,7 +97,22 @@ export default function MembersPage() {
             { header: "Phone", cell: (row) => row.mobile || "—" },
             { header: "Status", cell: (row) => row.status },
             { header: "Joined", cell: (row) => row.joinDate },
-            { header: "Actions", cell: (row) => <button className="min-h-11" onClick={(event) => { event.stopPropagation(); setSelected(row.id); setConfirmDelete(true); }} type="button">Delete</button> },
+            { header: "Actions", cell: (row) => (
+              <GridActionGroup>
+                {row.userId && row.email ? (
+                  <GridActionButton
+                    action="reset"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setResetNotice(null);
+                      sendReset.reset();
+                      setResetMember(row);
+                    }}
+                  />
+                ) : null}
+                <GridActionButton action="delete" onClick={(event) => { event.stopPropagation(); setSelected(row.id); setConfirmDelete(true); }} />
+              </GridActionGroup>
+            ) },
           ]}
           empty="No members were returned."
           onRowClick={(row) => router.push(memberDetailsHref(row.id))}
@@ -111,6 +141,20 @@ export default function MembersPage() {
           onConfirm={() => remove.mutate(selected)}
           pending={remove.isPending}
           title="Delete member"
+        />
+      ) : null}
+      {resetMember?.userId ? (
+        <ConfirmDialog
+          body={`Send a password reset email to ${resetMember.fullName}${resetMember.email ? ` at ${resetMember.email}` : ""}? The link expires after a short time and can be used once.`}
+          confirmLabel="Send reset link"
+          onCancel={() => { setResetMember(null); sendReset.reset(); }}
+          onConfirm={() => {
+            if (resetMember.userId) {
+              sendReset.mutate(resetMember.userId);
+            }
+          }}
+          pending={sendReset.isPending}
+          title="Send password reset"
         />
       ) : null}
     </PageState>

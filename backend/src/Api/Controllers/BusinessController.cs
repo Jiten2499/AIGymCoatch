@@ -4,6 +4,7 @@ using LifeFitAI.Application.Email;
 using LifeFitAI.Application.Gym.Business;
 using LifeFitAI.Application.Gym.Dashboard;
 using LifeFitAI.Application.Identity;
+using LifeFitAI.Application.Identity.Password;
 using LifeFitAI.Application.Identity.Profile;
 using LifeFitAI.Application.Licensing;
 using LifeFitAI.Application.Tenancy;
@@ -85,6 +86,11 @@ public sealed class BusinessController : ApiControllerBase
     [RequiresPermission(PermissionCodes.UserUpdate)]
     public async Task<IActionResult> ResendActivation(Guid userId, CancellationToken cancellationToken) =>
         (await Sender.Send(new ResendAccountActivationCommand(userId), cancellationToken)).ToActionResult();
+
+    [HttpPost("business/users/{userId:guid}/password-reset")]
+    [RequiresPermission(PermissionCodes.UserUpdate)]
+    public async Task<IActionResult> SendPasswordReset(Guid userId, CancellationToken cancellationToken) =>
+        (await Sender.Send(new SendWorkspacePasswordResetCommand(userId), cancellationToken)).ToActionResult();
 
     [HttpGet("business/users/{userId:guid}")]
     [RequiresPermission(PermissionCodes.UserUpdate)]

@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { ConfirmDialog } from "../../../components/ConfirmDialog";
 import { DataTable } from "../../../components/DataTable";
+import { GridActionButton } from "../../../components/GridActionButton";
 import { ScrollableGrid } from "../../../components/ScrollableGrid";
 import { PageState } from "../../../components/AdminShell";
 import { api, ApiError } from "../../../lib/api";
@@ -146,7 +147,7 @@ export default function BackgroundJobsPage() {
             { header: "Duration", cell: (row) => formatDuration(row.durationSeconds) },
             { header: "Attempts", cell: (row) => String(row.attemptCount) },
             { header: "Correlation ID", cell: (row) => row.correlationId || "—" },
-            { header: "Actions", cell: (row) => <button className="min-h-11" onClick={() => setSelectedId(row.jobId)} type="button">Details</button> },
+            { header: "Actions", cell: (row) => <GridActionButton action="details" onClick={() => setSelectedId(row.jobId)} /> },
           ]}
           empty={empty}
           paging={{ page: filters.page, pageSize: filters.pageSize, totalCount: list.data?.totalCount ?? 0, onPageChange: (page) => apply({ page }), onPageSizeChange: (pageSize) => apply({ pageSize, page: 1 }) }}

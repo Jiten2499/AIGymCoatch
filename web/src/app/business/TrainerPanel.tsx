@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, useSyncExternalStore } from "react";
 import { DataTable } from "../../components/DataTable";
 import { FormDialog } from "../../components/FormDialog";
+import { GridActionButton, GridActionGroup } from "../../components/GridActionButton";
 import { PageState } from "../../components/AdminShell";
 import { api, ApiError } from "../../lib/api";
 import { monthBounds } from "../../lib/trainerPeriod";
@@ -59,7 +60,12 @@ export function TrainerPanel() {
             { header: "Assigned Members", cell: (row) => String(row.assignedMembers) },
             { header: "Active PT Clients", cell: (row) => String(row.activePtClients) },
             { header: "Joining Date", cell: (row) => row.joiningDate || "—" },
-            { header: "Actions", cell: (row) => <span className="flex gap-2"><button className="min-h-11" onClick={() => { setSelected(row.id); setEditing(true); }} type="button">Edit</button><button className="min-h-11" onClick={() => setSelected(row.id)} type="button">View details</button></span> },
+            { header: "Actions", cell: (row) => (
+              <GridActionGroup>
+                <GridActionButton action="edit" onClick={() => { setSelected(row.id); setEditing(true); }} />
+                <GridActionButton action="view" label="View details" onClick={() => setSelected(row.id)} />
+              </GridActionGroup>
+            ) },
           ]}
           empty="No trainers are set up for this business."
           rowKey={(row) => row.id}

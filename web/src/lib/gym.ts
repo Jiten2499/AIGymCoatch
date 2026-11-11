@@ -1,5 +1,6 @@
 export type GymMember = {
   id: string;
+  userId?: string | null;
   fullName: string;
   mobile: string | null;
   email: string | null;

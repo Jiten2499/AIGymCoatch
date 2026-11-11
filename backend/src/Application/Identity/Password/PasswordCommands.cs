@@ -127,6 +127,7 @@ public sealed class ForgotPasswordCommandHandler : IRequestHandler<ForgotPasswor
 
         var raw = _tokens.Create();
         var now = _clock.UtcNow;
+        await _resets.RevokeUnusedAsync(user.Id, now, cancellationToken).ConfigureAwait(false);
         await _resets.AddAsync(
             PasswordResetToken.Create(Guid.NewGuid(), user.Id, _tokens.Hash(raw), now, now.Add(_settings.ResetLifetime)),
             cancellationToken).ConfigureAwait(false);

@@ -3,7 +3,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, useSyncExternalStore } from "react";
 import { PageState } from "../../../components/AdminShell";
+import { ConfirmDialog } from "../../../components/ConfirmDialog";
 import { DataTable } from "../../../components/DataTable";
+import { GridActionButton, GridActionGroup } from "../../../components/GridActionButton";
 import { ProfileDeleteDialog } from "../../../components/ProfileDeleteDialog";
 import { UserAvatar } from "../../../components/UserAvatar";
 import { api, ApiError } from "../../../lib/api";
@@ -31,7 +33,9 @@ export default function BusinessUsersPage() {
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [resetUser, setResetUser] = useState<WorkspaceUser | null>(null);
   const [deletedNotice, setDeletedNotice] = useState<string | null>(null);
+  const [resetNotice, setResetNotice] = useState<string | null>(null);
   const [assigning, setAssigning] = useState(false);
   const [issued, setIssued] = useState<CreatedWorkspaceUser | null>(null);
   const [activationQueued, setActivationQueued] = useState(false);
@@ -53,6 +57,15 @@ export default function BusinessUsersPage() {
       await client.invalidateQueries({ queryKey: ["workspace-users"] });
       await client.invalidateQueries({ queryKey: ["coaches"] });
       await client.invalidateQueries({ queryKey: ["members"] });
+    },
+  });
+  const sendReset = useMutation({
+    mutationFn: (userId: string) => api(`/business/users/${userId}/password-reset`, { method: "POST" }),
+    onSuccess: () => {
+      const name = resetUser ? `${resetUser.firstName} ${resetUser.lastName}` : "That person";
+      const email = resetUser?.email ? ` (${resetUser.email})` : "";
+      setResetNotice(`A password reset link was queued for ${name}${email}.`);
+      setResetUser(null);
     },
   });
 
@@ -97,6 +110,8 @@ export default function BusinessUsersPage() {
         </div>
       </div>
       {deletedNotice ? <p className="mt-4" role="status">{deletedNotice}</p> : null}
+      {resetNotice ? <p className="mt-4" role="status">{resetNotice}</p> : null}
+      {sendReset.error instanceof ApiError ? <p className="mt-4" role="alert">{sendReset.error.message}</p> : null}
       {photoNotice && !issued ? <p className="mt-4" role="alert">{photoNotice}</p> : null}
       <div className="mt-6">
         <DataTable
@@ -107,7 +122,12 @@ export default function BusinessUsersPage() {
             { header: "Plan", cell: (row) => row.plan || "—" },
             { header: "Status", cell: (row) => row.status },
             { header: "Created", value: (row) => row.createdAt, cell: (row) => new Date(row.createdAt).toLocaleDateString() },
-            { header: "Actions", cell: (row) => <button className="min-h-11" onClick={() => { setSelected(new Set([row.id])); setConfirmDelete(true); }} type="button">Delete</button> },
+            { header: "Actions", cell: (row) => (
+              <GridActionGroup>
+                <GridActionButton action="reset" onClick={() => { setResetNotice(null); sendReset.reset(); setResetUser(row); }} />
+                <GridActionButton action="delete" onClick={() => { setSelected(new Set([row.id])); setConfirmDelete(true); }} />
+              </GridActionGroup>
+            ) },
           ]}
           empty="No users were returned."
           rowKey={(row) => row.id}
@@ -163,6 +183,16 @@ export default function BusinessUsersPage() {
           onConfirm={() => remove.mutate(selectedRows.map((row) => row.id))}
           pending={remove.isPending}
           title="Delete staff"
+        />
+      ) : null}
+      {resetUser ? (
+        <ConfirmDialog
+          body={`Send a password reset email to ${resetUser.firstName} ${resetUser.lastName} at ${resetUser.email}? The link expires after a short time and can be used once.`}
+          confirmLabel="Send reset link"
+          onCancel={() => { setResetUser(null); sendReset.reset(); }}
+          onConfirm={() => sendReset.mutate(resetUser.id)}
+          pending={sendReset.isPending}
+          title="Send password reset"
         />
       ) : null}
       {issued ? (
