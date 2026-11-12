@@ -185,4 +185,8 @@ databaseChangeLog:
   - include:
       file: changes/061-email-delivery.xml
       relativeToChangelogFile: true
+  - include:
+      file: changes/062-coach-employment-types.xml
+      relativeToChangelogFile: true
+
 

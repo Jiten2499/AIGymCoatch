@@ -31,7 +31,7 @@ export type StaffDraft = {
   sendActivationLink: boolean;
 };
 
-export const employmentTypes = ["FullTime", "PartTime", "Contract", "Temporary", "Intern"] as const;
+export const employmentTypes = ["FullTime", "PartTime", "Contract", "Temporary", "Intern", "Freelance", "VisitingTrainer"] as const;
 export const genders = ["", "Female", "Male", "NonBinary", "PreferNotToSay"] as const;
 export const dataScopes = ["Own", "Assigned", "Branch", "All"] as const;
 
@@ -181,7 +181,7 @@ export function draftFromDetail(detail: StaffDetail): StaffDraft {
 }
 
 export function employmentTypeLabel(value: string) {
-  return ({ FullTime: "Full-time", PartTime: "Part-time", Contract: "Contract", Temporary: "Temporary", Intern: "Intern" } as Record<string, string>)[value] ?? value;
+  return ({ FullTime: "Full-time", PartTime: "Part-time", Contract: "Contract", Temporary: "Temporary", Intern: "Intern", Freelance: "Freelance", VisitingTrainer: "Visiting Trainer" } as Record<string, string>)[value] ?? value;
 }
 
 export function scopeLabel(value: string) {

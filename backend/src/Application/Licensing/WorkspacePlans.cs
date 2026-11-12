@@ -28,6 +28,14 @@ public sealed record WorkspacePlanResponse(
 
 public sealed record UserPlanAssignment(Guid SeatId, string PlanName);
 
+public sealed record WorkspacePlanAssignee(
+    Guid SeatId,
+    Guid UserId,
+    string Email,
+    string FirstName,
+    string LastName,
+    DateTime AssignedAt);
+
 public sealed record ListWorkspacePlansQuery : IRequest<Result<IReadOnlyList<WorkspacePlanResponse>>>;
 
 public sealed class ListWorkspacePlansQueryHandler : IRequestHandler<ListWorkspacePlansQuery, Result<IReadOnlyList<WorkspacePlanResponse>>>

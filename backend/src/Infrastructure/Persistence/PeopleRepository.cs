@@ -98,7 +98,7 @@ public sealed class PeopleRepository : IPeopleRepository
             joined = joined.Where(row => row.user.FirstName.Contains(term) || row.user.LastName.Contains(term) || row.user.Email.Contains(term) || (row.profile.EmployeeCode != null && row.profile.EmployeeCode.Contains(term)));
         }
 
-        var ordered = joined.OrderBy(row => row.user.LastName).ThenBy(row => row.user.FirstName);
+        var ordered = joined.OrderByDescending(row => row.profile.CreatedAt).ThenBy(row => row.user.LastName).ThenBy(row => row.user.FirstName);
         var total = await ordered.CountAsync(cancellationToken).ConfigureAwait(false);
         var pageRows = await ordered.Skip(page.Skip).Take(page.NormalizedSize).ToListAsync(cancellationToken).ConfigureAwait(false);
         var ids = pageRows.Select(row => row.profile.Id).ToArray();

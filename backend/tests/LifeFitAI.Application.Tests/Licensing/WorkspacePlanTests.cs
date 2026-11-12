@@ -53,6 +53,65 @@ public sealed class WorkspacePlanTests
         foreign.Error.Code.Should().Be("license.not_found");
     }
 
+    [Fact]
+    public async Task Owner_ListsAssigneesForWorkspacePlanAndRejectsForeignPlan()
+    {
+        var actor = Actor();
+        var subscription = Subscription.ForTenant(Guid.NewGuid(), actor.TenantId!.Value, Guid.NewGuid(), DateTime.UtcNow, 5);
+        var assignee = new WorkspacePlanAssignee(Guid.NewGuid(), Guid.NewGuid(), "coach@example.com", "Ada", "Lovelace", DateTime.UtcNow);
+        var store = Substitute.For<ILicenseAdminStore>();
+        store.GetTenantSubscriptionAsync(actor.TenantId.Value, subscription.Id, Arg.Any<CancellationToken>()).Returns(subscription);
+        store.GetTenantSubscriptionAsync(actor.TenantId.Value, Arg.Is<Guid>(id => id != subscription.Id), Arg.Any<CancellationToken>()).Returns((Subscription?)null);
+        store.ListActivePlanAssigneesAsync(actor.TenantId.Value, subscription.Id, Arg.Any<CancellationToken>()).Returns(new[] { assignee });
+        var handler = new ListWorkspacePlanAssigneesQueryHandler(actor, Permissions(licenseRead: true), Tenants(actor), store);
+
+        var listed = await handler.Handle(new ListWorkspacePlanAssigneesQuery(subscription.Id), CancellationToken.None);
+        var foreign = await handler.Handle(new ListWorkspacePlanAssigneesQuery(Guid.NewGuid()), CancellationToken.None);
+
+        listed.IsSuccess.Should().BeTrue();
+        listed.Value.Should().ContainSingle(item => item.Email == "coach@example.com");
+        foreign.Error.Code.Should().Be("license.not_found");
+    }
+
+    [Fact]
+    public async Task Owner_RevokesSelectedSeatsAndRejectsSeatsFromAnotherPlan()
+    {
+        var actor = Actor();
+        var subscription = Subscription.ForTenant(Guid.NewGuid(), actor.TenantId!.Value, Guid.NewGuid(), DateTime.UtcNow, 5);
+        var otherSubscriptionId = Guid.NewGuid();
+        var seat = SubscriptionSeat.Create(Guid.NewGuid(), subscription.Id, Guid.NewGuid(), actor.UserId, DateTime.UtcNow);
+        var foreignSeat = SubscriptionSeat.Create(Guid.NewGuid(), otherSubscriptionId, Guid.NewGuid(), actor.UserId, DateTime.UtcNow);
+        var store = Substitute.For<ILicenseAdminStore>();
+        store.GetTenantSubscriptionAsync(actor.TenantId.Value, subscription.Id, Arg.Any<CancellationToken>()).Returns(subscription);
+        store.GetSeatAsync(seat.Id, Arg.Any<CancellationToken>()).Returns(seat);
+        store.GetSeatAsync(foreignSeat.Id, Arg.Any<CancellationToken>()).Returns(foreignSeat);
+        store.SubscriptionTenantAsync(subscription.Id, Arg.Any<CancellationToken>()).Returns(actor.TenantId.Value);
+        store.SubscriptionTenantAsync(otherSubscriptionId, Arg.Any<CancellationToken>()).Returns(actor.TenantId.Value);
+        var unitOfWork = Substitute.For<IUnitOfWork>();
+        unitOfWork.ExecuteInTransactionAsync(Arg.Any<Func<CancellationToken, Task>>(), Arg.Any<CancellationToken>())
+            .Returns(call => call.Arg<Func<CancellationToken, Task>>()(CancellationToken.None));
+        var cache = Substitute.For<IPermissionCacheInvalidator>();
+        var handler = new RevokeWorkspacePlanSeatsCommandHandler(
+            actor,
+            Permissions(licenseManage: true),
+            Tenants(actor),
+            store,
+            Substitute.For<IAuditLogRepository>(),
+            cache,
+            unitOfWork,
+            Clock(),
+            Substitute.For<IClientContext>());
+
+        var revoked = await handler.Handle(new RevokeWorkspacePlanSeatsCommand(subscription.Id, [seat.Id]), CancellationToken.None);
+        var rejected = await handler.Handle(new RevokeWorkspacePlanSeatsCommand(subscription.Id, [foreignSeat.Id]), CancellationToken.None);
+
+        revoked.IsSuccess.Should().BeTrue();
+        seat.IsActive.Should().BeFalse();
+        cache.Received(1).ScheduleFeatures(actor.TenantId.Value);
+        rejected.Error.Code.Should().Be("license.not_found");
+        foreignSeat.IsActive.Should().BeTrue();
+    }
+
     private static FakeActor Actor() => new() { UserId = Guid.NewGuid(), TenantId = Guid.NewGuid() };
 
     private static IPermissionService Permissions(bool licenseRead = false, bool licenseManage = false)

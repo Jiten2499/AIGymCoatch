@@ -30,6 +30,8 @@ public enum EmploymentType
     Contract = 3,
     Temporary = 4,
     Intern = 5,
+    Freelance = 6,
+    VisitingTrainer = 7,
 }
 
 public enum MembershipType

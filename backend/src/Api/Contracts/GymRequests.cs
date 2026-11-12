@@ -113,7 +113,23 @@ public sealed record AddCoachRequest(
     string? Phone,
     string? Specialization,
     Guid? BranchId,
-    bool SendActivationLink = false);
+    bool SendActivationLink = false,
+    DateOnly? DateOfBirth = null,
+    string? Gender = null,
+    string? Address = null,
+    string? EmergencyContactName = null,
+    string? EmergencyContactPhone = null,
+    string? Designation = null,
+    string? Bio = null,
+    string? Certification = null,
+    int? ExperienceYears = null,
+    LifeFitAI.Domain.Gym.EmploymentType? EmploymentType = null,
+    DateOnly? JoiningDate = null,
+    Guid? ReportingManagerUserId = null,
+    string? EmploymentNotes = null,
+    LifeFitAI.Domain.Gym.ProfileStatus Status = LifeFitAI.Domain.Gym.ProfileStatus.Active,
+    bool CommissionEligible = false,
+    Guid? SubscriptionId = null);
 
 public sealed record UpdateTrainerRequest(
     string? Bio,
@@ -130,7 +146,18 @@ public sealed record UpdateTrainerRequest(
     string? EmployeeCode = null,
     DateOnly? JoiningDate = null,
     bool CommissionEligible = false,
-    bool SetEmployment = false);
+    bool SetEmployment = false,
+    DateOnly? DateOfBirth = null,
+    string? Gender = null,
+    string? Address = null,
+    string? EmergencyContactName = null,
+    string? EmergencyContactPhone = null,
+    string? Designation = null,
+    LifeFitAI.Domain.Gym.EmploymentType? EmploymentType = null,
+    Guid? ReportingManagerUserId = null,
+    string? EmploymentNotes = null,
+    bool SetStaffProfile = false,
+    Guid? SubscriptionId = null);
 
 public sealed record PlanRequest(
     string Name,

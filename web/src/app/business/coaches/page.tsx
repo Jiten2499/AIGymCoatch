@@ -12,12 +12,20 @@ import { getSession, subscribeSession } from "../../../lib/session";
 import type { Coach, CreatedCoach, Page } from "../../../lib/types";
 import { TrainerPerformancePanel } from "../TrainerPerformancePanel";
 import { CoachDetails } from "./CoachDetails";
-import { AddCoachDialog, EditCoachDialog, PasswordDialog } from "./CoachDialogs";
+import { AddCoachWizard } from "./AddCoachWizard";
+import { EditCoachWizard } from "./EditCoachWizard";
+import { PasswordDialog } from "./CoachDialogs";
 
 export default function BusinessCoachesPage() {
   const client = useQueryClient();
   const session = useSyncExternalStore(subscribeSession, getSession, () => null);
   const tenantId = session?.currentTenant?.id ?? null;
+  const access = useQuery({
+    queryKey: ["me-access", tenantId],
+    enabled: tenantId !== null,
+    queryFn: () => api<{ permissions: string[] }>("/users/me/access"),
+  });
+  const canEditCompensation = (access.data?.permissions ?? []).some((code) => code === "PAYROLL_PREPARE" || code === "PAYROLL_READ");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [search, setSearch] = useState("");
@@ -156,27 +164,50 @@ export default function BusinessCoachesPage() {
         />
       </div>
       {adding ? (
-        <AddCoachDialog
+        <AddCoachWizard
+          canEditCompensation={canEditCompensation}
           onCancel={() => setAdding(false)}
-          onCreated={async (created, photoWarning) => {
+          onCreated={async (result) => {
             setAdding(false);
-            setIssued(created);
-            setPhotoNotice(photoWarning ?? null);
-            await client.invalidateQueries({ queryKey: ["coaches", tenantId] });
+            setIssued(result.coach);
+            setPhotoNotice([result.photoWarning, result.compensationWarning].filter(Boolean).join(" ") || null);
+            setSearch("");
+            setStatus("");
+            setSpecialization("");
+            setApplied({ search: "", status: "", specialization: "" });
+            setPage(1);
+            setSelected(new Set());
+            await client.invalidateQueries({ queryKey: ["coaches"] });
+            await client.invalidateQueries({ queryKey: ["trainers"] });
           }}
         />
       ) : null}
       {editing && selectedRows[0] ? (
-        <EditCoachDialog
+        <EditCoachWizard
+          canEditCompensation={canEditCompensation}
           coach={selectedRows[0]}
           onCancel={() => setEditing(false)}
-          onSaved={async () => {
+          onSaved={async (result) => {
             setEditing(false);
-            await client.invalidateQueries({ queryKey: ["coaches", tenantId] });
+            setPhotoNotice([result?.photoWarning, result?.compensationWarning].filter(Boolean).join(" ") || null);
+            await client.invalidateQueries({ queryKey: ["coaches"] });
+            await client.invalidateQueries({ queryKey: ["coach-edit"] });
+            await client.invalidateQueries({ queryKey: ["coach-photo"] });
           }}
         />
       ) : null}
-      {issued ? <PasswordDialog created={issued} notice={photoNotice} onClose={() => { setIssued(null); setPhotoNotice(null); }} /> : null}
+      {issued ? (
+        <PasswordDialog
+          created={issued}
+          notice={photoNotice}
+          onClose={() => {
+            const createdId = issued.id;
+            setIssued(null);
+            setPhotoNotice(null);
+            setViewing(createdId);
+          }}
+        />
+      ) : null}
       {viewing ? <CoachDetails onClose={() => setViewing(null)} onDeleted={() => { setViewing(null); setDeletedNotice("The coach was deleted from active business views. The record is retained as soft-deleted data."); void client.invalidateQueries({ queryKey: ["coaches"] }); void client.invalidateQueries({ queryKey: ["trainers"] }); void client.invalidateQueries({ queryKey: ["members"] }); }} trainerId={viewing} /> : null}
       {confirmDelete && selectedRows.length > 0 ? (
         <ProfileDeleteDialog

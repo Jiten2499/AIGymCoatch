@@ -71,6 +71,8 @@ public interface ILicenseAdminStore
 
     Task<IReadOnlyList<WorkspacePlanResponse>> ListWorkspacePlansAsync(Guid tenantId, DateTime utcNow, CancellationToken cancellationToken);
 
+    Task<IReadOnlyList<WorkspacePlanAssignee>> ListActivePlanAssigneesAsync(Guid tenantId, Guid subscriptionId, CancellationToken cancellationToken);
+
     Task<IReadOnlyDictionary<Guid, UserPlanAssignment>> ActiveUserPlansAsync(Guid tenantId, CancellationToken cancellationToken);
 
     Task<Subscription?> GetTenantSubscriptionAsync(Guid tenantId, Guid subscriptionId, CancellationToken cancellationToken);

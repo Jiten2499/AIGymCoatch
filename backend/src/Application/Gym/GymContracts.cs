@@ -119,7 +119,19 @@ public sealed record TrainerResponse(
     string? Phone = null,
     DateOnly? JoiningDate = null,
     bool CommissionEligible = false,
-    bool HasPhoto = false);
+    bool HasPhoto = false,
+    Guid? StaffProfileId = null,
+    string? Designation = null,
+    DateOnly? DateOfBirth = null,
+    string? Gender = null,
+    string? Address = null,
+    string? EmergencyContactName = null,
+    string? EmergencyContactPhone = null,
+    EmploymentType? EmploymentType = null,
+    Guid? ReportingManagerUserId = null,
+    string? EmploymentNotes = null,
+    Guid? SubscriptionId = null,
+    string? PlanName = null);
 
 public sealed record PlanResponse(
     Guid Id,

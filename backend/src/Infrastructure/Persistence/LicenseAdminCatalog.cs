@@ -97,6 +97,20 @@ public sealed partial class LicenseAdminStore
         }).ToArray();
     }
 
+    public async Task<IReadOnlyList<WorkspacePlanAssignee>> ListActivePlanAssigneesAsync(Guid tenantId, Guid subscriptionId, CancellationToken cancellationToken) =>
+        await (
+            from seat in _db.SubscriptionSeats
+            join subscription in _db.Subscriptions on seat.SubscriptionId equals subscription.Id
+            join user in _db.Users on seat.UserId equals user.Id
+            where subscription.TenantId == tenantId
+                && subscription.Id == subscriptionId
+                && subscription.SubscriberType == SubscriberType.Tenant
+                && seat.Status == SeatStatus.Active
+            orderby user.LastName, user.FirstName, user.Email
+            select new WorkspacePlanAssignee(seat.Id, seat.UserId, user.Email, user.FirstName, user.LastName, seat.AssignedAt))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
     public async Task<IReadOnlyDictionary<Guid, UserPlanAssignment>> ActiveUserPlansAsync(Guid tenantId, CancellationToken cancellationToken)
     {
         var rows = await (

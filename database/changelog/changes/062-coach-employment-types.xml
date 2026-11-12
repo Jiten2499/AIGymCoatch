@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0082" author="lifefit-architecture">
+        <comment>Ticket: LF-0082. Extend StaffProfiles employment types for coaches: Freelance and VisitingTrainer. Index review: no new indexes; EmploymentType remains a low-cardinality CHECK on StaffProfiles. Performance note: constraint-only change; existing filtered indexes on StaffProfiles are unchanged.</comment>
+        <sql splitStatements="false">
+            ALTER TABLE app.StaffProfiles DROP CONSTRAINT CK_StaffProfiles_EmploymentType;
+            ALTER TABLE app.StaffProfiles ADD CONSTRAINT CK_StaffProfiles_EmploymentType
+                CHECK (EmploymentType IS NULL OR EmploymentType IN (
+                    N'FullTime', N'PartTime', N'Contract', N'Temporary', N'Intern', N'Freelance', N'VisitingTrainer'));
+        </sql>
+        <rollback>
+            <sql splitStatements="false">
+                UPDATE app.StaffProfiles
+                SET EmploymentType = N'Contract'
+                WHERE EmploymentType IN (N'Freelance', N'VisitingTrainer');
+                ALTER TABLE app.StaffProfiles DROP CONSTRAINT CK_StaffProfiles_EmploymentType;
+                ALTER TABLE app.StaffProfiles ADD CONSTRAINT CK_StaffProfiles_EmploymentType
+                    CHECK (EmploymentType IS NULL OR EmploymentType IN (N'FullTime', N'PartTime', N'Contract', N'Temporary', N'Intern'));
+            </sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

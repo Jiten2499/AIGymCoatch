@@ -32,6 +32,15 @@ export type WorkspacePlan = {
   features: { code: string; enabled: boolean }[];
 };
 
+export type WorkspacePlanAssignee = {
+  seatId: string;
+  userId: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  assignedAt: string;
+};
+
 export type CreatedWorkspaceUser = {
   id: string;
   email: string;
@@ -185,6 +194,18 @@ export type Coach = {
   joiningDate?: string | null;
   commissionEligible?: boolean;
   hasPhoto?: boolean;
+  staffProfileId?: string | null;
+  designation?: string | null;
+  dateOfBirth?: string | null;
+  gender?: string | null;
+  address?: string | null;
+  emergencyContactName?: string | null;
+  emergencyContactPhone?: string | null;
+  employmentType?: string | null;
+  reportingManagerUserId?: string | null;
+  employmentNotes?: string | null;
+  subscriptionId?: string | null;
+  planName?: string | null;
 };
 
 export type CreatedCoach = {
@@ -194,4 +215,5 @@ export type CreatedCoach = {
   lastName: string;
   specialization: string | null;
   temporaryPassword: string | null;
+  staffProfileId?: string | null;
 };

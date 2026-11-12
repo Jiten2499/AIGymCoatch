@@ -31,7 +31,30 @@ public sealed class TrainersController : ApiControllerBase
     [HttpPost("trainers")]
     [RequiresPermission(PermissionCodes.StaffCreate)]
     public async Task<IActionResult> Add(AddCoachRequest request, CancellationToken cancellationToken) =>
-        (await Sender.Send(new AddCoachCommand(request.Email, request.FirstName, request.LastName, request.Phone, request.Specialization, request.BranchId, request.SendActivationLink), cancellationToken)).ToActionResult();
+        (await Sender.Send(new AddCoachCommand(
+            request.Email,
+            request.FirstName,
+            request.LastName,
+            request.Phone,
+            request.Specialization,
+            request.BranchId,
+            request.SendActivationLink,
+            request.DateOfBirth,
+            request.Gender,
+            request.Address,
+            request.EmergencyContactName,
+            request.EmergencyContactPhone,
+            request.Designation,
+            request.Bio,
+            request.Certification,
+            request.ExperienceYears,
+            request.EmploymentType,
+            request.JoiningDate,
+            request.ReportingManagerUserId,
+            request.EmploymentNotes,
+            request.Status,
+            request.CommissionEligible,
+            request.SubscriptionId), cancellationToken)).ToActionResult();
 
     [HttpDelete("trainers/{id:guid}")]
     [RequiresPermission(PermissionCodes.TrainerUpdate)]
@@ -41,7 +64,34 @@ public sealed class TrainersController : ApiControllerBase
     [HttpPut("trainers/{id:guid}")]
     [RequiresPermission(PermissionCodes.TrainerUpdate)]
     public async Task<IActionResult> Update(Guid id, UpdateTrainerRequest request, CancellationToken cancellationToken) =>
-        (await Sender.Send(new UpdateTrainerCommand(id, request.Bio, request.Specialization, request.ExperienceYears, request.Certification, request.ProfileImageUrl, request.BranchId, request.Status, request.FirstName, request.LastName, request.Phone, request.SetPhone, request.EmployeeCode, request.JoiningDate, request.CommissionEligible, request.SetEmployment), cancellationToken)).ToActionResult();
+        (await Sender.Send(new UpdateTrainerCommand(
+            id,
+            request.Bio,
+            request.Specialization,
+            request.ExperienceYears,
+            request.Certification,
+            request.ProfileImageUrl,
+            request.BranchId,
+            request.Status,
+            request.FirstName,
+            request.LastName,
+            request.Phone,
+            request.SetPhone,
+            request.EmployeeCode,
+            request.JoiningDate,
+            request.CommissionEligible,
+            request.SetEmployment,
+            request.DateOfBirth,
+            request.Gender,
+            request.Address,
+            request.EmergencyContactName,
+            request.EmergencyContactPhone,
+            request.Designation,
+            request.EmploymentType,
+            request.ReportingManagerUserId,
+            request.EmploymentNotes,
+            request.SetStaffProfile,
+            request.SubscriptionId), cancellationToken)).ToActionResult();
 
     [HttpGet("trainers/{id:guid}/profile-photo")]
     [RequiresPermission(PermissionCodes.TrainerRead)]

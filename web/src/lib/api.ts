@@ -71,7 +71,16 @@ export async function api<T>(path: string, init: RequestInit = {}, allowRefresh 
     return undefined as T;
   }
 
-  return (await response.json()) as T;
+  const raw = await response.text();
+  if (!raw.trim()) {
+    return undefined as T;
+  }
+
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    throw new ApiError("The server returned an unexpected response.", response.status);
+  }
 }
 
 export async function login(email: string, password: string): Promise<AdminSession> {

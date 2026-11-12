@@ -5,7 +5,13 @@ namespace LifeFitAI.Application.Gym;
 
 public static class TrainerMaps
 {
-    public static TrainerResponse ToResponse(TrainerProfile trainer, UserAccount user, int assignedMembers = 0) =>
+    public static TrainerResponse ToResponse(
+        TrainerProfile trainer,
+        UserAccount user,
+        int assignedMembers = 0,
+        StaffProfile? staff = null,
+        Guid? subscriptionId = null,
+        string? planName = null) =>
         new(
             trainer.Id,
             trainer.UserId,
@@ -17,12 +23,24 @@ public static class TrainerMaps
             trainer.ExperienceYears,
             trainer.Certification,
             trainer.ProfileImageUrl,
-            trainer.BranchId,
+            trainer.BranchId ?? staff?.BranchId,
             trainer.Status,
             assignedMembers,
-            trainer.EmployeeCode,
+            trainer.EmployeeCode ?? staff?.EmployeeCode,
             user.Phone,
-            trainer.JoiningDate,
+            trainer.JoiningDate ?? staff?.JoiningDate,
             trainer.CommissionEligible,
-            trainer.PhotoStorageKey is not null);
+            trainer.PhotoStorageKey is not null,
+            staff?.Id,
+            staff?.Designation,
+            staff?.DateOfBirth,
+            staff?.Gender,
+            staff?.Address,
+            staff?.EmergencyContactName,
+            staff?.EmergencyContactPhone,
+            staff?.EmploymentType,
+            staff?.ReportingManagerUserId,
+            staff?.EmploymentNotes,
+            subscriptionId,
+            planName);
 }

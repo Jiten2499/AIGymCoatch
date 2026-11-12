@@ -44,8 +44,16 @@ public sealed class BusinessController : ApiControllerBase
 
     [HttpGet("business/users/lookup")]
     [RequiresPermission(PermissionCodes.UserCreate)]
-    public async Task<IActionResult> LookupUser([FromQuery] string? email, [FromQuery] string? phone, CancellationToken cancellationToken) =>
-        (await Sender.Send(new LookupStaffCandidateQuery(email, phone), cancellationToken)).ToActionResult();
+    public async Task<IActionResult> LookupUser([FromQuery] string? email, [FromQuery] string? phone, CancellationToken cancellationToken)
+    {
+        var result = await Sender.Send(new LookupStaffCandidateQuery(email, phone), cancellationToken);
+        if (result.IsSuccess && result.Value is null)
+        {
+            return NoContent();
+        }
+
+        return result.ToActionResult();
+    }
 
     [HttpPost("business/users")]
     [RequiresPermission(PermissionCodes.UserCreate)]
@@ -152,6 +160,16 @@ public sealed class BusinessController : ApiControllerBase
     [RequiresPermission(PermissionCodes.LicenseRead)]
     public async Task<IActionResult> Plans(CancellationToken cancellationToken) =>
         (await Sender.Send(new ListWorkspacePlansQuery(), cancellationToken)).ToActionResult();
+
+    [HttpGet("business/plans/{subscriptionId:guid}/assignees")]
+    [RequiresPermission(PermissionCodes.LicenseRead)]
+    public async Task<IActionResult> PlanAssignees(Guid subscriptionId, CancellationToken cancellationToken) =>
+        (await Sender.Send(new ListWorkspacePlanAssigneesQuery(subscriptionId), cancellationToken)).ToActionResult();
+
+    [HttpPost("business/plans/{subscriptionId:guid}/revoke")]
+    [RequiresPermission(PermissionCodes.LicenseManage)]
+    public async Task<IActionResult> RevokePlanSeats(Guid subscriptionId, RevokeWorkspacePlanSeatsRequest request, CancellationToken cancellationToken) =>
+        (await Sender.Send(new RevokeWorkspacePlanSeatsCommand(subscriptionId, request.SeatIds), cancellationToken)).ToActionResult();
 
     [HttpPost("business/users/{userId:guid}/plan")]
     [RequiresPermission(PermissionCodes.LicenseManage)]

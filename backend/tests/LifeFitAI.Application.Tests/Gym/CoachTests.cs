@@ -18,8 +18,18 @@ public sealed class CoachTests
     [Fact]
     public void AddCoach_RejectsABlankEmail()
     {
-        var result = new AddCoachCommandValidator().Validate(new AddCoachCommand(" ", "Ada", "Lovelace", null, null, null));
+        var result = new AddCoachCommandValidator().Validate(new AddCoachCommand(" ", "Ada", "Lovelace", "+9779800000000", null, null, false, Designation: "Personal Trainer", JoiningDate: new DateOnly(2026, 11, 12)));
         result.IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public void AddCoach_RequiresPhoneDesignationAndJoiningDate()
+    {
+        var result = new AddCoachCommandValidator().Validate(new AddCoachCommand("ada@gym.test", "Ada", "Lovelace", null, null, null));
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(error => error.PropertyName == nameof(AddCoachCommand.Phone));
+        result.Errors.Should().Contain(error => error.PropertyName == nameof(AddCoachCommand.Designation));
+        result.Errors.Should().Contain(error => error.PropertyName == nameof(AddCoachCommand.JoiningDate));
     }
 
     [Fact]
@@ -66,7 +76,63 @@ public sealed class CoachTests
         createdResult.Value.TemporaryPassword.Should().BeNull();
         createdResult.Value.Email.Should().Be("grace@gym.test");
         createdResult.Value.Specialization.Should().Be("Strength");
+        createdResult.Value.StaffProfileId.Should().NotBeNull();
         await freshPeople.Received(1).AddTrainerAsync(Arg.Any<TrainerProfile>(), Arg.Any<CancellationToken>());
+        await freshPeople.Received(1).AddStaffAsync(Arg.Any<StaffProfile>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AddCoach_PersistsExpandedProfileFieldsForFreelanceCoach()
+    {
+        var created = UserAccount.Create(Guid.NewGuid(), Guid.NewGuid(), "coach@gym.test", null, "hash", "salt", "Rahul", "Sharma");
+        var people = Substitute.For<IPeopleRepository>();
+        var users = Substitute.For<IUserAccountRepository>();
+        var accounts = Substitute.For<IAccountLinker>();
+        var roles = Substitute.For<IRoleRepository>();
+        users.GetByEmailAsync("coach@gym.test", Arg.Any<CancellationToken>()).Returns((UserAccount?)null);
+        accounts.ResolveAsync("coach@gym.test", Arg.Any<string?>(), "Rahul", "Sharma", "+9779800112233", Arg.Any<CancellationToken>()).Returns(Result.Success(created));
+        roles.GetByNameAsync(RoleNames.Trainer, Arg.Any<CancellationToken>()).Returns(Role.Create(Guid.NewGuid(), RoleNames.Trainer, null));
+        roles.GetRoleNamesAsync(created.Id, _tenantId, Arg.Any<CancellationToken>()).Returns(new List<string>());
+        StaffProfile? savedStaff = null;
+        TrainerProfile? savedTrainer = null;
+        people.When(repo => repo.AddStaffAsync(Arg.Any<StaffProfile>(), Arg.Any<CancellationToken>())).Do(call => savedStaff = call.Arg<StaffProfile>());
+        people.When(repo => repo.AddTrainerAsync(Arg.Any<TrainerProfile>(), Arg.Any<CancellationToken>())).Do(call => savedTrainer = call.Arg<TrainerProfile>());
+
+        var result = await Handler(Allow(), accounts, people, users, roles).Handle(
+            new AddCoachCommand(
+                "coach@gym.test",
+                "Rahul",
+                "Sharma",
+                "+9779800112233",
+                "Strength Training, Weight Loss",
+                null,
+                false,
+                new DateOnly(1995, 4, 12),
+                "Male",
+                "Kathmandu",
+                "Sita Sharma",
+                "+9779800998877",
+                "Senior Trainer",
+                "Leads strength blocks",
+                "ACE CPT · Issued by ACE",
+                5,
+                EmploymentType.Freelance,
+                new DateOnly(2026, 11, 1),
+                null,
+                "Previous workplace: Peak Gym",
+                ProfileStatus.Active,
+                true),
+            CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.StaffProfileId.Should().Be(savedStaff!.Id);
+        savedStaff.Designation.Should().Be("Senior Trainer");
+        savedStaff.EmploymentType.Should().Be(EmploymentType.Freelance);
+        savedStaff.EmergencyContactName.Should().Be("Sita Sharma");
+        savedTrainer!.Specialization.Should().Be("Strength Training, Weight Loss");
+        savedTrainer.ExperienceYears.Should().Be(5);
+        savedTrainer.CommissionEligible.Should().BeTrue();
+        savedTrainer.Certification.Should().Contain("ACE CPT");
     }
 
     [Fact]
@@ -78,7 +144,15 @@ public sealed class CoachTests
         var users = Substitute.For<IUserAccountRepository>();
         people.GetTrainerAsync(_tenantId, trainer.Id, Arg.Any<CancellationToken>()).Returns(trainer);
         users.GetByIdAsync(user.Id, Arg.Any<CancellationToken>()).Returns(user);
-        var handler = new UpdateTrainerCommandHandler(Allow(), Actor(), people, users, Substitute.For<IUnitOfWork>());
+        var handler = new UpdateTrainerCommandHandler(
+            Allow(),
+            Actor(),
+            people,
+            users,
+            Substitute.For<IUnitOfWork>(),
+            Substitute.For<LifeFitAI.Application.Licensing.ILicenseAdminStore>(),
+            Substitute.For<LifeFitAI.Application.Platform.IPermissionCacheInvalidator>(),
+            Clock());
 
         var result = await handler.Handle(new UpdateTrainerCommand(trainer.Id, "Leads strength", "Strength", 8, "ACE", null, null, ProfileStatus.Active, "Grace", "Hopper"), CancellationToken.None);
 
@@ -87,6 +161,7 @@ public sealed class CoachTests
         result.Value.LastName.Should().Be("Hopper");
         result.Value.Specialization.Should().Be("Strength");
         await people.Received(1).GetTrainerAsync(_tenantId, trainer.Id, Arg.Any<CancellationToken>());
+        await people.Received(1).GetStaffByUserAsync(_tenantId, user.Id, Arg.Any<CancellationToken>());
     }
 
     private AddCoachCommandHandler Handler(IOperationGuard guard, IAccountLinker accounts, IPeopleRepository people, IUserAccountRepository users, IRoleRepository? roles = null)
@@ -108,7 +183,9 @@ public sealed class CoachTests
             unit,
             Clock(),
             Substitute.For<IClientContext>(),
-            Substitute.For<ITenantRepository>());
+            Substitute.For<ITenantRepository>(),
+            Substitute.For<LifeFitAI.Application.Licensing.ILicenseAdminStore>(),
+            Substitute.For<LifeFitAI.Application.Platform.IPermissionCacheInvalidator>());
     }
 
     private IOperationGuard Allow()
