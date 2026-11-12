@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="063-staff-leave-defaults" author="lifefit">
+        <comment>Ticket: LF-0083. Grant LEAVE_APPLY to remaining business staff roles by default, and clarify LEAVE_READ as viewing others' leave on the calendar. Index review: catalog RolePermissions inserts only; UX_Permissions_Code and PK_RolePermissions. Performance note: fixed seed rows.</comment>
+        <sql splitStatements="false"><![CDATA[
+            SET QUOTED_IDENTIFIER ON;
+
+            UPDATE app.Permissions
+            SET Name = N'View others'' leave',
+                Description = N'View the staff leave calendar for other people in this workspace.',
+                UpdatedAt = SYSUTCDATETIME()
+            WHERE Code = N'LEAVE_READ';
+
+            UPDATE app.Permissions
+            SET Name = N'Apply own leave',
+                Description = N'Submit and cancel your own staff leave requests and see them on the calendar.',
+                UpdatedAt = SYSUTCDATETIME()
+            WHERE Code = N'LEAVE_APPLY';
+
+            INSERT INTO app.RolePermissions (RoleId, PermissionId)
+            SELECT r.Id, p.Id
+            FROM app.Roles r
+            JOIN app.Permissions p ON p.Code = N'LEAVE_APPLY'
+            WHERE r.TenantId IS NULL
+              AND r.Name IN (N'SuperAdmin', N'GymOwner', N'BusinessAdmin', N'GymManager', N'Trainer', N'Receptionist', N'Accountant')
+              AND NOT EXISTS (SELECT 1 FROM app.RolePermissions rp WHERE rp.RoleId = r.Id AND rp.PermissionId = p.Id);
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                UPDATE app.Permissions
+                SET Name = N'Read staff leave',
+                    Description = N'View staff leave calendar and request details.',
+                    UpdatedAt = SYSUTCDATETIME()
+                WHERE Code = N'LEAVE_READ';
+
+                UPDATE app.Permissions
+                SET Name = N'Apply leave',
+                    Description = N'Submit and cancel own staff leave requests.',
+                    UpdatedAt = SYSUTCDATETIME()
+                WHERE Code = N'LEAVE_APPLY';
+
+                DELETE rp
+                FROM app.RolePermissions rp
+                INNER JOIN app.Roles r ON r.Id = rp.RoleId
+                INNER JOIN app.Permissions p ON p.Id = rp.PermissionId
+                WHERE p.Code = N'LEAVE_APPLY'
+                  AND r.TenantId IS NULL
+                  AND r.Name IN (N'BusinessAdmin', N'Accountant');
+            ]]></sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

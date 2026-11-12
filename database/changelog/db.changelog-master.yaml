@@ -188,5 +188,8 @@ databaseChangeLog:
   - include:
       file: changes/062-coach-employment-types.xml
       relativeToChangelogFile: true
+  - include:
+      file: changes/063-staff-leave-defaults.xml
+      relativeToChangelogFile: true
 
 

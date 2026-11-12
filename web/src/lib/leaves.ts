@@ -47,8 +47,24 @@ export function listStaffLeaves(from: string, to: string, staffProfileId?: strin
   return api<StaffLeaveListItem[]>(`/leaves?${query.toString()}`);
 }
 
+export function listMyStaffLeaves() {
+  return api<StaffLeaveListItem[]>("/leaves/mine");
+}
+
 export function getStaffLeave(id: string) {
   return api<StaffLeaveDetails>(`/leaves/${id}`);
+}
+
+export function applyStaffLeave(body: { leaveType: string; startDate: string; endDate: string; reason: string }) {
+  return api<StaffLeaveDetails>("/leaves", { method: "POST", body: JSON.stringify(body) });
+}
+
+export function cancelStaffLeave(id: string) {
+  return api<StaffLeaveDetails>(`/leaves/${id}/cancel`, { method: "POST" });
+}
+
+export function overlapsRange(item: StaffLeaveListItem, from: string, to: string): boolean {
+  return item.startDate <= to && item.endDate >= from;
 }
 
 export function statusTone(status: string): string {

@@ -19,7 +19,7 @@ describe("business navigation", () => {
   });
 
   it("hides payroll and chat when the person cannot use them", () => {
-    const features = new Map([["GYM_STAFF_PAYROLL", true], ["GYM_CHAT", true], ["BUSINESS_REPORTS", true]]);
+    const features = new Map([["GYM_STAFF_PAYROLL", true], ["GYM_CHAT", true], ["BUSINESS_REPORTS", true], ["STAFF_LEAVE", true]]);
     const permissions = new Set(["REPORT_READ", "CHAT_READ"]);
 
     expect(canSeeBusinessLink("/business/payroll", permissions, features)).toBe(false);
@@ -31,5 +31,8 @@ describe("business navigation", () => {
     expect(canSeeBusinessLink("/business/coaches", new Set(["MEMBER_READ"]), new Map())).toBe(false);
     expect(canSeeBusinessLink("/business/coaches", new Set(["TRAINER_READ"]), new Map())).toBe(true);
     expect(canSeeBusinessLink("/business/payroll", null, features)).toBe(false);
+    expect(canSeeBusinessLink("/business/leaves", new Set(["LEAVE_APPLY"]), features)).toBe(true);
+    expect(canSeeBusinessLink("/business/leaves", new Set(["LEAVE_READ"]), features)).toBe(true);
+    expect(canSeeBusinessLink("/business/leaves", new Set(["REPORT_READ"]), features)).toBe(false);
   });
 });
