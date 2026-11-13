@@ -111,7 +111,7 @@ export default function GoogleDriveAdminPage() {
 
       <section className="mt-6 max-w-2xl rounded-2xl border border-line bg-surface px-6 py-5">
         <h2 className="text-xl font-semibold">OAuth app</h2>
-        <p className="mt-2 text-sm text-muted">Create a Google Cloud OAuth client and register the redirect URI below. The client secret is stored protected and is not shown again.</p>
+        <p className="mt-2 text-sm text-muted">Create a Google Cloud OAuth client and register this exact redirect URI. It must be the API address, <span className="text-foreground">https://api.growventur.com/api/v1/integrations/google-drive/callback</span>. The website address does not complete the connection. The client secret is stored protected and is not shown again.</p>
         <label className="mt-4 block text-sm text-muted">
           Client ID
           <input className="field mt-2 w-full" value={clientId} onChange={(event) => setClientId(event.target.value)} autoComplete="off" />
