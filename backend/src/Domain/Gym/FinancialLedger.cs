@@ -33,6 +33,7 @@ public enum JournalSourceType
     Expense = 2,
     Transfer = 3,
     Reversal = 4,
+    PtPackagePayment = 5,
 }
 
 public enum JournalEntryStatus
@@ -45,6 +46,7 @@ public enum JournalEntryStatus
 public static class LedgerAccountCodes
 {
     public const string MembershipRevenue = "REV_MEMBERSHIP";
+    public const string PtRevenue = "REV_PT";
     public const string OperatingExpense = "EXP_OPERATING";
     public static string AssetFor(Guid financialAccountId) => $"AST_{financialAccountId:N}";
 }

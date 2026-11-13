@@ -6,7 +6,7 @@ namespace LifeFitAI.Application.Gym.Members;
 
 public static class MemberPtOpening
 {
-    public static async Task<Guid> OpenAsync(IPtPackageRepository packages, Guid tenantId, Guid memberProfileId, Guid? trainerProfileId, Guid packageId, DateOnly start, CancellationToken cancellationToken)
+    public static async Task<MemberPtAssignment> OpenAsync(IPtPackageRepository packages, Guid tenantId, Guid memberProfileId, Guid? trainerProfileId, Guid packageId, DateOnly start, CancellationToken cancellationToken, PtOpeningPayment? payment = null)
     {
         var package = await packages.GetAsync(tenantId, packageId, cancellationToken).ConfigureAwait(false);
         if (package is null)
@@ -25,7 +25,22 @@ public static class MemberPtOpening
         }
 
         var assignmentId = Guid.NewGuid();
-        await packages.AddAssignmentAsync(MemberPtAssignment.Open(assignmentId, package, memberProfileId, trainerProfileId, start), cancellationToken).ConfigureAwait(false);
-        return assignmentId;
+        var assignment = MemberPtAssignment.Open(assignmentId, package, memberProfileId, trainerProfileId, start);
+        if (payment is not null)
+        {
+            try
+            {
+                assignment.RecordOpeningPayment(payment.Amount, payment.Method, payment.Date, payment.ReferenceNumber, payment.Notes);
+            }
+            catch (ArgumentException)
+            {
+                throw new MemberOnboardingException(GymErrors.InvalidState);
+            }
+        }
+
+        await packages.AddAssignmentAsync(assignment, cancellationToken).ConfigureAwait(false);
+        return assignment;
     }
 }
+
+public sealed record PtOpeningPayment(decimal Amount, MembershipPaymentMethod Method, DateOnly Date, string? ReferenceNumber, string? Notes);

@@ -32,5 +32,15 @@ body {
   border-radius: 0.75rem;
   border: 1px solid var(--line);
   background: var(--background);
+  color: var(--foreground);
   padding: 0 0.75rem;
+}
+
+select.field {
+  color-scheme: dark;
+}
+
+select.field option {
+  background: var(--surface);
+  color: var(--foreground);
 }

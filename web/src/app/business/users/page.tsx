@@ -105,7 +105,6 @@ export default function BusinessUsersPage() {
           <button className="min-h-11 rounded-full bg-accent px-4 font-semibold text-background" onClick={() => setAdding(true)} type="button">Add staff</button>
           <button className="min-h-11 rounded-full border border-line px-4" disabled={selectedRows.length !== 1} onClick={() => setEditing(true)} type="button">Edit</button>
           <button className="min-h-11 rounded-full border border-line px-4" disabled={selectedRows.length !== 1} onClick={() => setAssigning(true)} type="button">Assign plan</button>
-          <button className="min-h-11 rounded-full border border-line px-4" disabled={selectedRows.length === 0} onClick={() => setConfirmDelete(true)} type="button">Delete</button>
           <button className="min-h-11 rounded-full border border-line px-4" onClick={() => void users.refetch()} type="button">{users.isFetching ? "Refreshing..." : "Refresh"}</button>
         </div>
       </div>

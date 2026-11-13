@@ -16,6 +16,7 @@ public sealed class LedgerRepository : ILedgerRepository
     {
         currency = currency.ToUpperInvariant();
         await EnsureSystemLedgerAsync(tenantId, LedgerAccountCodes.MembershipRevenue, "Membership Revenue", LedgerAccountClass.Revenue, cancellationToken).ConfigureAwait(false);
+        await EnsureSystemLedgerAsync(tenantId, LedgerAccountCodes.PtRevenue, "Personal Training Revenue", LedgerAccountClass.Revenue, cancellationToken).ConfigureAwait(false);
         await EnsureSystemLedgerAsync(tenantId, LedgerAccountCodes.OperatingExpense, "Operating Expense", LedgerAccountClass.Expense, cancellationToken).ConfigureAwait(false);
 
         foreach (var (kind, name) in new (FinancialAccountKind, string)[]

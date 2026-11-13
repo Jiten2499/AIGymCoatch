@@ -5,6 +5,8 @@ namespace LifeFitAI.Domain.Gym;
 public enum PtPaymentStatus
 {
     Unpaid = 1,
+    PartiallyPaid = 2,
+    Paid = 3,
 }
 
 public enum PtPackageStatus
@@ -176,6 +178,16 @@ public sealed class MemberPtAssignment : BaseEntity
 
     public string Currency { get; private set; } = "USD";
 
+    public decimal AmountPaid { get; private set; }
+
+    public MembershipPaymentMethod? PaymentMethod { get; private set; }
+
+    public DateOnly? PaymentDate { get; private set; }
+
+    public string? PaymentReferenceNumber { get; private set; }
+
+    public string? PaymentNotes { get; private set; }
+
     public PtPaymentStatus PaymentStatus { get; private set; }
 
     public MemberPtAssignmentStatus Status { get; private set; }
@@ -204,6 +216,37 @@ public sealed class MemberPtAssignment : BaseEntity
             PaymentStatus = PtPaymentStatus.Unpaid,
             Status = MemberPtAssignmentStatus.Active,
         };
+    }
+
+    public void RecordOpeningPayment(decimal amount, MembershipPaymentMethod method, DateOnly date, string? reference, string? notes) =>
+        Collect(amount, method, date, reference, notes);
+
+    public void Collect(decimal amount, MembershipPaymentMethod method, DateOnly date, string? reference, string? notes)
+    {
+        var next = AmountPaid + amount;
+        if (amount <= 0 || next > Price)
+        {
+            throw new ArgumentOutOfRangeException(nameof(amount));
+        }
+
+        if (MembershipPaymentRules.RequiresReference(method) && string.IsNullOrWhiteSpace(reference))
+        {
+            throw new ArgumentException("A reference number is required for this payment method.", nameof(reference));
+        }
+
+        var cleanedReference = string.IsNullOrWhiteSpace(reference) ? null : reference.Trim();
+        var cleanedNotes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+        if (cleanedReference is { Length: > 100 } || cleanedNotes is { Length: > 2000 })
+        {
+            throw new ArgumentException("Payment details are too long.");
+        }
+
+        AmountPaid = next;
+        PaymentMethod = method;
+        PaymentDate = date;
+        PaymentReferenceNumber = cleanedReference;
+        PaymentNotes = cleanedNotes;
+        PaymentStatus = next == Price ? PtPaymentStatus.Paid : PtPaymentStatus.PartiallyPaid;
     }
 
     public bool TryConsume(DateOnly day)

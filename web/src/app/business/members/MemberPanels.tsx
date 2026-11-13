@@ -10,6 +10,7 @@ import { memberPaymentMethods } from "./memberWizard";
 
 type Attendance = { id: string; checkInTime: string; checkOutTime: string | null; checkInMethod: string };
 type Payment = { id: string; amount: number; currency: string; paymentMethod: string; paymentDate: string; status: string; referenceNumber: string | null };
+type PtBalance = { id: string; packageName: string; price: number; currency: string; amountPaid?: number; status: string };
 type Summary = { packagePrice: number; discountAmount: number; finalAmount: number; currency: string; totalPaid: number; outstanding: number; settlementStatus: string };
 type Measurement = { id: string; measurementDate: string; weight: number | null; bodyFatPercentage: number | null; waist: number | null; notes: string | null };
 
@@ -84,6 +85,27 @@ function Memberships({ memberId, tenantId }: { memberId: string; tenantId: strin
   );
 }
 
+const paymentMethodLabels: Record<(typeof memberPaymentMethods)[number], string> = {
+  Cash: "Cash",
+  Upi: "UPI",
+  DebitCard: "Debit card",
+  CreditCard: "Credit card",
+  BankTransfer: "Bank transfer",
+  OnlinePayment: "Online payment",
+  Cheque: "Cheque",
+  Other: "Other",
+};
+
+const referenceMethods = new Set<(typeof memberPaymentMethods)[number]>(["Upi", "DebitCard", "CreditCard", "BankTransfer", "OnlinePayment", "Cheque"]);
+
+function membershipLabel(item: GymMembership) {
+  return `Membership · ${item.planName || item.membershipNumber} · ${item.startDate} to ${item.endDate} · ${item.status}`;
+}
+
+function pendingPt(item: PtBalance) {
+  return item.status === "Cancelled" ? 0 : Math.max(0, item.price - (item.amountPaid ?? 0));
+}
+
 function Payments({ canPay, memberId, tenantId }: { canPay: boolean; memberId: string; tenantId: string | null }) {
   const client = useQueryClient();
   const memberships = useQuery({
@@ -91,51 +113,97 @@ function Payments({ canPay, memberId, tenantId }: { canPay: boolean; memberId: s
     enabled: tenantId !== null,
     queryFn: () => api<Page<GymMembership>>(`/memberships?memberId=${memberId}&page=1&pageSize=20`),
   });
-  const [membershipId, setMembershipId] = useState("");
-  const selected = membershipId || memberships.data?.items[0]?.id || "";
+  const packages = useQuery({
+    queryKey: ["member-pt", tenantId, memberId],
+    enabled: tenantId !== null,
+    queryFn: () => api<PtBalance[]>(`/members/${memberId}/pt-assignments`),
+  });
+  const options = [
+    ...(memberships.data?.items ?? []).map((item) => ({ key: `membership:${item.id}`, label: membershipLabel(item) })),
+    ...(packages.data ?? []).flatMap((item) => {
+      const due = pendingPt(item);
+      return due > 0 ? [{ key: `pt:${item.id}`, label: `PT · ${item.packageName} · pending ${due} ${item.currency}` }] : [];
+    }),
+  ];
+  const [target, setTarget] = useState("");
+  const selected = options.some((item) => item.key === target) ? target : options[0]?.key ?? "";
+  const membershipId = selected.startsWith("membership:") ? selected.slice("membership:".length) : "";
+  const ptId = selected.startsWith("pt:") ? selected.slice(3) : "";
+  const pt = (packages.data ?? []).find((item) => item.id === ptId) ?? null;
   const payments = useQuery({
     queryKey: ["member-payments", tenantId, selected],
-    enabled: tenantId !== null && selected !== "",
-    queryFn: () => api<Page<Payment>>(`/memberships/${selected}/payments?page=1&pageSize=20`),
+    enabled: tenantId !== null && membershipId !== "",
+    queryFn: () => api<Page<Payment>>(`/memberships/${membershipId}/payments?page=1&pageSize=20`),
+  });
+  const ptPayments = useQuery({
+    queryKey: ["member-pt-payments", tenantId, ptId],
+    enabled: tenantId !== null && ptId !== "",
+    queryFn: () => api<Payment[]>(`/members/${memberId}/pt-assignments/${ptId}/payments`),
   });
   const summary = useQuery({
-    queryKey: ["member-payment-summary", tenantId, selected],
-    enabled: tenantId !== null && selected !== "",
-    queryFn: () => api<Summary>(`/memberships/${selected}/payment-summary`),
+    queryKey: ["member-payment-summary", tenantId, membershipId],
+    enabled: tenantId !== null && membershipId !== "",
+    queryFn: () => api<Summary>(`/memberships/${membershipId}/payment-summary`),
   });
+  const paymentRows = membershipId ? payments.data?.items ?? [] : ptPayments.data ?? [];
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState<(typeof memberPaymentMethods)[number]>("Cash");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [reference, setReference] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
   const record = useMutation({
-    mutationFn: () => api(`/memberships/${selected}/payments`, { method: "POST", body: JSON.stringify({ amount: Number(amount), paymentMethod: method, paymentDate: date, referenceNumber: null, notes: null }) }),
+    mutationFn: () => api(membershipId ? `/memberships/${membershipId}/payments` : `/members/${memberId}/pt-assignments/${ptId}/payments`, { method: "POST", body: JSON.stringify({ amount: Number(amount), paymentMethod: method, paymentDate: date, referenceNumber: reference.trim() || null, notes: null }) }),
     onSuccess: async () => {
       setAmount("");
-      await client.invalidateQueries({ queryKey: ["member-payments", tenantId, selected] });
-      await client.invalidateQueries({ queryKey: ["member-payment-summary", tenantId, selected] });
+      setReference("");
+      setFormError(null);
+      await client.invalidateQueries({ queryKey: ["member-payments", tenantId] });
+      await client.invalidateQueries({ queryKey: ["member-pt-payments", tenantId] });
+      await client.invalidateQueries({ queryKey: ["member-payment-summary", tenantId] });
       await client.invalidateQueries({ queryKey: ["memberships", tenantId, memberId] });
+      await client.invalidateQueries({ queryKey: ["member-pt", tenantId, memberId] });
+      await client.invalidateQueries({ queryKey: ["ledger-summary", tenantId] });
+      await client.invalidateQueries({ queryKey: ["ledger-transactions", tenantId] });
     },
   });
+  const ptDue = pt ? pendingPt(pt) : 0;
+  const loading = memberships.isLoading || packages.isLoading;
   return (
     <section className="mt-6 grid gap-4">
-      <label className="grid max-w-sm gap-2 text-sm">Membership
-        <select aria-label="Payment membership" className="field" onChange={(event) => setMembershipId(event.target.value)} value={selected}>
-          {(memberships.data?.items ?? []).map((item) => <option key={item.id} value={item.id}>{item.planName || item.membershipNumber}</option>)}
-        </select>
-      </label>
+      <p className="max-w-2xl text-sm text-muted">Collect the pending balance for a gym membership or a personal-training package. The balance is the price minus payments already recorded.</p>
+      {loading ? <p role="status">Loading balances.</p> : null}
+      {memberships.error instanceof ApiError ? <p role="alert">{memberships.error.message}</p> : null}
+      {packages.error instanceof ApiError ? <p role="alert">{packages.error.message}</p> : null}
+      {!loading && options.length === 0 ? <p className="text-muted">No membership or personal-training package has a pending balance.</p> : null}
+      {options.length > 0 ? (
+        <div className="grid max-w-xl gap-2 text-sm">
+          <span id="payment-membership-label">Balance</span>
+          <select aria-labelledby="payment-membership-label" className="field" onChange={(event) => setTarget(event.target.value)} value={selected}>
+            {options.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}
+          </select>
+        </div>
+      ) : null}
       {summary.data ? <p className="text-sm">Balance {summary.data.outstanding} {summary.data.currency} · {summary.data.settlementStatus} · Paid {summary.data.totalPaid} of {summary.data.finalAmount}</p> : null}
+      {pt ? <p className="text-sm">Balance {ptDue} {pt.currency} · Paid {pt.amountPaid ?? 0} of {pt.price}</p> : null}
       {payments.error instanceof ApiError ? <p role="alert">{payments.error.message}</p> : null}
+      {ptPayments.error instanceof ApiError ? <p role="alert">{ptPayments.error.message}</p> : null}
       <ScrollableGrid><ul className="grid w-max min-w-full gap-2 text-sm">
-        {(payments.data?.items ?? []).map((item) => <li className="rounded-2xl border border-line bg-surface p-3" key={item.id}>{item.paymentDate} · {item.amount} {item.currency} · {item.paymentMethod} · {item.status}</li>)}
-        {payments.data && payments.data.items.length === 0 ? <li className="text-muted">No payments recorded.</li> : null}
+        {paymentRows.map((item) => <li className="rounded-2xl border border-line bg-surface p-3" key={item.id}>{item.paymentDate} · {item.amount} {item.currency} · {paymentMethodLabels[item.paymentMethod as (typeof memberPaymentMethods)[number]] ?? item.paymentMethod} · {item.status}{item.referenceNumber ? ` · ${item.referenceNumber}` : ""}</li>)}
+        {(membershipId ? payments.data : ptPayments.data) && paymentRows.length === 0 ? <li className="text-muted">No payments recorded.</li> : null}
       </ul></ScrollableGrid>
       {canPay && selected ? (
-        <form className="grid max-w-lg gap-3 rounded-2xl border border-line bg-surface p-4" onSubmit={(event) => { event.preventDefault(); record.mutate(); }}>
+        <form className="grid max-w-lg gap-3 rounded-2xl border border-line bg-surface p-4" onSubmit={(event) => { event.preventDefault(); if (referenceMethods.has(method) && !reference.trim()) { setFormError("Enter a reference number for this payment method."); return; } setFormError(null); record.mutate(); }}>
           <h2 className="font-semibold">Record payment</h2>
-          <input aria-label="Payment amount" className="field" min="0" onChange={(event) => setAmount(event.target.value)} required step="0.01" type="number" value={amount} />
-          <select aria-label="Payment method" className="field" onChange={(event) => setMethod(event.target.value as (typeof memberPaymentMethods)[number])} value={method}>
-            {memberPaymentMethods.map((item) => <option key={item}>{item}</option>)}
-          </select>
+          <input aria-label="Payment amount" className="field" max={pt ? ptDue : summary.data?.outstanding} min="0.01" onChange={(event) => setAmount(event.target.value)} required step="0.01" type="number" value={amount} />
+          <div className="grid gap-2 text-sm">
+            <span id="payment-method-label">Payment method</span>
+            <select aria-labelledby="payment-method-label" className="field" onChange={(event) => setMethod(event.target.value as (typeof memberPaymentMethods)[number])} value={method}>
+              {memberPaymentMethods.map((item) => <option key={item} value={item}>{paymentMethodLabels[item]}</option>)}
+            </select>
+          </div>
           <input aria-label="Payment date" className="field" onChange={(event) => setDate(event.target.value)} required type="date" value={date} />
+          <input aria-label="Reference number" className="field" onChange={(event) => setReference(event.target.value)} placeholder={referenceMethods.has(method) ? "Required for this method" : "Optional"} value={reference} />
+          {formError ? <p role="alert">{formError}</p> : null}
           {record.error instanceof ApiError ? <p role="alert">{record.error.message}</p> : null}
           <button className="min-h-11 rounded-full bg-accent px-4 font-semibold text-background" type="submit">Save payment</button>
         </form>

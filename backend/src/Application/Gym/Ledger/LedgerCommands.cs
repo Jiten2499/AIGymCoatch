@@ -220,7 +220,7 @@ public sealed class LedgerCommandHandler :
             return Result.Failure<LedgerTransactionItem>(GymErrors.NotFound);
         }
 
-        if (entry.SourceType is JournalSourceType.MembershipPayment or JournalSourceType.Expense)
+        if (entry.SourceType is JournalSourceType.MembershipPayment or JournalSourceType.Expense or JournalSourceType.PtPackagePayment)
         {
             return Result.Failure<LedgerTransactionItem>(GymErrors.InvalidState);
         }

@@ -1,3 +1,4 @@
+using LifeFitAI.Application.Gym.Pt;
 using LifeFitAI.Application.Identity;
 using LifeFitAI.Domain.Gym;
 using LifeFitAI.Domain.Identity;
@@ -37,13 +38,17 @@ public sealed class LedgerQueryHandler :
     private readonly ICurrentActor _actor;
     private readonly ILedgerRepository _ledger;
     private readonly IBusinessProfileRepository _profiles;
+    private readonly ILedgerPostingService _posting;
+    private readonly IPtPackageRepository _packages;
 
-    public LedgerQueryHandler(IOperationGuard guard, ICurrentActor actor, ILedgerRepository ledger, IBusinessProfileRepository profiles)
+    public LedgerQueryHandler(IOperationGuard guard, ICurrentActor actor, ILedgerRepository ledger, IBusinessProfileRepository profiles, ILedgerPostingService posting, IPtPackageRepository packages)
     {
         _guard = guard;
         _actor = actor;
         _ledger = ledger;
         _profiles = profiles;
+        _posting = posting;
+        _packages = packages;
     }
 
     public async Task<Result<IReadOnlyList<FinancialAccountItem>>> Handle(ListFinancialAccountsQuery request, CancellationToken cancellationToken)
@@ -84,7 +89,7 @@ public sealed class LedgerQueryHandler :
             return Result.Failure<PageResult<LedgerTransactionItem>>(opened.Error);
         }
 
-        await EnsureAsync(opened.Value, cancellationToken).ConfigureAwait(false);
+        await PrepareAsync(opened.Value, cancellationToken).ConfigureAwait(false);
         var page = await _ledger.SearchTransactionsAsync(
             opened.Value,
             new LedgerTransactionSearch(request.From, request.To, request.EntryType, request.FinancialAccountId, request.Category, request.Status, request.RecordedByUserId, request.Page, request.PageSize),
@@ -105,7 +110,7 @@ public sealed class LedgerQueryHandler :
             return Result.Failure<LedgerSummary>(GymErrors.InvalidState);
         }
 
-        await EnsureAsync(opened.Value, cancellationToken).ConfigureAwait(false);
+        await PrepareAsync(opened.Value, cancellationToken).ConfigureAwait(false);
         return Result.Success(await _ledger.SummarizeAsync(opened.Value, request.From, request.To, cancellationToken).ConfigureAwait(false));
     }
 
@@ -138,5 +143,17 @@ public sealed class LedgerQueryHandler :
     {
         var profile = await _profiles.GetAsync(tenantId, cancellationToken).ConfigureAwait(false);
         await _ledger.EnsureDefaultsAsync(tenantId, profile?.Currency ?? "USD", cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task PrepareAsync(Guid tenantId, CancellationToken cancellationToken)
+    {
+        await EnsureAsync(tenantId, cancellationToken).ConfigureAwait(false);
+        if (_actor.UserId is not Guid actorId)
+        {
+            return;
+        }
+
+        var paid = await _packages.ListUnpostedPaidAssignmentsAsync(tenantId, cancellationToken).ConfigureAwait(false);
+        await _posting.PostOutstandingPtPaymentsAsync(tenantId, actorId, paid, cancellationToken).ConfigureAwait(false);
     }
 }

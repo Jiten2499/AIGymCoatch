@@ -49,6 +49,18 @@ export function setSession(session: AdminSession | null): void {
   emit();
 }
 
+export function rotateSession(next: AdminSession): void {
+  if (!current || viewChanged(current, next)) {
+    setSession(next);
+    return;
+  }
+
+  current.accessToken = next.accessToken;
+  current.refreshToken = next.refreshToken;
+  current.expiresAt = next.expiresAt;
+  writeStored(current);
+}
+
 export function subscribeSession(listener: () => void): () => void {
   listeners.add(listener);
   if (!ready && typeof window !== "undefined") {
@@ -78,6 +90,22 @@ function readActivity(): number | null {
 
   const last = Number(raw);
   return Number.isFinite(last) ? last : null;
+}
+
+function viewChanged(current: AdminSession, next: AdminSession): boolean {
+  const user = current.user;
+  const tenant = current.currentTenant;
+  const nextUser = next.user;
+  const nextTenant = next.currentTenant;
+  return user.id !== nextUser.id
+    || user.email !== nextUser.email
+    || user.firstName !== nextUser.firstName
+    || user.lastName !== nextUser.lastName
+    || user.hasPhoto !== nextUser.hasPhoto
+    || tenant?.id !== nextTenant?.id
+    || tenant?.name !== nextTenant?.name
+    || tenant?.type !== nextTenant?.type
+    || tenant?.status !== nextTenant?.status;
 }
 
 function emit(): void {

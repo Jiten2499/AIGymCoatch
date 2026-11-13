@@ -17,8 +17,9 @@ export function BusinessShell({ children }: { children: React.ReactNode }) {
   const sessionReady = useSyncExternalStore(subscribeSession, isSessionReady, () => false);
   const [workspaceSettled, setWorkspaceSettled] = useState(false);
   const onPlatform = !session?.currentTenant || session.currentTenant.type === "Platform";
+  const signedIn = session !== null;
   const tenantId = onPlatform ? null : session?.currentTenant?.id ?? null;
-  useCircularRealtime(tenantId, session?.accessToken);
+  useCircularRealtime(tenantId);
   const features = useQuery({
     queryKey: ["features", tenantId],
     enabled: tenantId !== null,
@@ -74,13 +75,13 @@ export function BusinessShell({ children }: { children: React.ReactNode }) {
   ].filter((group) => group.links.length > 0);
 
   useEffect(() => {
-    if (sessionReady && !session) {
+    if (sessionReady && !signedIn) {
       router.replace("/login");
     }
-  }, [router, session, sessionReady]);
+  }, [router, sessionReady, signedIn]);
 
   useEffect(() => {
-    if (!session || !onPlatform) {
+    if (!signedIn || !onPlatform) {
       return;
     }
 
@@ -99,7 +100,7 @@ export function BusinessShell({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [onPlatform, router, session]);
+  }, [onPlatform, router, signedIn]);
 
   if (!session) {
     return <p className="p-8 text-muted">Checking your session.</p>;

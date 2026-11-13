@@ -1,4 +1,4 @@
-import { getSession, isIdle, setSession, type AdminSession, type AdminUser } from "./session";
+import { getSession, isIdle, rotateSession, setSession, type AdminSession, type AdminUser } from "./session";
 
 export class ApiError extends Error {
   constructor(
@@ -111,7 +111,7 @@ async function refresh(refreshToken: string): Promise<boolean> {
     if (!response.ok) {
       return false;
     }
-    setSession((await response.json()) as AdminSession);
+    rotateSession((await response.json()) as AdminSession);
     return true;
   } catch {
     return false;

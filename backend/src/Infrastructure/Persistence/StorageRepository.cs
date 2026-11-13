@@ -19,6 +19,15 @@ public sealed class StorageRepository : ITenantStorageConnectionRepository
         return Task.CompletedTask;
     }
 
+    public Task<PlatformStorageConnection?> GetPlatformAsync(StorageProviderKind provider, CancellationToken cancellationToken) =>
+        _db.PlatformStorageConnections.FirstOrDefaultAsync(item => item.Provider == provider, cancellationToken);
+
+    public Task AddPlatformAsync(PlatformStorageConnection connection, CancellationToken cancellationToken)
+    {
+        _db.PlatformStorageConnections.Add(connection);
+        return Task.CompletedTask;
+    }
+
     public Task<StorageOAuthState?> GetOAuthStateByHashAsync(string stateHash, CancellationToken cancellationToken) =>
         _db.StorageOAuthStates.FirstOrDefaultAsync(item => item.StateHash == stateHash, cancellationToken);
 

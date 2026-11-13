@@ -13,7 +13,6 @@ import { AttendanceForm, CatalogAddDialog, CatalogList, CategoryDialog, CrmDefau
 import { CoachRewardsSection } from "./CoachRewardsSection";
 import { ChatPermissionsSection } from "./ChatPermissionsSection";
 import { PtPackagesSection } from "./PtPackagesSection";
-import { GoogleDriveSection } from "../integrations/GoogleDriveSection";
 import { RolesPermissionsSection } from "./RolesPermissionsSection";
 
 export default function ConfigurationPage() {
@@ -88,7 +87,6 @@ export default function ConfigurationPage() {
       {tab === "PT Packages" ? <PtPackagesSection tenantId={tenantId} /> : null}
       {tab === "Coach Rewards" ? <CoachRewardsSection tenantId={tenantId} /> : null}
       {chatEnabled && tab === "Chat" ? <ChatPermissionsSection /> : null}
-      {tab === "Integrations" ? <div className="mt-8"><GoogleDriveSection /></div> : null}
       {tab === "Roles & Permissions" ? <RolesPermissionsSection tenantId={tenantId} /> : null}
       {data && tab === "Member Categories" ? (
         <div className="mt-4">

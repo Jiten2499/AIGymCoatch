@@ -8,7 +8,6 @@ export const gymLinks = [
   ["Staff Leaves", "/business/leaves"],
   ["Circulars", "/business/communications"],
   ["Chats", "/business/chats"],
-  ["Integrations", "/business/integrations"],
   ["Configuration", "/business/configuration"],
 ] as const;
 
@@ -19,7 +18,6 @@ export const gymLinkFeatures: Partial<Record<(typeof gymLinks)[number][1], strin
   "/business/ledger": "GYM_FINANCIAL_LEDGER",
   "/business/payroll": "GYM_STAFF_PAYROLL",
   "/business/leaves": "STAFF_LEAVE",
-  "/business/integrations": "GOOGLE_DRIVE_STORAGE",
 };
 
 /** Any one of these permissions is enough to show the link. */
@@ -36,7 +34,6 @@ const linkPermissions: Record<string, readonly string[]> = {
   "/business/leaves": ["LEAVE_READ", "LEAVE_APPLY"],
   "/business/communications": ["COMMUNICATION_READ"],
   "/business/chats": ["CHAT_READ"],
-  "/business/integrations": ["INTEGRATION_READ"],
   "/business/configuration": ["CONFIGURATION_READ"],
   "/business/tasks": ["MEMBERSHIP_FREEZE", "MEMBERSHIP_RENEW", "TRAINER_UPDATE", "LEAVE_APPROVE"],
 };

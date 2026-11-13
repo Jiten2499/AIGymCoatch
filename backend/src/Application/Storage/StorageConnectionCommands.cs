@@ -1,8 +1,10 @@
 using System.Security.Cryptography;
 using System.Text;
 using FluentValidation;
+using LifeFitAI.Application.Authorization;
 using LifeFitAI.Application.Gym;
 using LifeFitAI.Application.Identity;
+using LifeFitAI.Application.Platform;
 using LifeFitAI.Domain.Identity;
 using LifeFitAI.Domain.Storage;
 using LifeFitAI.SharedKernel.Abstractions;
@@ -32,29 +34,32 @@ public sealed class BeginGoogleDriveConnectionCommandValidator : AbstractValidat
 
 public sealed class StorageConnectionQueryHandler : IRequestHandler<GetGoogleDriveConnectionQuery, Result<StorageConnectionResponse>>
 {
-    private readonly IOperationGuard _guard;
     private readonly ICurrentActor _actor;
+    private readonly IRoleRepository _roles;
+    private readonly IPermissionService _permissions;
     private readonly ITenantStorageConnectionRepository _storage;
     private readonly IGoogleDriveOAuthService _oauth;
 
-    public StorageConnectionQueryHandler(IOperationGuard guard, ICurrentActor actor, ITenantStorageConnectionRepository storage, IGoogleDriveOAuthService oauth)
+    public StorageConnectionQueryHandler(ICurrentActor actor, IRoleRepository roles, IPermissionService permissions, ITenantStorageConnectionRepository storage, IGoogleDriveOAuthService oauth)
     {
-        _guard = guard;
         _actor = actor;
+        _roles = roles;
+        _permissions = permissions;
         _storage = storage;
         _oauth = oauth;
     }
 
     public async Task<Result<StorageConnectionResponse>> Handle(GetGoogleDriveConnectionQuery request, CancellationToken cancellationToken)
     {
-        var gate = await _guard.AllowAsync(PermissionCodes.IntegrationRead, FeatureCodes.GoogleDriveStorage, cancellationToken).ConfigureAwait(false);
-        if (gate.IsFailure || _actor.TenantId is not Guid tenantId)
+        var gate = await PlatformAccess.RequireSuperAdminAsync(_actor, _roles, _permissions, cancellationToken).ConfigureAwait(false);
+        if (gate.IsFailure)
         {
-            return Result.Failure<StorageConnectionResponse>(MapGate(gate.Error));
+            return Result.Failure<StorageConnectionResponse>(gate.Error);
         }
 
-        var connection = await _storage.GetAsync(tenantId, StorageProviderKind.GoogleDrive, cancellationToken).ConfigureAwait(false);
-        return Result.Success(StorageMaps.ToResponse(connection, _oauth.IsConfigured));
+        var connection = await _storage.GetPlatformAsync(StorageProviderKind.GoogleDrive, cancellationToken).ConfigureAwait(false);
+        var canConnect = await _oauth.HasAppAsync(cancellationToken).ConfigureAwait(false);
+        return Result.Success(StorageMaps.ToResponse(connection, canConnect, connection?.RedirectUri ?? _oauth.RedirectUri));
     }
 
     internal static Error MapGate(Error error) =>
@@ -67,8 +72,9 @@ public sealed class StorageConnectionCommandHandler :
     IRequestHandler<TestGoogleDriveConnectionCommand, Result<StorageConnectionResponse>>,
     IRequestHandler<DisconnectGoogleDriveCommand, Result<StorageConnectionResponse>>
 {
-    private readonly IOperationGuard _guard;
     private readonly ICurrentActor _actor;
+    private readonly IRoleRepository _roles;
+    private readonly IPermissionService _permissions;
     private readonly ITenantStorageConnectionRepository _storage;
     private readonly IGoogleDriveOAuthService _oauth;
     private readonly IGoogleDriveApiClient _drive;
@@ -79,8 +85,9 @@ public sealed class StorageConnectionCommandHandler :
     private readonly IClientContext _client;
 
     public StorageConnectionCommandHandler(
-        IOperationGuard guard,
         ICurrentActor actor,
+        IRoleRepository roles,
+        IPermissionService permissions,
         ITenantStorageConnectionRepository storage,
         IGoogleDriveOAuthService oauth,
         IGoogleDriveApiClient drive,
@@ -90,8 +97,9 @@ public sealed class StorageConnectionCommandHandler :
         IDateTimeProvider clock,
         IClientContext client)
     {
-        _guard = guard;
         _actor = actor;
+        _roles = roles;
+        _permissions = permissions;
         _storage = storage;
         _oauth = oauth;
         _drive = drive;
@@ -110,14 +118,14 @@ public sealed class StorageConnectionCommandHandler :
             return Result.Failure<BeginStorageConnectionResponse>(gate.Error);
         }
 
-        if (!_oauth.IsConfigured)
+        if (!await _oauth.HasAppAsync(cancellationToken).ConfigureAwait(false))
         {
             return Result.Failure<BeginStorageConnectionResponse>(StorageErrors.ConfigurationMissing);
         }
 
         var tenantId = _actor.TenantId!.Value;
         var userId = _actor.UserId!.Value;
-        var connection = await EnsureConnectionAsync(tenantId, cancellationToken).ConfigureAwait(false);
+        var connection = await EnsureConnectionAsync(cancellationToken).ConfigureAwait(false);
         connection.MarkConnecting();
 
         var state = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
@@ -135,7 +143,7 @@ public sealed class StorageConnectionCommandHandler :
             _clock.UtcNow,
             expiresAt);
         await _storage.AddOAuthStateAsync(oauthState, cancellationToken).ConfigureAwait(false);
-        await _audit.AddAsync(AuditLog.Create(Guid.NewGuid(), tenantId, userId, "GoogleDriveConnectStarted", "TenantStorageConnection", connection.Id, null, null, _client.IpAddress, _client.UserAgent, _clock.UtcNow), cancellationToken).ConfigureAwait(false);
+        await _audit.AddAsync(AuditLog.Create(Guid.NewGuid(), tenantId, userId, "GoogleDriveConnectStarted", "PlatformStorageConnection", connection.Id, null, null, _client.IpAddress, _client.UserAgent, _clock.UtcNow), cancellationToken).ConfigureAwait(false);
         await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return Result.Success(new BeginStorageConnectionResponse(_oauth.BuildAuthorizationUrl(state, challenge), expiresAt));
     }
@@ -176,7 +184,7 @@ public sealed class StorageConnectionCommandHandler :
             return Result.Failure<string>(folders.Error);
         }
 
-        var connection = await EnsureConnectionAsync(oauthState.TenantId, cancellationToken).ConfigureAwait(false);
+        var connection = await EnsureConnectionAsync(cancellationToken).ConfigureAwait(false);
         connection.Connect(
             account.Value.Email,
             _secrets.Protect(tokens.Value.RefreshToken),
@@ -188,7 +196,7 @@ public sealed class StorageConnectionCommandHandler :
             folders.Value.OtherFolderId,
             oauthState.UserId,
             _clock.UtcNow);
-        await _audit.AddAsync(AuditLog.Create(Guid.NewGuid(), oauthState.TenantId, oauthState.UserId, "GoogleDriveConnected", "TenantStorageConnection", connection.Id, null, account.Value.Email, null, null, _clock.UtcNow), cancellationToken).ConfigureAwait(false);
+        await _audit.AddAsync(AuditLog.Create(Guid.NewGuid(), oauthState.TenantId, oauthState.UserId, "GoogleDriveConnected", "PlatformStorageConnection", connection.Id, null, account.Value.Email, null, null, _clock.UtcNow), cancellationToken).ConfigureAwait(false);
         await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return Result.Success(BuildReturnUrl(oauthState, true, null));
     }
@@ -202,7 +210,7 @@ public sealed class StorageConnectionCommandHandler :
         }
 
         var tenantId = _actor.TenantId!.Value;
-        var connection = await _storage.GetAsync(tenantId, StorageProviderKind.GoogleDrive, cancellationToken).ConfigureAwait(false);
+        var connection = await _storage.GetPlatformAsync(StorageProviderKind.GoogleDrive, cancellationToken).ConfigureAwait(false);
         if (connection is null || connection.Status != StorageConnectionStatus.Connected || string.IsNullOrWhiteSpace(connection.ProtectedRefreshToken) || string.IsNullOrWhiteSpace(connection.RootFolderId))
         {
             return Result.Failure<StorageConnectionResponse>(StorageErrors.NotConnected);
@@ -220,7 +228,7 @@ public sealed class StorageConnectionCommandHandler :
         if (tokens.IsFailure)
         {
             connection.MarkRevoked(tokens.Error.Description);
-            await _audit.AddAsync(AuditLog.Create(Guid.NewGuid(), tenantId, _actor.UserId, "GoogleDriveRevoked", "TenantStorageConnection", connection.Id, null, null, _client.IpAddress, _client.UserAgent, _clock.UtcNow), cancellationToken).ConfigureAwait(false);
+            await _audit.AddAsync(AuditLog.Create(Guid.NewGuid(), tenantId, _actor.UserId, "GoogleDriveRevoked", "PlatformStorageConnection", connection.Id, null, null, _client.IpAddress, _client.UserAgent, _clock.UtcNow), cancellationToken).ConfigureAwait(false);
             await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             return Result.Failure<StorageConnectionResponse>(StorageErrors.OAuthRevoked);
         }
@@ -234,9 +242,9 @@ public sealed class StorageConnectionCommandHandler :
         }
 
         connection.MarkValidated(_clock.UtcNow);
-        await _audit.AddAsync(AuditLog.Create(Guid.NewGuid(), tenantId, _actor.UserId, "GoogleDriveTested", "TenantStorageConnection", connection.Id, null, connection.AccountEmail, _client.IpAddress, _client.UserAgent, _clock.UtcNow), cancellationToken).ConfigureAwait(false);
+        await _audit.AddAsync(AuditLog.Create(Guid.NewGuid(), tenantId, _actor.UserId, "GoogleDriveTested", "PlatformStorageConnection", connection.Id, null, connection.AccountEmail, _client.IpAddress, _client.UserAgent, _clock.UtcNow), cancellationToken).ConfigureAwait(false);
         await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        return Result.Success(StorageMaps.ToResponse(connection, _oauth.IsConfigured));
+        return Result.Success(await DescribeAsync(connection, cancellationToken).ConfigureAwait(false));
     }
 
     public async Task<Result<StorageConnectionResponse>> Handle(DisconnectGoogleDriveCommand request, CancellationToken cancellationToken)
@@ -248,42 +256,38 @@ public sealed class StorageConnectionCommandHandler :
         }
 
         var tenantId = _actor.TenantId!.Value;
-        var connection = await _storage.GetAsync(tenantId, StorageProviderKind.GoogleDrive, cancellationToken).ConfigureAwait(false);
+        var connection = await _storage.GetPlatformAsync(StorageProviderKind.GoogleDrive, cancellationToken).ConfigureAwait(false);
         if (connection is null)
         {
-            return Result.Success(StorageMaps.ToResponse(null, _oauth.IsConfigured));
+            return Result.Success(await DescribeAsync(null, cancellationToken).ConfigureAwait(false));
         }
 
         connection.Disconnect();
-        await _audit.AddAsync(AuditLog.Create(Guid.NewGuid(), tenantId, _actor.UserId, "GoogleDriveDisconnected", "TenantStorageConnection", connection.Id, null, null, _client.IpAddress, _client.UserAgent, _clock.UtcNow), cancellationToken).ConfigureAwait(false);
+        await _audit.AddAsync(AuditLog.Create(Guid.NewGuid(), tenantId, _actor.UserId, "GoogleDriveDisconnected", "PlatformStorageConnection", connection.Id, null, null, _client.IpAddress, _client.UserAgent, _clock.UtcNow), cancellationToken).ConfigureAwait(false);
         await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        return Result.Success(StorageMaps.ToResponse(connection, _oauth.IsConfigured));
+        return Result.Success(await DescribeAsync(connection, cancellationToken).ConfigureAwait(false));
     }
 
-    private async Task<Result> AllowManageAsync(CancellationToken cancellationToken)
-    {
-        var gate = await _guard.AllowAsync(PermissionCodes.IntegrationManage, FeatureCodes.GoogleDriveStorage, cancellationToken).ConfigureAwait(false);
-        if (gate.IsFailure)
-        {
-            return Result.Failure(StorageConnectionQueryHandler.MapGate(gate.Error));
-        }
+    private Task<Result> AllowManageAsync(CancellationToken cancellationToken) =>
+        PlatformAccess.RequireSuperAdminAsync(_actor, _roles, _permissions, cancellationToken);
 
-        return _actor.TenantId is not null && _actor.UserId is not null
-            ? Result.Success()
-            : Result.Failure(IdentityErrors.InvalidCredentials);
-    }
-
-    private async Task<TenantStorageConnection> EnsureConnectionAsync(Guid tenantId, CancellationToken cancellationToken)
+    private async Task<PlatformStorageConnection> EnsureConnectionAsync(CancellationToken cancellationToken)
     {
-        var existing = await _storage.GetAsync(tenantId, StorageProviderKind.GoogleDrive, cancellationToken).ConfigureAwait(false);
+        var existing = await _storage.GetPlatformAsync(StorageProviderKind.GoogleDrive, cancellationToken).ConfigureAwait(false);
         if (existing is not null)
         {
             return existing;
         }
 
-        var created = TenantStorageConnection.Create(Guid.NewGuid(), tenantId, StorageProviderKind.GoogleDrive);
-        await _storage.AddAsync(created, cancellationToken).ConfigureAwait(false);
+        var created = PlatformStorageConnection.Create(Guid.NewGuid(), StorageProviderKind.GoogleDrive);
+        await _storage.AddPlatformAsync(created, cancellationToken).ConfigureAwait(false);
         return created;
+    }
+
+    private async Task<StorageConnectionResponse> DescribeAsync(PlatformStorageConnection? connection, CancellationToken cancellationToken)
+    {
+        var canConnect = await _oauth.HasAppAsync(cancellationToken).ConfigureAwait(false);
+        return StorageMaps.ToResponse(connection, canConnect, connection?.RedirectUri ?? _oauth.RedirectUri);
     }
 
     private string BuildReturnUrl(StorageOAuthState state, bool success, string? error)

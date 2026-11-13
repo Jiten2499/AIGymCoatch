@@ -106,6 +106,8 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
 
     public DbSet<MemberPtAssignment> MemberPtAssignments => Set<MemberPtAssignment>();
 
+    public DbSet<MemberPtPayment> MemberPtPayments => Set<MemberPtPayment>();
+
     public DbSet<PtSession> PtSessions => Set<PtSession>();
 
     public DbSet<PtSessionExercise> PtSessionExercises => Set<PtSessionExercise>();
@@ -229,6 +231,8 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<EmailDeliveryLog> EmailDeliveryLogs => Set<EmailDeliveryLog>();
 
     public DbSet<TenantStorageConnection> TenantStorageConnections => Set<TenantStorageConnection>();
+
+    public DbSet<PlatformStorageConnection> PlatformStorageConnections => Set<PlatformStorageConnection>();
 
     public DbSet<StoredFile> StoredFiles => Set<StoredFile>();
 

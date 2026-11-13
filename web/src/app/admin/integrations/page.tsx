@@ -1,16 +1,14 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
 import { PageState } from "../../../components/AdminShell";
 import { api, ApiError } from "../../../lib/api";
-import { getSession, subscribeSession } from "../../../lib/session";
 
 type StorageConnection = {
   provider: string;
   status: string;
   accountEmail: string | null;
-  rootFolderId: string | null;
   connectedAt: string | null;
   lastValidatedAt: string | null;
   lastError: string | null;
@@ -18,49 +16,64 @@ type StorageConnection = {
   storeProgressPhotos: boolean;
   progressFolderId: string | null;
   progressFolderName: string | null;
+  clientId: string | null;
+  hasClientSecret: boolean;
+  redirectUri: string | null;
 };
 
 type DriveFolder = { id: string; name: string; current: boolean };
 
-export function GoogleDriveSection() {
+export default function GoogleDriveAdminPage() {
   const client = useQueryClient();
-  const session = useSyncExternalStore(subscribeSession, getSession, () => null);
-  const tenantId = session?.currentTenant?.id ?? null;
   const [notice, setNotice] = useState<string | null>(null);
   const [foldersOpen, setFoldersOpen] = useState(false);
-  const features = useQuery({
-    queryKey: ["features", tenantId],
-    enabled: tenantId !== null,
-    queryFn: () => api<{ featureCode: string; enabled: boolean }[]>("/features"),
-  });
-  const enabled = features.data?.some((feature) => feature.featureCode === "GOOGLE_DRIVE_STORAGE" && feature.enabled) === true;
+  const [clientId, setClientId] = useState("");
+  const [clientSecret, setClientSecret] = useState("");
+  const [redirectUri, setRedirectUri] = useState("");
+  const [formReady, setFormReady] = useState(false);
   const connection = useQuery({
-    queryKey: ["google-drive-connection", tenantId],
-    enabled: tenantId !== null && enabled,
+    queryKey: ["platform-google-drive"],
     queryFn: () => api<StorageConnection>("/integrations/google-drive"),
   });
   const folders = useQuery({
-    queryKey: ["google-drive-folders", tenantId],
+    queryKey: ["platform-google-drive-folders"],
     enabled: foldersOpen && connection.data?.status === "Connected",
     queryFn: () => api<DriveFolder[]>("/integrations/google-drive/folders"),
   });
 
   useEffect(() => {
+    if (connection.data && !formReady) {
+      setClientId(connection.data.clientId ?? "");
+      setRedirectUri(connection.data.redirectUri ?? "");
+      setFormReady(true);
+    }
+  }, [connection.data, formReady]);
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const status = params.get("status");
-    if (status === "connected") {
-      setNotice("Google Drive is connected.");
-    }
-    if (status === "failed") {
-      setNotice("Google Drive could not be connected. Approve access and try again.");
-    }
+    if (status === "connected") setNotice("Google Drive is connected for every gym.");
+    if (status === "failed") setNotice("Google Drive could not be connected. Approve access and try again.");
     if (status) {
-      void client.invalidateQueries({ queryKey: ["google-drive-connection", tenantId] });
+      void client.invalidateQueries({ queryKey: ["platform-google-drive"] });
       window.history.replaceState({}, "", window.location.pathname);
     }
-  }, [client, tenantId]);
+  }, [client]);
 
-  const refresh = async () => { await client.invalidateQueries({ queryKey: ["google-drive-connection", tenantId] }); };
+  const refresh = async () => { await client.invalidateQueries({ queryKey: ["platform-google-drive"] }); };
+  const save = useMutation({
+    mutationFn: () => api<StorageConnection>("/integrations/google-drive/app", {
+      method: "PUT",
+      body: JSON.stringify({ clientId, clientSecret, redirectUri }),
+    }),
+    onSuccess: async (saved) => {
+      setClientId(saved.clientId ?? "");
+      setRedirectUri(saved.redirectUri ?? "");
+      setClientSecret("");
+      setNotice("Google OAuth app saved.");
+      await refresh();
+    },
+  });
   const connect = useMutation({
     mutationFn: () => api<{ authorizationUrl: string }>("/integrations/google-drive/connect", {
       method: "POST",
@@ -85,24 +98,40 @@ export function GoogleDriveSection() {
     onSuccess: async (data) => { setNotice(`Destination folder is ${data.progressFolderName ?? "the selected folder"}.`); setFoldersOpen(false); await refresh(); },
   });
 
-  if (features.isLoading) {
-    return <PageState error={null} loading onRetry={() => void features.refetch()}><span /></PageState>;
-  }
-  if (!enabled) {
-    return <p className="mt-4 text-muted">Google Drive storage is not enabled for this workspace.</p>;
-  }
-
   const data = connection.data;
   const connected = data?.status === "Connected";
-  const actionError = connect.error ?? test.error ?? disconnect.error ?? toggle.error ?? chooseFolder.error ?? folders.error;
+  const actionError = save.error ?? connect.error ?? test.error ?? disconnect.error ?? toggle.error ?? chooseFolder.error ?? folders.error;
   const destination = data?.progressFolderName ?? (connected ? "LifeFit / Members" : "Not selected");
 
   return (
     <PageState error={connection.error instanceof ApiError ? connection.error.message : null} loading={connection.isLoading} onRetry={() => void connection.refetch()}>
-      <section className="max-w-2xl rounded-2xl border border-line bg-surface px-6 py-5 text-foreground">
-        <h2 className="text-xl font-semibold text-foreground">Google Drive</h2>
-        <p className="mt-2 text-muted">Private storage for member progress photos in this business.</p>
-        <dl className="mt-4 grid gap-2 text-sm text-foreground">
+      <p className="text-sm text-muted">System Settings &gt; Google Drive</p>
+      <h1 className="mt-2 text-3xl font-semibold">Google Drive</h1>
+      <p className="mt-2 max-w-3xl text-muted">One Google Drive account for the whole platform. Gyms store files here when their plan includes Google Drive storage.</p>
+
+      <section className="mt-6 max-w-2xl rounded-2xl border border-line bg-surface px-6 py-5">
+        <h2 className="text-xl font-semibold">OAuth app</h2>
+        <p className="mt-2 text-sm text-muted">Create a Google Cloud OAuth client and register the redirect URI below. The client secret is stored protected and is not shown again.</p>
+        <label className="mt-4 block text-sm text-muted">
+          Client ID
+          <input className="field mt-2 w-full" value={clientId} onChange={(event) => setClientId(event.target.value)} autoComplete="off" />
+        </label>
+        <label className="mt-4 block text-sm text-muted">
+          Client secret
+          <input className="field mt-2 w-full" type="password" value={clientSecret} onChange={(event) => setClientSecret(event.target.value)} placeholder={data?.hasClientSecret ? "Saved. Leave blank to keep it." : "Paste the client secret"} autoComplete="new-password" />
+        </label>
+        <label className="mt-4 block text-sm text-muted">
+          Redirect URI
+          <input className="field mt-2 w-full" value={redirectUri} onChange={(event) => setRedirectUri(event.target.value)} autoComplete="off" />
+        </label>
+        <button className="mt-4 min-h-11 rounded-full bg-accent px-4 font-semibold text-background disabled:opacity-40" disabled={save.isPending || clientId.trim().length === 0 || redirectUri.trim().length === 0} onClick={() => save.mutate()} type="button">
+          {save.isPending ? "Saving..." : "Save OAuth app"}
+        </button>
+      </section>
+
+      <section className="mt-6 max-w-2xl rounded-2xl border border-line bg-surface px-6 py-5">
+        <h2 className="text-xl font-semibold">Connection</h2>
+        <dl className="mt-4 grid gap-2 text-sm">
           <div className="flex flex-wrap gap-2"><dt className="text-muted">Status:</dt><dd>{statusText(data?.status)}</dd></div>
           <div className="flex flex-wrap gap-2"><dt className="text-muted">Account:</dt><dd>{data?.accountEmail ?? "Not connected"}</dd></div>
           <div className="flex flex-wrap gap-2"><dt className="text-muted">Destination folder:</dt><dd>{destination}</dd></div>
@@ -128,10 +157,10 @@ export function GoogleDriveSection() {
             </>
           )}
         </div>
-        {data && !data.canConnect ? <p className="mt-3 text-sm text-muted">Google OAuth is not configured on the API server yet.</p> : null}
+        {data && !data.canConnect ? <p className="mt-3 text-sm text-muted">Save the OAuth client ID, secret, and redirect URI before connecting.</p> : null}
         {data?.status === "Revoked" ? <p className="mt-3 text-sm">Authorization expired or was revoked. Reconnect before uploading progress photos.</p> : null}
         {actionError instanceof ApiError ? <p className="mt-3 text-sm" role="alert">{actionError.message}</p> : null}
-        {notice ? <p className="mt-3 text-sm">{notice}</p> : null}
+        {notice ? <p className="mt-3 text-sm" role="status">{notice}</p> : null}
         {foldersOpen ? (
           <div className="mt-4 grid gap-2">
             {folders.isLoading ? <p className="text-sm text-muted">Loading folders...</p> : null}

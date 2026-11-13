@@ -81,7 +81,6 @@ export default function MembersPage() {
         <div className="flex flex-wrap gap-2">
           {selected ? <Link className="inline-flex min-h-11 items-center rounded-full bg-accent px-4 font-semibold text-background" href={memberDetailsHref(selected)}>View Details</Link> : null}
           {selected ? <button className="min-h-11 rounded-full border border-line px-4" onClick={() => setEditing(true)} type="button">Edit</button> : null}
-          {selected ? <button className="min-h-11 rounded-full border border-line px-4" onClick={() => setConfirmDelete(true)} type="button">Delete</button> : null}
           <button className="min-h-11 rounded-full border border-line px-4" onClick={() => setAdding(true)} type="button">Add member</button>
         </div>
       </div>

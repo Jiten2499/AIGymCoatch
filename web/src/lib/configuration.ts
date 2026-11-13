@@ -62,5 +62,5 @@ export type BusinessConfiguration = {
   lostReasons: CrmCatalogItem[];
 };
 
-export const configTabs = ["Membership", "Discounts", "Member Categories", "PT Packages", "Coach Rewards", "Freeze & Extensions", "Attendance", "CRM", "Chat", "Integrations", "Roles & Permissions"] as const;
+export const configTabs = ["Membership", "Discounts", "Member Categories", "PT Packages", "Coach Rewards", "Freeze & Extensions", "Attendance", "CRM", "Chat", "Roles & Permissions"] as const;
 export type ConfigTab = (typeof configTabs)[number];

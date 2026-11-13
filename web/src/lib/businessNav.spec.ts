@@ -13,7 +13,6 @@ describe("business navigation", () => {
       "/business/leaves",
       "/business/communications",
       "/business/chats",
-      "/business/integrations",
       "/business/configuration",
     ]);
   });

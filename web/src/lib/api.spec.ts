@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { api, ApiError, login, refreshSession } from "./api";
-import { getSession, isIdle, setSession, touchActivity, type AdminSession } from "./session";
+import { getSession, isIdle, setSession, subscribeSession, touchActivity, type AdminSession } from "./session";
 
 describe("admin api", () => {
   afterEach(() => {
@@ -59,6 +59,43 @@ describe("admin api", () => {
     expect(getSession()?.accessToken).toBe("access");
   });
 
+  it("renews the login token without redrawing the open page", async () => {
+    const memory = new Map<string, string>();
+    stubStorage(memory);
+    setSession(sampleSession("2000-01-01T00:00:00Z"));
+    touchActivity();
+    let notices = 0;
+    const stop = subscribeSession(() => {
+      notices += 1;
+    });
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(sampleSession("2099-01-01T00:00:00Z", "renewed", "next-refresh")), { status: 200 })));
+    await expect(refreshSession()).resolves.toBe(true);
+    expect(getSession()?.accessToken).toBe("renewed");
+    expect(getSession()?.refreshToken).toBe("next-refresh");
+    expect(notices).toBe(0);
+    expect(JSON.parse(memory.get("lifefit.session") ?? "").accessToken).toBe("renewed");
+    stop();
+  });
+
+  it("redraws the page when a renewed session changes the workspace", async () => {
+    const memory = new Map<string, string>();
+    stubStorage(memory);
+    setSession({ ...sampleSession(), currentTenant: { id: "north", name: "North", type: "Business", status: "Active" } });
+    touchActivity();
+    let notices = 0;
+    const stop = subscribeSession(() => {
+      notices += 1;
+    });
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
+      ...sampleSession("2099-01-01T00:00:00Z", "renewed"),
+      currentTenant: { id: "south", name: "South", type: "Business", status: "Active" },
+    }), { status: 200 })));
+    await expect(refreshSession()).resolves.toBe(true);
+    expect(notices).toBe(1);
+    expect(getSession()?.currentTenant?.id).toBe("south");
+    stop();
+  });
+
   it("keeps the session when refresh cannot reach the server", async () => {
     const memory = new Map<string, string>();
     stubStorage(memory);
@@ -96,6 +133,6 @@ function stubStorage(memory: Map<string, string>): void {
   });
 }
 
-function sampleSession(expiresAt = "2099-01-01T00:00:00Z"): AdminSession {
-  return { accessToken: "access", refreshToken: "refresh", expiresAt, user: { id: "1", email: "ada@example.com", firstName: "Ada", lastName: "Lovelace" } };
+function sampleSession(expiresAt = "2099-01-01T00:00:00Z", accessToken = "access", refreshToken = "refresh"): AdminSession {
+  return { accessToken, refreshToken, expiresAt, user: { id: "1", email: "ada@example.com", firstName: "Ada", lastName: "Lovelace" } };
 }

@@ -1,6 +1,17 @@
 import { NativeModules, TurboModuleRegistry } from 'react-native';
 
-const defaultApiUrl = 'http://localhost:8080';
+/** Verified production API host used by the web client. No trailing `/api/v1`. */
+export const productionApiUrl = 'https://api.growventur.com';
+
+const developmentDefaultApiUrl = 'http://localhost:8080';
+
+export function isDevelopmentRuntime(): boolean {
+  return typeof __DEV__ !== 'undefined' && __DEV__;
+}
+
+export function defaultApiUrlForEnvironment(isDev: boolean): string {
+  return isDev ? developmentDefaultApiUrl : productionApiUrl;
+}
 
 export function hostFromScriptUrl(scriptUrl: string | null | undefined): string | null {
   if (!scriptUrl) {
@@ -23,9 +34,19 @@ export function hostFromPackagerAddress(value: string | null | undefined): strin
   return usableHost(value.split(':')[0]);
 }
 
-export function resolveApiBaseUrl(configured: string | undefined, packagerHost: string | null): string {
-  const base = (configured?.trim() || defaultApiUrl).replace(/\/$/, '');
-  if (!packagerHost || !isLoopbackUrl(base)) {
+export function resolveApiBaseUrl(
+  configured: string | undefined,
+  packagerHost: string | null,
+  options?: { isDev?: boolean },
+): string {
+  const isDev = options?.isDev ?? isDevelopmentRuntime();
+  const base = (configured?.trim() || defaultApiUrlForEnvironment(isDev)).replace(/\/$/, '');
+
+  if (!isDev && isLoopbackUrl(base)) {
+    return productionApiUrl;
+  }
+
+  if (!isDev || !packagerHost || !isLoopbackUrl(base)) {
     return base;
   }
 
@@ -99,7 +120,7 @@ function readPackagerHost(): string | null {
 
 export const apiBaseUrl = resolveApiBaseUrl(process.env.EXPO_PUBLIC_API_URL, readPackagerHost());
 
-if (typeof __DEV__ !== 'undefined' && __DEV__ && process.env.NODE_ENV !== 'test') {
+if (isDevelopmentRuntime() && process.env.NODE_ENV !== 'test') {
   console.log(`API base URL ${apiBaseUrl}`);
 }
 

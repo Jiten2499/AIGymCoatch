@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using LifeFitAI.Application.Identity;
 using LifeFitAI.Application.Licensing;
 using LifeFitAI.Domain.Gym;
 using LifeFitAI.Domain.Identity;
@@ -8,20 +10,25 @@ namespace LifeFitAI.Application.Gym.Ledger;
 
 public sealed class LedgerPostingService : ILedgerPostingService
 {
+    private static readonly ConcurrentDictionary<Guid, SemaphoreSlim> PostingGates = new();
+
     private readonly IFeatureFlagService _features;
     private readonly ILedgerRepository _ledger;
     private readonly IBusinessProfileRepository _profiles;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly IDateTimeProvider _clock;
 
     public LedgerPostingService(
         IFeatureFlagService features,
         ILedgerRepository ledger,
         IBusinessProfileRepository profiles,
+        IUnitOfWork unitOfWork,
         IDateTimeProvider clock)
     {
         _features = features;
         _ledger = ledger;
         _profiles = profiles;
+        _unitOfWork = unitOfWork;
         _clock = clock;
     }
 
@@ -67,6 +74,67 @@ public sealed class LedgerPostingService : ILedgerPostingService
             ]);
         await _ledger.AddEntryAsync(created.Entry, created.Lines, cancellationToken).ConfigureAwait(false);
         return Result.Success();
+    }
+
+    public async Task<Result<bool>> TryPostPtPackagePaymentAsync(Guid tenantId, MemberPtAssignment assignment, Guid actorId, CancellationToken cancellationToken)
+    {
+        if (!Payable(assignment) || !await LedgerEnabledAsync(tenantId, cancellationToken).ConfigureAwait(false))
+        {
+            return Result.Success(false);
+        }
+
+        return await PostPtPackageAsync(tenantId, assignment, assignment.Id, assignment.AmountPaid, assignment.PaymentMethod!.Value, assignment.PaymentDate!.Value, assignment.PaymentReferenceNumber, actorId, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<Result<bool>> TryPostPtCollectionAsync(Guid tenantId, MemberPtAssignment assignment, MemberPtPayment payment, Guid actorId, CancellationToken cancellationToken)
+    {
+        if (payment.Amount <= 0 || !await LedgerEnabledAsync(tenantId, cancellationToken).ConfigureAwait(false))
+        {
+            return Result.Success(false);
+        }
+
+        return await PostPtPackageAsync(tenantId, assignment, payment.Id, payment.Amount, payment.PaymentMethod, payment.PaymentDate, payment.ReferenceNumber, actorId, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<Result<bool>> PostOutstandingPtPaymentsAsync(Guid tenantId, Guid actorId, IReadOnlyList<MemberPtAssignment> assignments, CancellationToken cancellationToken)
+    {
+        var gate = PostingGates.GetOrAdd(tenantId, static _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (!await LedgerEnabledAsync(tenantId, cancellationToken).ConfigureAwait(false))
+            {
+                return Result.Success(false);
+            }
+
+            var posted = false;
+            foreach (var assignment in assignments)
+            {
+                if (!Payable(assignment))
+                {
+                    continue;
+                }
+
+                var result = await PostPtPackageAsync(tenantId, assignment, assignment.Id, assignment.AmountPaid, assignment.PaymentMethod!.Value, assignment.PaymentDate!.Value, assignment.PaymentReferenceNumber, assignment.CreatedBy ?? actorId, cancellationToken).ConfigureAwait(false);
+                if (result.IsFailure)
+                {
+                    return result;
+                }
+
+                posted |= result.Value;
+            }
+
+            if (posted)
+            {
+                await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            return Result.Success(posted);
+        }
+        finally
+        {
+            gate.Release();
+        }
     }
 
     public Task<Result> TryReverseMembershipPaymentAsync(Guid tenantId, MembershipPayment payment, Guid actorId, CancellationToken cancellationToken) =>
@@ -161,6 +229,52 @@ public sealed class LedgerPostingService : ILedgerPostingService
         await _ledger.AddEntryAsync(created.Entry, created.Lines, cancellationToken).ConfigureAwait(false);
         return Result.Success();
     }
+
+    private async Task<Result<bool>> PostPtPackageAsync(Guid tenantId, MemberPtAssignment assignment, Guid sourceId, decimal amount, MembershipPaymentMethod method, DateOnly paymentDate, string? referenceNumber, Guid actorId, CancellationToken cancellationToken)
+    {
+        if (await _ledger.SourceExistsAsync(tenantId, JournalSourceType.PtPackagePayment, sourceId, cancellationToken).ConfigureAwait(false))
+        {
+            return Result.Success(false);
+        }
+
+        await EnsureAsync(tenantId, assignment.Currency, cancellationToken).ConfigureAwait(false);
+        var moneyAccount = await ResolveAccountAsync(tenantId, LedgerMethodMap.FromMembershipMethod(method), cancellationToken).ConfigureAwait(false);
+        var revenue = await _ledger.GetLedgerAccountByCodeAsync(tenantId, LedgerAccountCodes.PtRevenue, cancellationToken).ConfigureAwait(false);
+        if (moneyAccount is null || revenue is null)
+        {
+            return Result.Failure<bool>(GymErrors.InvalidState);
+        }
+
+        var reference = string.IsNullOrWhiteSpace(referenceNumber) ? sourceId.ToString("N")[..8] : referenceNumber.Trim();
+        var created = JournalEntry.CreatePosted(
+            Guid.NewGuid(),
+            tenantId,
+            paymentDate,
+            $"PT package {assignment.PackageName} {reference}",
+            JournalEntryType.MoneyIn,
+            JournalSourceType.PtPackagePayment,
+            sourceId,
+            "Personal training",
+            moneyAccount.Id,
+            null,
+            amount,
+            assignment.Currency,
+            actorId,
+            _clock.UtcNow,
+            null,
+            [
+                (moneyAccount.LedgerAccountId, amount, 0m),
+                (revenue.Id, 0m, amount),
+            ]);
+        await _ledger.AddEntryAsync(created.Entry, created.Lines, cancellationToken).ConfigureAwait(false);
+        return Result.Success(true);
+    }
+
+    private Task<bool> LedgerEnabledAsync(Guid tenantId, CancellationToken cancellationToken) =>
+        _features.IsEnabledAsync(tenantId, FeatureCodes.GymFinancialLedger, cancellationToken);
+
+    private static bool Payable(MemberPtAssignment assignment) =>
+        assignment.AmountPaid > 0 && assignment.PaymentMethod is not null && assignment.PaymentDate is not null;
 
     private async Task EnsureAsync(Guid tenantId, string currency, CancellationToken cancellationToken)
     {

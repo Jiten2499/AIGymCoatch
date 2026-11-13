@@ -42,6 +42,12 @@ public interface ILedgerPostingService
 {
     Task<Result> TryPostMembershipPaymentAsync(Guid tenantId, MembershipPayment payment, Guid actorId, CancellationToken cancellationToken);
 
+    Task<Result<bool>> TryPostPtPackagePaymentAsync(Guid tenantId, MemberPtAssignment assignment, Guid actorId, CancellationToken cancellationToken);
+
+    Task<Result<bool>> TryPostPtCollectionAsync(Guid tenantId, MemberPtAssignment assignment, MemberPtPayment payment, Guid actorId, CancellationToken cancellationToken);
+
+    Task<Result<bool>> PostOutstandingPtPaymentsAsync(Guid tenantId, Guid actorId, IReadOnlyList<MemberPtAssignment> assignments, CancellationToken cancellationToken);
+
     Task<Result> TryReverseMembershipPaymentAsync(Guid tenantId, MembershipPayment payment, Guid actorId, CancellationToken cancellationToken);
 
     Task<Result> TryPostExpenseAsync(Guid tenantId, Expense expense, string categoryName, Guid actorId, CancellationToken cancellationToken);

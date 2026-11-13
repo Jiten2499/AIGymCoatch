@@ -12,6 +12,8 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const session = useSyncExternalStore(subscribeSession, getSession, () => null);
   const sessionReady = useSyncExternalStore(subscribeSession, isSessionReady, () => false);
+  const userId = session?.user.id ?? null;
+  const tenantType = session?.currentTenant?.type ?? null;
   const [platform, setPlatform] = useState<string>("");
   const jobs = useQuery({
     queryKey: ["background-jobs", "access"],
@@ -26,22 +28,36 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    if (!session) {
+    if (!userId) {
       router.replace("/login");
       return;
     }
 
-    if (session.currentTenant && session.currentTenant.type !== "Platform") {
+    if (tenantType && tenantType !== "Platform") {
       router.replace("/business");
     }
-  }, [router, session, sessionReady]);
+  }, [router, sessionReady, tenantType, userId]);
 
   useEffect(() => {
-    if (!session) {
+    if (!userId || tenantType !== "Platform") {
       return;
     }
-    void api<{ name: string; version: string; status: string }>("/platform").then((info) => setPlatform(`${info.name} ${info.version}`)).catch(() => setPlatform(""));
-  }, [session]);
+    let cancelled = false;
+    void api<{ name: string; version: string; status: string }>("/platform")
+      .then((info) => {
+        if (!cancelled) {
+          setPlatform(`${info.name} ${info.version}`);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPlatform("");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tenantType, userId]);
 
   if (!session) {
     return <p className="p-8 text-muted">Checking your session.</p>;

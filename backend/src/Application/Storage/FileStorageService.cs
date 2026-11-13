@@ -57,7 +57,7 @@ public sealed class FileStorageService : IFileStorageService
             return Result.Failure<StoredFileResponse>(StorageErrors.Conflict);
         }
 
-        var access = await AccessTokenAsync(request.TenantId, cancellationToken).ConfigureAwait(false);
+        var access = await AccessTokenAsync(cancellationToken).ConfigureAwait(false);
         if (access.IsFailure)
         {
             return Result.Failure<StoredFileResponse>(access.Error);
@@ -109,7 +109,7 @@ public sealed class FileStorageService : IFileStorageService
             return Result.Failure<FileContentResult>(StorageErrors.NotFound);
         }
 
-        var access = await AccessTokenAsync(request.TenantId, cancellationToken).ConfigureAwait(false);
+        var access = await AccessTokenAsync(cancellationToken).ConfigureAwait(false);
         if (access.IsFailure)
         {
             return Result.Failure<FileContentResult>(access.Error);
@@ -134,7 +134,7 @@ public sealed class FileStorageService : IFileStorageService
             return Result.Failure(StorageErrors.NotFound);
         }
 
-        var access = await AccessTokenAsync(tenantId, cancellationToken).ConfigureAwait(false);
+        var access = await AccessTokenAsync(cancellationToken).ConfigureAwait(false);
         if (access.IsFailure)
         {
             return Result.Failure(access.Error);
@@ -177,12 +177,12 @@ public sealed class FileStorageService : IFileStorageService
         return Result.Success(file is not null && file.Status == StoredFileStatus.Active);
     }
 
-    private async Task<Result<(TenantStorageConnection Connection, string AccessToken)>> AccessTokenAsync(Guid tenantId, CancellationToken cancellationToken)
+    private async Task<Result<(PlatformStorageConnection Connection, string AccessToken)>> AccessTokenAsync(CancellationToken cancellationToken)
     {
-        var connection = await _storage.GetAsync(tenantId, StorageProviderKind.GoogleDrive, cancellationToken).ConfigureAwait(false);
+        var connection = await _storage.GetPlatformAsync(StorageProviderKind.GoogleDrive, cancellationToken).ConfigureAwait(false);
         if (connection is null || connection.Status != StorageConnectionStatus.Connected || string.IsNullOrWhiteSpace(connection.ProtectedRefreshToken))
         {
-            return Result.Failure<(TenantStorageConnection, string)>(StorageErrors.NotConnected);
+            return Result.Failure<(PlatformStorageConnection, string)>(StorageErrors.NotConnected);
         }
 
         var refreshToken = _secrets.Unprotect(connection.ProtectedRefreshToken);
@@ -190,7 +190,7 @@ public sealed class FileStorageService : IFileStorageService
         {
             connection.MarkRevoked();
             await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-            return Result.Failure<(TenantStorageConnection, string)>(StorageErrors.OAuthRevoked);
+            return Result.Failure<(PlatformStorageConnection, string)>(StorageErrors.OAuthRevoked);
         }
 
         var tokens = await _oauth.RefreshAsync(refreshToken, cancellationToken).ConfigureAwait(false);
@@ -198,7 +198,7 @@ public sealed class FileStorageService : IFileStorageService
         {
             connection.MarkRevoked(tokens.Error.Description);
             await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-            return Result.Failure<(TenantStorageConnection, string)>(StorageErrors.OAuthRevoked);
+            return Result.Failure<(PlatformStorageConnection, string)>(StorageErrors.OAuthRevoked);
         }
 
         return Result.Success((connection, tokens.Value.AccessToken));

@@ -1,0 +1,22 @@
+# Used when EAS_NO_VCS=1 uploads from the mobile/ directory.
+node_modules/
+.expo/
+coverage/
+eas-archive*/
+dist/
+web-build/
+android/
+ios/
+.env
+.env*.local
+**/*.spec.ts
+**/*.spec.tsx
+jest.setup.ts
+tsconfig.spec.json
+*.md
+eas-*.log
+eas-*.bin
+eas-*.txt
+*.jks
+*.keystore
+.git/

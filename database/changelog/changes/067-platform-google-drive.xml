@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="067-platform-google-drive" author="lifefit">
+        <comment>Ticket: LF-0087. One platform Google Drive connection and OAuth app, managed by SuperAdmin. Index review: PK_PlatformStorageConnections; UX_PlatformStorageConnections_Provider keeps a single live row per provider. No tenant foreign key. Performance note: file uploads read this one row. The client secret and refresh token are stored only as protected ciphertext.</comment>
+        <sql splitStatements="false"><![CDATA[
+            CREATE TABLE app.PlatformStorageConnections
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                Provider NVARCHAR(32) NOT NULL,
+                Status NVARCHAR(32) NOT NULL,
+                ClientId NVARCHAR(200) NULL,
+                ProtectedClientSecret NVARCHAR(MAX) NULL,
+                RedirectUri NVARCHAR(500) NULL,
+                AccountEmail NVARCHAR(320) NULL,
+                RootFolderId NVARCHAR(128) NULL,
+                MembersFolderId NVARCHAR(128) NULL,
+                CommunicationsFolderId NVARCHAR(128) NULL,
+                GymFolderId NVARCHAR(128) NULL,
+                OtherFolderId NVARCHAR(128) NULL,
+                ProtectedRefreshToken NVARCHAR(MAX) NULL,
+                GrantedScopes NVARCHAR(500) NULL,
+                ConnectedByUserId UNIQUEIDENTIFIER NULL,
+                ConnectedAt DATETIME2 NULL,
+                LastValidatedAt DATETIME2 NULL,
+                LastError NVARCHAR(500) NULL,
+                StoreProgressPhotos BIT NOT NULL CONSTRAINT DF_PlatformStorageConnections_StoreProgressPhotos DEFAULT (1),
+                ProgressFolderId NVARCHAR(128) NULL,
+                ProgressFolderName NVARCHAR(200) NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_PlatformStorageConnections PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_PlatformStorageConnections_Users FOREIGN KEY (ConnectedByUserId) REFERENCES app.Users (Id),
+                CONSTRAINT CK_PlatformStorageConnections_Provider CHECK (Provider = N'GoogleDrive'),
+                CONSTRAINT CK_PlatformStorageConnections_Status CHECK (Status IN (N'NotConnected', N'Connecting', N'Connected', N'Failed', N'Revoked'))
+            );
+            CREATE UNIQUE INDEX UX_PlatformStorageConnections_Provider
+                ON app.PlatformStorageConnections (Provider)
+                WHERE DeletedAt IS NULL;
+        ]]></sql>
+        <rollback>
+            <sql>DROP TABLE app.PlatformStorageConnections;</sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

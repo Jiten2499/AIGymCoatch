@@ -14,7 +14,10 @@ public sealed record StorageConnectionResponse(
     bool CanConnect,
     bool StoreProgressPhotos = true,
     string? ProgressFolderId = null,
-    string? ProgressFolderName = null);
+    string? ProgressFolderName = null,
+    string? ClientId = null,
+    bool HasClientSecret = false,
+    string? RedirectUri = null);
 
 public sealed record BeginStorageConnectionResponse(string AuthorizationUrl, DateTime ExpiresAt);
 
@@ -69,6 +72,10 @@ public interface ITenantStorageConnectionRepository
     Task<TenantStorageConnection?> GetAsync(Guid tenantId, StorageProviderKind provider, CancellationToken cancellationToken);
 
     Task AddAsync(TenantStorageConnection connection, CancellationToken cancellationToken);
+
+    Task<PlatformStorageConnection?> GetPlatformAsync(StorageProviderKind provider, CancellationToken cancellationToken);
+
+    Task AddPlatformAsync(PlatformStorageConnection connection, CancellationToken cancellationToken);
 
     Task<StorageOAuthState?> GetOAuthStateByHashAsync(string stateHash, CancellationToken cancellationToken);
 

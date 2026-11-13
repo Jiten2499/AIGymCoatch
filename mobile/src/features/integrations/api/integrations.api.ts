@@ -22,7 +22,7 @@ export async function getGoogleDriveConnection(signal?: AbortSignal) {
 export async function beginGoogleDriveConnection() {
   const response = await apiClient.post<{ authorizationUrl: string }>('/integrations/google-drive/connect', {
     clientKind: 'Mobile',
-    returnPath: 'lifefit://integrations/google-drive',
+    returnPath: 'growfit://integrations/google-drive',
   });
   return response.data;
 }

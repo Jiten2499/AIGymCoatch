@@ -28,6 +28,12 @@ public interface IPtPackageRepository
 
     Task<IReadOnlyList<MemberPtAssignment>> ListMemberAssignmentsAsync(Guid tenantId, Guid memberProfileId, CancellationToken cancellationToken);
 
+    Task<IReadOnlyList<MemberPtAssignment>> ListUnpostedPaidAssignmentsAsync(Guid tenantId, CancellationToken cancellationToken);
+
+    Task AddPaymentAsync(MemberPtPayment payment, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<MemberPtPayment>> ListPaymentsAsync(Guid tenantId, Guid assignmentId, CancellationToken cancellationToken);
+
     Task<IReadOnlyList<PtSession>> ListMemberSessionsAsync(Guid tenantId, Guid memberProfileId, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<PtSessionConsumption>> ListMemberConsumptionsAsync(Guid tenantId, Guid memberProfileId, CancellationToken cancellationToken);

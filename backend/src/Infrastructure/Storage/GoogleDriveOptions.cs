@@ -10,7 +10,7 @@ public sealed class GoogleDriveOptions
 
     public string RedirectUri { get; set; } = string.Empty;
 
-    public string WebSuccessRedirectUri { get; set; } = "/business/integrations";
+    public string WebSuccessRedirectUri { get; set; } = "/admin/integrations";
 
     public string MobileSuccessRedirectUri { get; set; } = "lifefit://integrations/google-drive";
 

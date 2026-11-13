@@ -33,6 +33,39 @@ public sealed class PtPackageAssignmentTests
     }
 
     [Fact]
+    public void Later_collection_reduces_the_pending_balance_and_cannot_exceed_it()
+    {
+        var package = PtPackage.Create(Guid.NewGuid(), _tenant, "10 sessions", null, 10, 60, 300m, "USD");
+        var assignment = MemberPtAssignment.Open(Guid.NewGuid(), package, Guid.NewGuid(), null, new DateOnly(2026, 10, 9));
+        assignment.RecordOpeningPayment(100m, MembershipPaymentMethod.Cash, new DateOnly(2026, 10, 9), null, null);
+        assignment.Collect(50m, MembershipPaymentMethod.Upi, new DateOnly(2026, 10, 10), "UPI1", null);
+        assignment.AmountPaid.Should().Be(150m);
+        assignment.PaymentStatus.Should().Be(PtPaymentStatus.PartiallyPaid);
+        var over = () => assignment.Collect(151m, MembershipPaymentMethod.Cash, new DateOnly(2026, 10, 10), null, null);
+        over.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [Fact]
+    public void Opening_payment_can_be_partial_or_full_and_cannot_exceed_the_price()
+    {
+        var package = PtPackage.Create(Guid.NewGuid(), _tenant, "10 sessions", null, 10, 60, 300m, "USD");
+        var partial = MemberPtAssignment.Open(Guid.NewGuid(), package, Guid.NewGuid(), null, new DateOnly(2026, 10, 9));
+        partial.RecordOpeningPayment(100m, MembershipPaymentMethod.Cash, new DateOnly(2026, 10, 9), null, null);
+        partial.PaymentStatus.Should().Be(PtPaymentStatus.PartiallyPaid);
+        partial.AmountPaid.Should().Be(100m);
+
+        var paid = MemberPtAssignment.Open(Guid.NewGuid(), package, Guid.NewGuid(), null, new DateOnly(2026, 10, 9));
+        paid.RecordOpeningPayment(300m, MembershipPaymentMethod.Upi, new DateOnly(2026, 10, 9), "UPI1", null);
+        paid.PaymentStatus.Should().Be(PtPaymentStatus.Paid);
+        paid.PaymentReferenceNumber.Should().Be("UPI1");
+
+        var overpay = () => paid.RecordOpeningPayment(301m, MembershipPaymentMethod.Cash, new DateOnly(2026, 10, 9), null, null);
+        overpay.Should().Throw<ArgumentOutOfRangeException>();
+        var missingReference = () => MemberPtAssignment.Open(Guid.NewGuid(), package, Guid.NewGuid(), null, new DateOnly(2026, 10, 9)).RecordOpeningPayment(50m, MembershipPaymentMethod.Upi, new DateOnly(2026, 10, 9), " ", null);
+        missingReference.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
     public async Task Inactive_or_unknown_package_is_rejected()
     {
         await using var db = CreateDb();

@@ -1,24 +1,50 @@
 {
   "expo": {
-    "name": "LifeFit AI",
-    "slug": "lifefit-ai",
+    "name": "GrowFit",
+    "slug": "growfit",
     "version": "1.0.0",
-    "scheme": "lifefit",
+    "scheme": "growfit",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "backgroundColor": "#07110d",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.growventur.growfit",
+      "infoPlist": {
+        "NSCameraUsageDescription": "GrowFit uses the camera for profile and progress photos.",
+        "NSPhotoLibraryUsageDescription": "GrowFit accesses your photo library for profile and progress photos."
+      }
     },
     "android": {
+      "package": "com.growventur.growfit",
       "adaptiveIcon": {
         "backgroundColor": "#07110d",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "softwareKeyboardLayoutMode": "resize",
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ],
+          "data": [
+            {
+              "scheme": "growfit",
+              "host": "integrations",
+              "pathPrefix": "/google-drive"
+            }
+          ]
+        }
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -27,7 +53,31 @@
       "expo-secure-store",
       "expo-localization",
       "expo-status-bar",
-      "expo-image-picker"
-    ]
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow GrowFit to access your photos for profile and progress images.",
+          "cameraPermission": "Allow GrowFit to use the camera for profile and progress photos.",
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#07110d"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "922a0d36-9711-4e43-875a-82b4d4a6c9c3"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    }
   }
 }

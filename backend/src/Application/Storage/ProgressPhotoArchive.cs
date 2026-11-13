@@ -96,7 +96,7 @@ public sealed class ProgressPhotoArchive : IProgressPhotoArchive
             return Result.Success(false);
         }
 
-        var connection = await _connections.GetAsync(tenantId, StorageProviderKind.GoogleDrive, cancellationToken).ConfigureAwait(false);
+        var connection = await _connections.GetPlatformAsync(StorageProviderKind.GoogleDrive, cancellationToken).ConfigureAwait(false);
         if (connection is null || !connection.StoreProgressPhotos || connection.Status == StorageConnectionStatus.NotConnected)
         {
             return Result.Success(false);

@@ -58,6 +58,31 @@ public sealed class PtPackageRepository : IPtPackageRepository
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
+    public async Task<IReadOnlyList<MemberPtAssignment>> ListUnpostedPaidAssignmentsAsync(Guid tenantId, CancellationToken cancellationToken) =>
+        await _db.MemberPtAssignments.AsNoTracking()
+            .Where(item => item.TenantId == tenantId
+                && item.AmountPaid > 0
+                && item.PaymentMethod != null
+                && item.PaymentDate != null
+                && !_db.MemberPtPayments.Any(payment => payment.TenantId == tenantId && payment.MemberPtAssignmentId == item.Id)
+                && !_db.JournalEntries.Any(entry => entry.TenantId == tenantId
+                    && entry.SourceType == JournalSourceType.PtPackagePayment
+                    && entry.Status == JournalEntryStatus.Posted
+                    && entry.SourceId == item.Id))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+    public async Task AddPaymentAsync(MemberPtPayment payment, CancellationToken cancellationToken) =>
+        await _db.MemberPtPayments.AddAsync(payment, cancellationToken).ConfigureAwait(false);
+
+    public async Task<IReadOnlyList<MemberPtPayment>> ListPaymentsAsync(Guid tenantId, Guid assignmentId, CancellationToken cancellationToken) =>
+        await _db.MemberPtPayments.AsNoTracking()
+            .Where(item => item.TenantId == tenantId && item.MemberPtAssignmentId == assignmentId)
+            .OrderBy(item => item.PaymentDate)
+            .ThenBy(item => item.CreatedAt)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
     public async Task<IReadOnlyList<PtSession>> ListMemberSessionsAsync(Guid tenantId, Guid memberProfileId, CancellationToken cancellationToken) =>
         await _db.PtSessions.AsNoTracking()
             .Where(item => item.TenantId == tenantId && item.MemberProfileId == memberProfileId)

@@ -1,5 +1,6 @@
 using FluentAssertions;
 using LifeFitAI.Application.Gym;
+using LifeFitAI.Application.Gym.Pt;
 using LifeFitAI.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using LifeFitAI.Application.Gym.Ledger;
@@ -39,14 +40,14 @@ public sealed class LedgerFoundationTests
         var features = Substitute.For<IFeatureFlagService>();
         features.IsEnabledAsync(_tenantA, FeatureCodes.GymFinancialLedger, Arg.Any<CancellationToken>()).Returns(false);
         var ledger = Substitute.For<ILedgerRepository>();
-        var service = new LedgerPostingService(features, ledger, Substitute.For<IBusinessProfileRepository>(), Clock());
+        var service = new LedgerPostingService(features, ledger, Substitute.For<IBusinessProfileRepository>(), Unit(), Clock());
         var payment = MembershipPayment.Create(Guid.NewGuid(), _tenantA, Guid.NewGuid(), Guid.NewGuid(), 100m, "INR", MembershipPaymentMethod.Cash, _today, _userId, null, null);
         (await service.TryPostMembershipPaymentAsync(_tenantA, payment, _userId, CancellationToken.None)).IsSuccess.Should().BeTrue();
         await ledger.DidNotReceive().AddEntryAsync(Arg.Any<JournalEntry>(), Arg.Any<IReadOnlyList<JournalEntryLine>>(), Arg.Any<CancellationToken>());
 
         var guard = Substitute.For<IOperationGuard>();
         guard.AllowAsync(PermissionCodes.LedgerRead, FeatureCodes.GymFinancialLedger, Arg.Any<CancellationToken>()).Returns(Result.Failure(GymErrors.FeatureDisabled));
-        var queries = new LedgerQueryHandler(guard, Actor(_tenantA), ledger, Substitute.For<IBusinessProfileRepository>());
+        var queries = Queries(guard, Actor(_tenantA), ledger);
         var denied = await queries.Handle(new GetLedgerSummaryQuery(_today, _today), CancellationToken.None);
         denied.Error.Should().Be(GymErrors.FeatureDisabled);
     }
@@ -65,7 +66,7 @@ public sealed class LedgerFoundationTests
         repo.SourceExistsAsync(_tenantA, JournalSourceType.MembershipPayment, Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false, true);
         repo.FindActiveByKindAsync(_tenantA, FinancialAccountKind.Cash, Arg.Any<CancellationToken>()).Returns(cash);
         repo.GetLedgerAccountByCodeAsync(_tenantA, LedgerAccountCodes.MembershipRevenue, Arg.Any<CancellationToken>()).Returns(revenue);
-        var service = new LedgerPostingService(features, repo, Substitute.For<IBusinessProfileRepository>(), Clock());
+        var service = new LedgerPostingService(features, repo, Substitute.For<IBusinessProfileRepository>(), Unit(), Clock());
         var payment = MembershipPayment.Create(Guid.NewGuid(), _tenantA, Guid.NewGuid(), Guid.NewGuid(), 5000m, "INR", MembershipPaymentMethod.Cash, _today, _userId, null, null);
         (await service.TryPostMembershipPaymentAsync(_tenantA, payment, _userId, CancellationToken.None)).IsSuccess.Should().BeTrue();
         (await service.TryPostMembershipPaymentAsync(_tenantA, payment, _userId, CancellationToken.None)).IsSuccess.Should().BeTrue();
@@ -75,7 +76,7 @@ public sealed class LedgerFoundationTests
         var guard = Substitute.For<IOperationGuard>();
         guard.AllowAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(Result.Success());
         repo.GetFinancialAccountAsync(_tenantB, cashId, Arg.Any<CancellationToken>()).Returns((FinancialAccount?)null);
-        var balance = await new LedgerQueryHandler(guard, actorB, repo, Substitute.For<IBusinessProfileRepository>())
+        var balance = await Queries(guard, actorB, repo)
             .Handle(new GetFinancialAccountBalanceQuery(cashId), CancellationToken.None);
         balance.Error.Should().Be(GymErrors.NotFound);
     }
@@ -127,7 +128,7 @@ public sealed class LedgerFoundationTests
         repo.SourceExistsAsync(_tenantA, JournalSourceType.Expense, Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false);
         repo.FindActiveByKindAsync(_tenantA, FinancialAccountKind.Cash, Arg.Any<CancellationToken>()).Returns(cash);
         repo.GetLedgerAccountByCodeAsync(_tenantA, LedgerAccountCodes.OperatingExpense, Arg.Any<CancellationToken>()).Returns(expenseAccount);
-        var service = new LedgerPostingService(features, repo, Substitute.For<IBusinessProfileRepository>(), Clock());
+        var service = new LedgerPostingService(features, repo, Substitute.For<IBusinessProfileRepository>(), Unit(), Clock());
         var expense = Expense.Create(Guid.NewGuid(), _tenantA, Guid.NewGuid(), "Rent", 50000m, "INR", _today, ExpensePaymentMethod.Cash, _userId, null);
         (await service.TryPostExpenseAsync(_tenantA, expense, "Rent", _userId, CancellationToken.None)).IsSuccess.Should().BeTrue();
         await repo.Received(1).AddEntryAsync(
@@ -153,6 +154,42 @@ public sealed class LedgerFoundationTests
 
         await repo.EnsureDefaultsAsync(_tenantA, "INR", CancellationToken.None);
         db.FinancialAccounts.Local.Count(item => item.TenantId == _tenantA && item.AccountKind == FinancialAccountKind.Cash).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task PostPtPackagePayment_CreditsPersonalTrainingRevenue()
+    {
+        var cashLedgerId = Guid.NewGuid();
+        var revenueId = Guid.NewGuid();
+        var cash = FinancialAccount.Create(Guid.NewGuid(), _tenantA, "Cash", FinancialAccountKind.Cash, "INR", cashLedgerId);
+        var revenue = LedgerAccount.Create(revenueId, _tenantA, LedgerAccountCodes.PtRevenue, "Personal Training Revenue", LedgerAccountClass.Revenue, true);
+        var features = Substitute.For<IFeatureFlagService>();
+        features.IsEnabledAsync(_tenantA, FeatureCodes.GymFinancialLedger, Arg.Any<CancellationToken>()).Returns(true);
+        var repo = Substitute.For<ILedgerRepository>();
+        repo.SourceExistsAsync(_tenantA, JournalSourceType.PtPackagePayment, Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false, true);
+        repo.FindActiveByKindAsync(_tenantA, FinancialAccountKind.Cash, Arg.Any<CancellationToken>()).Returns(cash);
+        repo.GetLedgerAccountByCodeAsync(_tenantA, LedgerAccountCodes.PtRevenue, Arg.Any<CancellationToken>()).Returns(revenue);
+        var service = new LedgerPostingService(features, repo, Substitute.For<IBusinessProfileRepository>(), Unit(), Clock());
+        var package = PtPackage.Create(Guid.NewGuid(), _tenantA, "Starter", null, 8, 30, 100m, "INR");
+        var assignment = MemberPtAssignment.Open(Guid.NewGuid(), package, Guid.NewGuid(), null, _today);
+        assignment.RecordOpeningPayment(80m, MembershipPaymentMethod.Cash, _today, null, null);
+
+        (await service.TryPostPtPackagePaymentAsync(_tenantA, assignment, _userId, CancellationToken.None)).Value.Should().BeTrue();
+        (await service.TryPostPtPackagePaymentAsync(_tenantA, assignment, _userId, CancellationToken.None)).Value.Should().BeFalse();
+
+        await repo.Received(1).AddEntryAsync(
+            Arg.Is<JournalEntry>(entry => entry.SourceType == JournalSourceType.PtPackagePayment && entry.EntryType == JournalEntryType.MoneyIn && entry.Amount == 80m && entry.Category == "Personal training"),
+            Arg.Is<IReadOnlyList<JournalEntryLine>>(lines => lines.Any(line => line.LedgerAccountId == revenueId && line.CreditAmount == 80m) && lines.Any(line => line.LedgerAccountId == cashLedgerId && line.DebitAmount == 80m)),
+            Arg.Any<CancellationToken>());
+    }
+
+    private static LedgerQueryHandler Queries(IOperationGuard guard, ICurrentActor actor, ILedgerRepository ledger)
+    {
+        var packages = Substitute.For<IPtPackageRepository>();
+        packages.ListUnpostedPaidAssignmentsAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(Array.Empty<MemberPtAssignment>());
+        var posting = Substitute.For<ILedgerPostingService>();
+        posting.PostOutstandingPtPaymentsAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<IReadOnlyList<MemberPtAssignment>>(), Arg.Any<CancellationToken>()).Returns(Result.Success(false));
+        return new LedgerQueryHandler(guard, actor, ledger, Substitute.For<IBusinessProfileRepository>(), posting, packages);
     }
 
     private ICurrentActor Actor(Guid tenantId)

@@ -14,7 +14,7 @@ import { useSessionStore } from '../../store/sessionStore';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 
 const memberLinks = ['Fitness', 'AiCoach', 'Challenges', 'Profile', 'Settings'] as const;
-const businessLinks = ['BusinessDashboard', 'Members', 'Staff', 'Trainers', 'Memberships', 'Tasks', 'Leads', 'Expenses', 'Ledger', 'Integrations', 'Attendance', 'MyLeaves', 'ApplyLeave', 'BusinessSettings'] as const;
+const businessLinks = ['BusinessDashboard', 'Members', 'Staff', 'Trainers', 'Memberships', 'Tasks', 'Leads', 'Expenses', 'Ledger', 'Attendance', 'MyLeaves', 'ApplyLeave', 'BusinessSettings'] as const;
 
 export function MoreScreen() {
   const theme = useTheme();
@@ -32,7 +32,6 @@ export function MoreScreen() {
   const leadsEnabled = features.data?.[featureCodes.gymCrm] === true;
   const expensesEnabled = features.data?.[featureCodes.gymExpenseManagement] === true;
   const ledgerEnabled = features.data?.[featureCodes.gymFinancialLedger] === true;
-  const integrationsEnabled = features.data?.[featureCodes.googleDriveStorage] === true;
   const leaveEnabled = features.data?.[featureCodes.staffLeave] === true;
   const chatEnabled = current?.type !== 'Personal' && features.data?.[featureCodes.gymChat] === true;
   const approvals = useQuery({
@@ -41,7 +40,7 @@ export function MoreScreen() {
     retry: false,
     queryFn: ({ signal }) => getApprovalCount(signal),
   });
-  const links = businessLinks.filter((route) => (route !== 'Members' || membersEnabled) && (route !== 'Memberships' || membershipsEnabled) && (route !== 'Tasks' || approvals.isSuccess) && (route !== 'Leads' || leadsEnabled) && (route !== 'Expenses' || expensesEnabled) && (route !== 'Ledger' || ledgerEnabled) && (route !== 'Integrations' || integrationsEnabled) && ((route !== 'MyLeaves' && route !== 'ApplyLeave') || leaveEnabled));
+  const links = businessLinks.filter((route) => (route !== 'Members' || membersEnabled) && (route !== 'Memberships' || membershipsEnabled) && (route !== 'Tasks' || approvals.isSuccess) && (route !== 'Leads' || leadsEnabled) && (route !== 'Expenses' || expensesEnabled) && (route !== 'Ledger' || ledgerEnabled) && ((route !== 'MyLeaves' && route !== 'ApplyLeave') || leaveEnabled));
 
   return (
     <ScrollView contentContainerStyle={{ gap: theme.spacing.sm, padding: theme.spacing.xl }}>
@@ -88,7 +87,6 @@ function labelKey(route: string): string {
     Leads: 'nav.leads',
     Expenses: 'nav.expenses',
     Ledger: 'nav.ledger',
-    Integrations: 'nav.integrations',
     Attendance: 'nav.attendance',
     MyLeaves: 'nav.myLeaves',
     ApplyLeave: 'nav.applyLeave',

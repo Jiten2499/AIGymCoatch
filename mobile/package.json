@@ -10,18 +10,19 @@
     "@react-navigation/native-stack": "^7.19.2",
     "@tanstack/react-query": "^5.104.0",
     "axios": "^1.20.0",
-    "expo": "^58.0.0",
+    "expo": "~58.0.25",
     "expo-image-picker": "~58.0.10",
     "expo-localization": "~58.0.5",
-    "expo-secure-store": "~58.0.2",
-    "expo-status-bar": "~58.0.4",
+    "expo-secure-store": "~58.0.3",
+    "expo-splash-screen": "~58.0.14",
+    "expo-status-bar": "~58.0.5",
     "i18next": "^26.4.2",
     "react": "19.3.0",
     "react-hook-form": "^7.89.0",
     "react-i18next": "^17.0.15",
-    "react-native": "0.88.0",
-    "react-native-safe-area-context": "~5.10.1",
-    "react-native-screens": "~4.30.0",
+    "react-native": "0.88.1",
+    "react-native-safe-area-context": "~5.11.1",
+    "react-native-screens": "~4.30.1",
     "react-native-svg": "15.16.0",
     "zod": "^4.6.5",
     "zustand": "^5.0.15"
@@ -31,7 +32,7 @@
     "@types/jest": "^30.0.0",
     "@types/react": "~19.3.0",
     "jest": "~30.5.2",
-    "jest-expo": "~58.0.12",
+    "jest-expo": "~58.0.14",
     "typescript": "~6.0.3"
   },
   "scripts": {
@@ -41,7 +42,10 @@
     "test:coverage": "jest --coverage",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "eas:preview": "eas build --platform android --profile preview",
+    "eas:production": "eas build --platform android --profile production",
+    "eas:credentials": "eas credentials"
   },
   "private": true,
   "jest": {

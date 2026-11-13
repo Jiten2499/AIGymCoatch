@@ -1,7 +1,9 @@
 using FluentValidation;
 using LifeFitAI.Application.Authorization;
+using LifeFitAI.Application.Gym.Ledger;
 using LifeFitAI.Application.Gym.Pt;
 using LifeFitAI.Application.Identity;
+using LifeFitAI.Domain.Gym;
 using LifeFitAI.Domain.Identity;
 using LifeFitAI.SharedKernel.Abstractions;
 using LifeFitAI.SharedKernel.Results;
@@ -9,7 +11,16 @@ using MediatR;
 
 namespace LifeFitAI.Application.Gym.Members;
 
-public sealed record AssignMemberPtPackageCommand(Guid MemberId, Guid PackageId, Guid? TrainerId, DateOnly StartDate) : IRequest<Result<Guid>>;
+public sealed record AssignMemberPtPackageCommand(
+    Guid MemberId,
+    Guid PackageId,
+    Guid? TrainerId,
+    DateOnly StartDate,
+    decimal? PaymentAmount,
+    MembershipPaymentMethod? PaymentMethod,
+    DateOnly? PaymentDate,
+    string? PaymentReferenceNumber,
+    string? PaymentNotes) : IRequest<Result<Guid>>;
 
 public sealed class AssignMemberPtPackageCommandValidator : AbstractValidator<AssignMemberPtPackageCommand>
 {
@@ -18,6 +29,14 @@ public sealed class AssignMemberPtPackageCommandValidator : AbstractValidator<As
         RuleFor(command => command.MemberId).NotEmpty();
         RuleFor(command => command.PackageId).NotEmpty();
         RuleFor(command => command.StartDate).NotEmpty();
+        RuleFor(command => command.PaymentAmount).GreaterThan(0).When(command => command.PaymentAmount is not null);
+        RuleFor(command => command.PaymentMethod).NotNull().When(command => command.PaymentAmount is not null);
+        RuleFor(command => command.PaymentDate).NotNull().When(command => command.PaymentAmount is not null);
+        RuleFor(command => command.PaymentReferenceNumber).MaximumLength(100);
+        RuleFor(command => command.PaymentNotes).MaximumLength(2000);
+        RuleFor(command => command.PaymentReferenceNumber)
+            .NotEmpty()
+            .When(command => command.PaymentAmount is not null && command.PaymentMethod is MembershipPaymentMethod method && MembershipPaymentRules.RequiresReference(method));
     }
 }
 
@@ -27,15 +46,19 @@ public sealed class AssignMemberPtPackageCommandHandler : IRequestHandler<Assign
     private readonly ICurrentActor _actor;
     private readonly IPeopleRepository _people;
     private readonly IPtPackageRepository _packages;
+    private readonly ILedgerPostingService _ledger;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IDateTimeProvider _clock;
 
-    public AssignMemberPtPackageCommandHandler(IOperationGuard guard, ICurrentActor actor, IPeopleRepository people, IPtPackageRepository packages, IUnitOfWork unitOfWork)
+    public AssignMemberPtPackageCommandHandler(IOperationGuard guard, ICurrentActor actor, IPeopleRepository people, IPtPackageRepository packages, ILedgerPostingService ledger, IUnitOfWork unitOfWork, IDateTimeProvider clock)
     {
         _guard = guard;
         _actor = actor;
         _people = people;
         _packages = packages;
+        _ledger = ledger;
         _unitOfWork = unitOfWork;
+        _clock = clock;
     }
 
     public async Task<Result<Guid>> Handle(AssignMemberPtPackageCommand request, CancellationToken cancellationToken)
@@ -57,11 +80,36 @@ public sealed class AssignMemberPtPackageCommandHandler : IRequestHandler<Assign
             return Result.Failure<Guid>(GymErrors.NotFound);
         }
 
+        PtOpeningPayment? payment = null;
+        if (request.PaymentAmount is decimal amount)
+        {
+            if (request.PaymentMethod is not MembershipPaymentMethod method || request.PaymentDate is not DateOnly paymentDate || !MembershipPaymentRules.Date(paymentDate, DateOnly.FromDateTime(_clock.UtcNow)))
+            {
+                return Result.Failure<Guid>(GymErrors.InvalidState);
+            }
+
+            payment = new PtOpeningPayment(amount, method, paymentDate, request.PaymentReferenceNumber, request.PaymentNotes);
+        }
+
+        if (_actor.UserId is not Guid actorId)
+        {
+            return Result.Failure<Guid>(GymErrors.InvalidState);
+        }
+
         try
         {
-            var assignmentId = await MemberPtOpening.OpenAsync(_packages, tenantId, member.Id, request.TrainerId, request.PackageId, request.StartDate, cancellationToken).ConfigureAwait(false);
+            var assignment = await MemberPtOpening.OpenAsync(_packages, tenantId, member.Id, request.TrainerId, request.PackageId, request.StartDate, cancellationToken, payment).ConfigureAwait(false);
+            if (payment is not null)
+            {
+                var posted = await _ledger.TryPostPtPackagePaymentAsync(tenantId, assignment, actorId, cancellationToken).ConfigureAwait(false);
+                if (posted.IsFailure)
+                {
+                    return Result.Failure<Guid>(posted.Error);
+                }
+            }
+
             await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-            return Result.Success(assignmentId);
+            return Result.Success(assignment.Id);
         }
         catch (MemberOnboardingException exception)
         {

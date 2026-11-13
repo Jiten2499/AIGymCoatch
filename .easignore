@@ -1,0 +1,61 @@
+# Root .easignore for EAS (replaces .gitignore when present).
+# Keep GrowFit mobile sources; drop the rest of the monorepo and install deps on the worker.
+
+# From .gitignore
+bin/
+obj/
+TestResults/
+*.user
+*.suo
+.vs/
+node_modules/
+.next/
+out/
+dist/
+.expo/
+web/tsconfig.tsbuildinfo
+.env
+.env.local
+.env.*.local
+*.pfx
+liquibase.properties
+databasechangelog.csv
+Thumbs.db
+.DS_Store
+.idea/
+logs/
+*.log
+/storage/
+/backend/src/Api/storage/
+/mobile/coverage/
+
+# Monorepo paths not needed for the GrowFit Android build
+.local/
+.cursor/
+.github/
+backend/
+database/
+docs/
+web/
+agent-transcripts/
+*.sln
+*.md
+
+# Mobile-only extras
+/mobile/android/
+/mobile/ios/
+/mobile/dist/
+/mobile/web-build/
+/mobile/.env
+/mobile/.env*.local
+/mobile/**/*.spec.ts
+/mobile/**/*.spec.tsx
+/mobile/jest.setup.ts
+/mobile/tsconfig.spec.json
+/mobile/*.md
+/mobile/eas-*.log
+/mobile/eas-*.bin
+/mobile/eas-*.txt
+/mobile/*.jks
+/mobile/*.keystore
+.git/

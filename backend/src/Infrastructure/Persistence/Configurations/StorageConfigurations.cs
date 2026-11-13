@@ -31,6 +31,32 @@ public sealed class TenantStorageConnectionConfiguration : IEntityTypeConfigurat
     }
 }
 
+public sealed class PlatformStorageConnectionConfiguration : IEntityTypeConfiguration<PlatformStorageConnection>
+{
+    public void Configure(EntityTypeBuilder<PlatformStorageConnection> builder)
+    {
+        builder.ToTable("PlatformStorageConnections", "app");
+        builder.HasKey(item => item.Id);
+        builder.Property(item => item.Provider).HasConversion<string>().HasMaxLength(32);
+        builder.Property(item => item.Status).HasConversion<string>().HasMaxLength(32);
+        builder.Property(item => item.ClientId).HasMaxLength(200);
+        builder.Property(item => item.RedirectUri).HasMaxLength(500);
+        builder.Property(item => item.AccountEmail).HasMaxLength(320);
+        builder.Property(item => item.RootFolderId).HasMaxLength(128);
+        builder.Property(item => item.MembersFolderId).HasMaxLength(128);
+        builder.Property(item => item.CommunicationsFolderId).HasMaxLength(128);
+        builder.Property(item => item.GymFolderId).HasMaxLength(128);
+        builder.Property(item => item.OtherFolderId).HasMaxLength(128);
+        builder.Property(item => item.GrantedScopes).HasMaxLength(500);
+        builder.Property(item => item.LastError).HasMaxLength(500);
+        builder.Property(item => item.ProgressFolderId).HasMaxLength(128);
+        builder.Property(item => item.ProgressFolderName).HasMaxLength(200);
+        builder.Property(item => item.RowVersion).IsRowVersion();
+        builder.HasOne<UserAccount>().WithMany().HasForeignKey(item => item.ConnectedByUserId).IsRequired(false).OnDelete(DeleteBehavior.Restrict);
+        builder.HasQueryFilter(item => item.DeletedAt == null);
+    }
+}
+
 public sealed class StoredFileConfiguration : IEntityTypeConfiguration<StoredFile>
 {
     public void Configure(EntityTypeBuilder<StoredFile> builder)

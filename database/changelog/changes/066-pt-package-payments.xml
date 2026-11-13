@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="066-pt-package-payments" author="lifefit">
+        <comment>Ticket: LF-0086. Record each personal-training collection separately from the assignment balance. Index review: PK on MemberPtPayments.Id; IX_MemberPtPayments_TenantId_MemberPtAssignmentId_PaymentDate for the member payments list. No extra unique index because several collections can share a day. Performance note: the list index leads with TenantId and covers one assignment.</comment>
+        <sql splitStatements="false"><![CDATA[
+            CREATE TABLE app.MemberPtPayments
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                MemberProfileId UNIQUEIDENTIFIER NOT NULL,
+                MemberPtAssignmentId UNIQUEIDENTIFIER NOT NULL,
+                Amount DECIMAL(19, 4) NOT NULL,
+                Currency NVARCHAR(3) NOT NULL,
+                PaymentMethod NVARCHAR(32) NOT NULL,
+                PaymentDate DATE NOT NULL,
+                ReferenceNumber NVARCHAR(100) NULL,
+                Notes NVARCHAR(2000) NULL,
+                Status NVARCHAR(16) NOT NULL,
+                ReceivedByUserId UNIQUEIDENTIFIER NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_MemberPtPayments PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_MemberPtPayments_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT FK_MemberPtPayments_MemberProfiles FOREIGN KEY (MemberProfileId) REFERENCES app.MemberProfiles (Id),
+                CONSTRAINT FK_MemberPtPayments_MemberPtAssignments FOREIGN KEY (MemberPtAssignmentId) REFERENCES app.MemberPtAssignments (Id),
+                CONSTRAINT FK_MemberPtPayments_ReceivedByUsers FOREIGN KEY (ReceivedByUserId) REFERENCES app.Users (Id),
+                CONSTRAINT CK_MemberPtPayments_Amount CHECK (Amount > 0),
+                CONSTRAINT CK_MemberPtPayments_Status CHECK (Status = N'Posted'),
+                CONSTRAINT CK_MemberPtPayments_PaymentMethod CHECK (PaymentMethod IN (N'Cash', N'Upi', N'DebitCard', N'CreditCard', N'BankTransfer', N'OnlinePayment', N'Cheque', N'Other'))
+            );
+            CREATE INDEX IX_MemberPtPayments_TenantId_MemberPtAssignmentId_PaymentDate
+                ON app.MemberPtPayments (TenantId, MemberPtAssignmentId, PaymentDate DESC)
+                WHERE DeletedAt IS NULL;
+        ]]></sql>
+        <rollback>
+            <sql>DROP TABLE app.MemberPtPayments;</sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

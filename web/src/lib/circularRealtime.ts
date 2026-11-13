@@ -17,10 +17,10 @@ export function acceptCircularEvent(event: CircularPublishedEvent | null | undef
   return Boolean(tenantId && event?.communicationId && event.tenantId === tenantId);
 }
 
-export function useCircularRealtime(tenantId: string | null, accessToken: string | undefined) {
+export function useCircularRealtime(tenantId: string | null) {
   const client = useQueryClient();
   useEffect(() => {
-    if (!tenantId || !accessToken) {
+    if (!tenantId || !getSession()?.accessToken) {
       return undefined;
     }
 
@@ -48,5 +48,5 @@ export function useCircularRealtime(tenantId: string | null, accessToken: string
     return () => {
       void connection.stop();
     };
-  }, [accessToken, client, tenantId]);
+  }, [client, tenantId]);
 }

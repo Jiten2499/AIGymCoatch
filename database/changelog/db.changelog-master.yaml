@@ -191,5 +191,17 @@ databaseChangeLog:
   - include:
       file: changes/063-staff-leave-defaults.xml
       relativeToChangelogFile: true
+  - include:
+      file: changes/064-pt-package-opening-payment.xml
+      relativeToChangelogFile: true
+  - include:
+      file: changes/065-pt-package-ledger-source.xml
+      relativeToChangelogFile: true
+  - include:
+      file: changes/066-pt-package-payments.xml
+      relativeToChangelogFile: true
+  - include:
+      file: changes/067-platform-google-drive.xml
+      relativeToChangelogFile: true
 
 

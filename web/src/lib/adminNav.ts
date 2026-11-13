@@ -7,7 +7,7 @@ const baseGroups: AdminGroup[] = [
   { title: "AI", links: [["Connections", "/admin/llm"], ["Models", "/admin/models"]] },
   { title: "Directory", links: [["Tenants", "/admin/tenants"], ["Users", "/admin/users"]] },
   { title: "Licensing", links: [["Plans", "/admin/plans"], ["Features", "/admin/features"], ["Subscriptions", "/admin/licenses"], ["Seats", "/admin/assignments"], ["Expiring", "/admin/expiring"]] },
-  { title: "System Settings", links: [["Email & Delivery", "/admin/email"]] },
+  { title: "System Settings", links: [["Email & Delivery", "/admin/email"], ["Google Drive", "/admin/integrations"]] },
   { title: "Audit", links: [["Activity", "/admin/audit"]] },
 ];
 

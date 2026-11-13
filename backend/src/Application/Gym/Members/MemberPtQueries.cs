@@ -20,7 +20,11 @@ public sealed record MemberPtAssignmentItem(
     decimal Price,
     string Currency,
     MemberPtAssignmentStatus Status,
-    PtPaymentStatus PaymentStatus);
+    PtPaymentStatus PaymentStatus,
+    decimal AmountPaid,
+    MembershipPaymentMethod? PaymentMethod,
+    DateOnly? PaymentDate,
+    string? PaymentReferenceNumber);
 
 public sealed record MemberPtSessionItem(
     Guid Id,
@@ -63,7 +67,7 @@ public sealed class MemberPtQueryHandlers :
 
         var rows = await _packages.ListMemberAssignmentsAsync(tenant.Value, request.MemberId, cancellationToken).ConfigureAwait(false);
         IReadOnlyList<MemberPtAssignmentItem> items = rows
-            .Select(row => new MemberPtAssignmentItem(row.Id, row.PtPackageId, row.PackageName, row.TrainerProfileId, row.StartDate, row.EndDate, row.SessionCount, row.SessionsRemaining, row.Price, row.Currency, row.Status, row.PaymentStatus))
+            .Select(row => new MemberPtAssignmentItem(row.Id, row.PtPackageId, row.PackageName, row.TrainerProfileId, row.StartDate, row.EndDate, row.SessionCount, row.SessionsRemaining, row.Price, row.Currency, row.Status, row.PaymentStatus, row.AmountPaid, row.PaymentMethod, row.PaymentDate, row.PaymentReferenceNumber))
             .ToArray();
         return Result.Success(items);
     }

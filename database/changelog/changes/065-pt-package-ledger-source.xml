@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="065-pt-package-ledger-source" author="lifefit">
+        <comment>Ticket: LF-0085. Allow a personal-training package payment as a journal source. Index review: no new index. UX_JournalEntries_TenantId_Source already makes one posted row per assignment. Performance note: source lookups stay on that unique index.</comment>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE app.JournalEntries DROP CONSTRAINT CK_JournalEntries_SourceType;
+            ALTER TABLE app.JournalEntries ADD CONSTRAINT CK_JournalEntries_SourceType
+                CHECK (SourceType IN (N'MembershipPayment', N'Expense', N'Transfer', N'Reversal', N'PtPackagePayment'));
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                DELETE FROM app.JournalEntryLines
+                WHERE JournalEntryId IN (SELECT Id FROM app.JournalEntries WHERE SourceType = N'PtPackagePayment');
+                DELETE FROM app.JournalEntries WHERE SourceType = N'PtPackagePayment';
+                ALTER TABLE app.JournalEntries DROP CONSTRAINT CK_JournalEntries_SourceType;
+                ALTER TABLE app.JournalEntries ADD CONSTRAINT CK_JournalEntries_SourceType
+                    CHECK (SourceType IN (N'MembershipPayment', N'Expense', N'Transfer', N'Reversal'));
+            ]]></sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

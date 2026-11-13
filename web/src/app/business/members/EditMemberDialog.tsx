@@ -5,33 +5,50 @@ import { useEffect, useMemo, useState } from "react";
 import { FormDialog } from "../../../components/FormDialog";
 import { api, apiBlob, apiRoot, ApiError } from "../../../lib/api";
 import { getSession } from "../../../lib/session";
-import type { GymMemberDetails } from "../../../lib/gym";
+import type { BranchOption, GymMemberDetails, GymMembership, MembershipPackage } from "../../../lib/gym";
 import { nameInitials } from "../../../lib/initials";
 import type { Page } from "../../../lib/types";
-import { draftFromMember, editError, fitnessGoals, memberGenders, memberStatuses, memberUpdateBody, type MemberDraft } from "./memberWizard";
+import { draftFromMember, editError, memberUpdateBody, stepError, type MemberDraft } from "./memberWizard";
+import { MemberReview, MembershipPackageStep, type MembershipTerm, type PtPackageOption } from "./MemberPackageStep";
+import { BasicStep, ContactStep, GymStep } from "./MemberWizardSteps";
 
 type TrainerOption = { id: string; firstName: string; lastName: string; status: string };
+type PtAssignment = { packageId: string; startDate: string; status: string };
 
 const photoTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 export function EditMemberDialog({ memberId, onCancel, onSaved }: { memberId: string; onCancel: () => void; onSaved: () => void }) {
   const member = useQuery({ queryKey: ["member", "edit", memberId], queryFn: () => api<GymMemberDetails>(`/members/${memberId}`) });
-  return (
-    <FormDialog onCancel={onCancel} title="Edit member" wide>
-      {member.isLoading ? <p className="mt-4" role="status">Loading member.</p> : null}
-      {member.error instanceof ApiError ? <p className="mt-4" role="alert">{member.error.message}</p> : null}
-      {member.data ? <EditForm key={member.data.id} member={member.data} memberId={memberId} onCancel={onCancel} onSaved={onSaved} /> : null}
-    </FormDialog>
-  );
+  if (!member.data) {
+    return (
+      <FormDialog onCancel={onCancel} title="Edit member" wide>
+        {member.isLoading ? <p className="mt-4" role="status">Loading member.</p> : null}
+        {member.error instanceof ApiError ? <p className="mt-4" role="alert">{member.error.message}</p> : null}
+      </FormDialog>
+    );
+  }
+  return <EditWizard key={member.data.id} member={member.data} memberId={memberId} onCancel={onCancel} onSaved={onSaved} />;
 }
 
-function EditForm({ member, memberId, onCancel, onSaved }: { member: GymMemberDetails; memberId: string; onCancel: () => void; onSaved: () => void }) {
+function EditWizard({ member, memberId, onCancel, onSaved }: { member: GymMemberDetails; memberId: string; onCancel: () => void; onSaved: () => void }) {
   const client = useQueryClient();
+  const [step, setStep] = useState(1);
   const [draft, setDraft] = useState<MemberDraft>(() => draftFromMember(member));
   const [photo, setPhoto] = useState<File | null>(null);
   const [removePhoto, setRemovePhoto] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [filled, setFilled] = useState(false);
+  const packages = useQuery({ queryKey: ["membership-plans", "member-edit"], queryFn: () => api<Page<MembershipPackage>>("/membership-plans?page=1&pageSize=100") });
+  const branches = useQuery({ queryKey: ["branches", "member-edit"], queryFn: () => api<Page<BranchOption>>("/branches?page=1&pageSize=50") });
   const trainers = useQuery({ queryKey: ["trainers", "member-edit"], queryFn: () => api<Page<TrainerOption>>("/trainers?page=1&pageSize=50") });
+  const ptPackages = useQuery({ queryKey: ["pt-packages", "member-edit"], queryFn: () => api<PtPackageOption[]>("/pt-packages") });
+  const memberships = useQuery({ queryKey: ["memberships", memberId, "edit"], queryFn: () => api<Page<GymMembership>>(`/memberships?memberId=${memberId}&page=1&pageSize=20`) });
+  const assignments = useQuery({ queryKey: ["member-pt", memberId, "edit"], queryFn: () => api<PtAssignment[]>(`/members/${memberId}/pt-assignments`) });
+  const term = useQuery({
+    queryKey: ["membership-term", draft.planId, draft.startDate],
+    enabled: Boolean(draft.planId && draft.startDate),
+    queryFn: () => api<MembershipTerm>(`/membership-plans/${draft.planId}/term?start=${draft.startDate}`),
+  });
   const existing = useQuery({
     queryKey: ["member-photo", memberId],
     enabled: member.hasPhoto && !photo && !removePhoto,
@@ -62,7 +79,26 @@ function EditForm({ member, memberId, onCancel, onSaved }: { member: GymMemberDe
     },
   });
 
+  useEffect(() => {
+    if (filled || !memberships.isSuccess || !assignments.isSuccess) {
+      return;
+    }
+    const membership = currentMembership(memberships.data.items);
+    const assignment = currentAssignment(assignments.data);
+    setDraft((current) => ({
+      ...current,
+      planId: membership?.membershipPlanId ?? "",
+      branchId: membership?.branchId ?? "",
+      startDate: membership?.startDate ?? current.startDate,
+      ptPackageId: assignment?.packageId ?? "",
+    }));
+    setFilled(true);
+  }, [assignments.data, assignments.isSuccess, filled, memberships.data, memberships.isSuccess]);
+
+  const selected = (packages.data?.items ?? []).find((plan) => plan.id === draft.planId) ?? null;
+  const selectedPt = (ptPackages.data ?? []).find((item) => item.id === draft.ptPackageId) ?? null;
   const activeTrainers = (trainers.data?.items ?? []).filter((trainer) => trainer.status === "Active" || trainer.id === draft.trainerId);
+  const trainerName = activeTrainers.find((trainer) => trainer.id === draft.trainerId);
   const currentPhoto = photo ?? (removePhoto ? null : existing.data ?? null);
 
   function update(patch: Partial<MemberDraft>) {
@@ -70,46 +106,78 @@ function EditForm({ member, memberId, onCancel, onSaved }: { member: GymMemberDe
     setDraft((current) => ({ ...current, ...patch }));
   }
 
+  function next() {
+    const error = step === 4 ? null : stepError(step, draft);
+    if (error) {
+      setMessage(error);
+      return;
+    }
+    setMessage(null);
+    setStep((current) => current + 1);
+  }
+
+  function choosePhoto(file: File | null) {
+    setRemovePhoto(false);
+    setPhoto(file);
+    setMessage(file && (!photoTypes.has(file.type) || file.size > 2_097_152) ? "Choose a JPEG, PNG, or WebP image under 2 MB." : null);
+  }
+
   return (
-    <form className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={(event) => { event.preventDefault(); setMessage(null); save.mutate(); }}>
-      <div className="flex items-center gap-4 sm:col-span-2">
-        <PhotoFace file={currentPhoto} initials={nameInitials(member.firstName, member.lastName)} />
-        <div className="grid gap-2">
-          <label className="grid gap-2">Profile photo
-            <input accept="image/jpeg,image/png,image/webp" aria-label="Profile photo" className="field" onChange={(event) => { const file = event.target.files?.[0] ?? null; setRemovePhoto(false); setPhoto(file); setMessage(file && (!photoTypes.has(file.type) || file.size > 2_097_152) ? "Choose a JPEG, PNG, or WebP image under 2 MB." : null); }} type="file" />
-          </label>
-          {member.hasPhoto || photo ? <button className="min-h-11 justify-self-start rounded-full border border-line px-4" onClick={() => { setPhoto(null); setRemovePhoto(true); }} type="button">Remove photo</button> : null}
+    <FormDialog onCancel={onCancel} title={`Edit member · Step ${step} of 5`} wide>
+    <div className="mt-4 grid gap-3">
+      {step === 1 ? (
+        <BasicStep
+          draft={draft}
+          emailLocked
+          onPhoto={choosePhoto}
+          photoName={photo?.name ?? (removePhoto ? "Photo will be removed" : member.hasPhoto ? "Current photo" : "")}
+          photoPreview={(
+            <div className="flex items-center gap-4">
+              <PhotoFace file={currentPhoto} initials={nameInitials(member.firstName, member.lastName)} />
+              {member.hasPhoto || photo ? <button className="min-h-11 rounded-full border border-line px-4" onClick={() => { setPhoto(null); setRemovePhoto(true); }} type="button">Remove photo</button> : null}
+            </div>
+          )}
+          update={update}
+        />
+      ) : null}
+      {step === 2 ? <ContactStep draft={draft} update={update} /> : null}
+      {step === 3 ? <GymStep draft={draft} showAppAccess={false} trainers={activeTrainers} update={update} /> : null}
+      {step === 4 ? (
+        <MembershipPackageStep
+          branches={branches.data?.items ?? []}
+          draft={draft}
+          plans={packages.data?.items ?? []}
+          ptPackages={ptPackages.data ?? []}
+          readOnly
+          term={term.data}
+          update={update}
+        />
+      ) : null}
+      {step === 5 ? <MemberReview draft={draft} editing plan={selected} ptPackage={selectedPt} term={term.data ?? null} trainerName={trainerName ? `${trainerName.firstName} ${trainerName.lastName}` : ""} /> : null}
+      {message ? <p role="alert">{message}</p> : null}
+      {save.error instanceof ApiError ? <p role="alert">{save.error.message}</p> : null}
+      <div className="mt-2 flex items-center justify-between gap-3">
+        <button className="min-h-11 rounded-full border border-line px-4" disabled={save.isPending} onClick={onCancel} type="button">Cancel</button>
+        <div className="flex gap-3">
+          {step > 1 ? <button className="min-h-11 rounded-full px-4" disabled={save.isPending} onClick={() => setStep((current) => current - 1)} type="button">Previous</button> : null}
+          {step < 5 ? (
+            <button className="min-h-11 rounded-full bg-accent px-4 font-semibold text-background" onClick={next} type="button">Next</button>
+          ) : (
+            <button className="min-h-11 rounded-full bg-accent px-4 font-semibold text-background disabled:opacity-60" disabled={save.isPending} onClick={() => { const error = editError(draft); if (error) { setMessage(error); return; } save.mutate(); }} type="button">{save.isPending ? "Saving..." : "Save member"}</button>
+          )}
         </div>
       </div>
-      <Field text="Full name"><input className="field" onChange={(event) => update({ fullName: event.target.value })} value={draft.fullName} /></Field>
-      <Field text="Mobile number"><input className="field" onChange={(event) => update({ phone: event.target.value })} value={draft.phone} /></Field>
-      <Field text="Email"><input className="field" disabled value={draft.email} /></Field>
-      <Field text="Date of birth"><input className="field" onChange={(event) => update({ dateOfBirth: event.target.value })} type="date" value={draft.dateOfBirth} /></Field>
-      <Field text="Gender"><Select onChange={(gender) => update({ gender })} options={memberGenders} value={draft.gender} /></Field>
-      <Field text="Member status"><Select onChange={(status) => update({ status: status as MemberDraft["status"] })} options={memberStatuses} value={draft.status} /></Field>
-      <Field text="Joining date"><input className="field" onChange={(event) => update({ joinDate: event.target.value })} type="date" value={draft.joinDate} /></Field>
-      <Field text="Fitness goal"><Select onChange={(fitnessGoal) => update({ fitnessGoal })} options={fitnessGoals} value={draft.fitnessGoal} /></Field>
-      <Field text="Assigned trainer">
-        <select className="field" onChange={(event) => update({ trainerId: event.target.value })} value={draft.trainerId}>
-          <option value="">None</option>
-          {activeTrainers.map((trainer) => <option key={trainer.id} value={trainer.id}>{trainer.firstName} {trainer.lastName}</option>)}
-        </select>
-      </Field>
-      <Field text="Address"><input className="field" onChange={(event) => update({ address: event.target.value })} value={draft.address} /></Field>
-      <Field text="City"><input className="field" onChange={(event) => update({ city: event.target.value })} value={draft.city} /></Field>
-      <Field text="State"><input className="field" onChange={(event) => update({ state: event.target.value })} value={draft.state} /></Field>
-      <Field text="Postal code"><input className="field" onChange={(event) => update({ postalCode: event.target.value })} value={draft.postalCode} /></Field>
-      <Field text="Emergency contact name"><input className="field" onChange={(event) => update({ emergencyName: event.target.value })} value={draft.emergencyName} /></Field>
-      <Field text="Emergency contact mobile"><input className="field" onChange={(event) => update({ emergencyPhone: event.target.value })} value={draft.emergencyPhone} /></Field>
-      <Field text="Emergency relationship"><input className="field" onChange={(event) => update({ emergencyRelationship: event.target.value })} value={draft.emergencyRelationship} /></Field>
-      {message ? <p className="sm:col-span-2" role="alert">{message}</p> : null}
-      {save.error instanceof ApiError ? <p className="sm:col-span-2" role="alert">{save.error.message}</p> : null}
-      <div className="mt-2 flex justify-end gap-3 sm:col-span-2">
-        <button className="min-h-11 rounded-full border border-line px-4" disabled={save.isPending} onClick={onCancel} type="button">Cancel</button>
-        <button className="min-h-11 rounded-full bg-accent px-4 font-semibold text-background disabled:opacity-60" disabled={save.isPending} type="submit">{save.isPending ? "Saving..." : "Save member"}</button>
-      </div>
-    </form>
+    </div>
+    </FormDialog>
   );
+}
+
+function currentMembership(items: GymMembership[]) {
+  return [...items].sort((left, right) => Number(right.status === "Active") - Number(left.status === "Active") || right.startDate.localeCompare(left.startDate))[0];
+}
+
+function currentAssignment(items: PtAssignment[]) {
+  return [...items].sort((left, right) => Number(right.status === "Active") - Number(left.status === "Active") || right.startDate.localeCompare(left.startDate))[0];
 }
 
 async function uploadMemberPhoto(memberId: string, file: File) {
@@ -128,26 +196,9 @@ async function uploadMemberPhoto(memberId: string, file: File) {
 
 function PhotoFace({ file, initials }: { file: Blob | null; initials: string }) {
   const src = useMemo(() => (file ? URL.createObjectURL(file) : null), [file]);
-  useEffect(() => () => {
-    if (src) {
-      URL.revokeObjectURL(src);
-    }
-  }, [src]);
+  useEffect(() => () => { if (src) URL.revokeObjectURL(src); }, [src]);
   if (!src) {
     return <span className="inline-flex h-20 w-20 items-center justify-center rounded-full bg-background text-lg font-semibold">{initials}</span>;
   }
   return <img alt="" className="h-20 w-20 rounded-full object-cover" src={src} />;
-}
-
-function Field({ text, children }: { text: string; children: React.ReactNode }) {
-  return <label className="grid gap-2">{text}{children}</label>;
-}
-
-function Select({ value, options, onChange }: { value: string; options: readonly string[]; onChange: (value: string) => void }) {
-  return (
-    <select className="field" onChange={(event) => onChange(event.target.value)} value={value}>
-      <option value="">Select</option>
-      {options.map((option) => <option key={option}>{option}</option>)}
-    </select>
-  );
 }

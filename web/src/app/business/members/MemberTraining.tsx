@@ -7,6 +7,7 @@ import { api, ApiError } from "../../../lib/api";
 import type { GymMembership } from "../../../lib/gym";
 import { ptPackageLabel, type PtPackageOption } from "../../../lib/ptPackage";
 import type { Coach, Page } from "../../../lib/types";
+import { PtPackagePaymentDialog } from "./PtPackagePaymentDialog";
 
 type Assignment = {
   id: string;
@@ -20,6 +21,9 @@ type Assignment = {
   currency: string;
   status: string;
   paymentStatus: string;
+  amountPaid?: number;
+  paymentMethod?: string | null;
+  paymentDate?: string | null;
 };
 
 type Session = {
@@ -66,6 +70,9 @@ export function MemberTraining({
     await client.invalidateQueries({ queryKey: ["member-pt", tenantId, memberId] });
     await client.invalidateQueries({ queryKey: ["member-pt-sessions", tenantId, memberId] });
     await client.invalidateQueries({ queryKey: ["memberships", tenantId, memberId] });
+    await client.invalidateQueries({ queryKey: ["ledger-summary", tenantId] });
+    await client.invalidateQueries({ queryKey: ["ledger-transactions", tenantId] });
+    await client.invalidateQueries({ queryKey: ["financial-accounts", tenantId] });
   };
   const names = new Map((trainers.data?.items ?? []).map((trainer) => [trainer.id, `${trainer.firstName} ${trainer.lastName}`]));
   const name = (id: string | null) => (id ? names.get(id) ?? "Trainer" : "—");
@@ -80,7 +87,7 @@ export function MemberTraining({
           <article className="rounded-2xl border border-line bg-surface p-4 text-sm" key={item.id}>
             <h2 className="font-semibold">{item.packageName}</h2>
             <p className="mt-1 text-muted">Valid {item.startDate} to {item.endDate} · {item.status} · {item.paymentStatus}</p>
-            <p className="mt-1">Sessions remaining {item.sessionsRemaining} of {item.sessionCount} · {name(item.trainerId)} · {item.price} {item.currency}</p>
+            <p className="mt-1">Sessions remaining {item.sessionsRemaining} of {item.sessionCount} · {name(item.trainerId)} · {item.price} {item.currency}{item.amountPaid ? ` · Paid ${item.amountPaid}${item.paymentMethod ? ` by ${item.paymentMethod}` : ""}${item.paymentDate ? ` on ${item.paymentDate}` : ""}` : ""}</p>
           </article>
         ))}
         {assignments.data && assignments.data.length === 0 ? <p className="text-muted">No personal-training package is assigned.</p> : null}
@@ -109,12 +116,10 @@ function AssignForm({ memberId, onAssigned, trainerId, trainers }: { memberId: s
   const [packageId, setPackageId] = useState("");
   const [selectedTrainer, setSelectedTrainer] = useState(trainerId ?? "");
   const [start, setStart] = useState(new Date().toISOString().slice(0, 10));
-  const assign = useMutation({
-    mutationFn: () => api(`/members/${memberId}/pt-assignments`, { method: "POST", body: JSON.stringify({ packageId, trainerId: selectedTrainer || null, startDate: start }) }),
-    onSuccess: onAssigned,
-  });
+  const [paying, setPaying] = useState(false);
+  const selectedPackage = (packages.data ?? []).find((item) => item.id === packageId);
   return (
-    <form className="grid gap-3 rounded-2xl border border-line bg-surface p-4" onSubmit={(event) => { event.preventDefault(); assign.mutate(); }}>
+    <form className="grid gap-3 rounded-2xl border border-line bg-surface p-4" onSubmit={(event) => { event.preventDefault(); setPaying(true); }}>
       <h2 className="font-semibold">Assign PT package</h2>
       <select aria-label="PT package" className="field" onChange={(event) => setPackageId(event.target.value)} required value={packageId}>
         <option value="">Select a package</option>
@@ -126,8 +131,20 @@ function AssignForm({ memberId, onAssigned, trainerId, trainers }: { memberId: s
       </select>
       <input aria-label="Package start date" className="field" onChange={(event) => setStart(event.target.value)} required type="date" value={start} />
       {packages.error instanceof ApiError ? <p role="alert">{packages.error.message}</p> : null}
-      {assign.error instanceof ApiError ? <p role="alert">{assign.error.message}</p> : null}
       <button className="min-h-11 w-fit rounded-full bg-accent px-4 font-semibold text-background" type="submit">Assign package</button>
+      {paying && selectedPackage ? (
+        <PtPackagePaymentDialog
+          currency={selectedPackage.currency}
+          memberId={memberId}
+          onCancel={() => setPaying(false)}
+          onSaved={async () => { setPaying(false); await onAssigned(); }}
+          packageId={packageId}
+          packageName={selectedPackage.name}
+          price={selectedPackage.price}
+          startDate={start}
+          trainerId={selectedTrainer || null}
+        />
+      ) : null}
     </form>
   );
 }

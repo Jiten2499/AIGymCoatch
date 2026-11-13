@@ -13,19 +13,21 @@ export function FormDialog({
   large?: boolean;
   children: React.ReactNode;
 }) {
-  const width = large ? "max-h-[94vh] max-w-6xl" : wide ? "max-h-[90vh] max-w-3xl" : "max-h-[90vh] max-w-lg";
+  const width = large ? "max-w-6xl" : wide ? "max-w-3xl" : "max-w-lg";
   return (
-    <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/60 p-4" role="presentation">
-      <div aria-labelledby="form-dialog-title" aria-modal="true" className={`flex w-full min-w-0 flex-col overflow-hidden rounded-2xl border border-line bg-surface ${width}`} role="dialog">
-        <div className="shrink-0 border-b border-line px-6 py-5">
-          {header ?? (
-            <div className="flex items-start justify-between gap-4">
-              <h2 className="text-xl font-semibold" id="form-dialog-title">{title}</h2>
-              <button className="min-h-11 rounded-full border border-line px-4" onClick={onCancel} type="button">Close</button>
-            </div>
-          )}
+    <div className="fixed inset-0 z-20 overflow-y-auto bg-black/60 p-4" role="presentation">
+      <div className="flex min-h-full items-center justify-center">
+        <div aria-labelledby="form-dialog-title" aria-modal="true" className={`my-4 w-full min-w-0 rounded-2xl border border-line bg-surface ${width}`} role="dialog">
+          <div className="border-b border-line px-6 py-5">
+            {header ?? (
+              <div className="flex items-start justify-between gap-4">
+                <h2 className="text-xl font-semibold" id="form-dialog-title">{title}</h2>
+                <button className="min-h-11 rounded-full border border-line px-4" onClick={onCancel} type="button">Close</button>
+              </div>
+            )}
+          </div>
+          <div className="px-6 py-5">{children}</div>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5">{children}</div>
       </div>
     </div>
   );

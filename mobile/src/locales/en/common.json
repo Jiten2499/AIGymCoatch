@@ -792,7 +792,7 @@
   "integrations": {
     "title": "Integrations",
     "googleDrive": "Google Drive",
-    "storageBlurb": "Storage for LifeFit files",
+    "storageBlurb": "Google Drive is set up by the platform administrator and shared by every gym.",
     "status": "Status",
     "notConnected": "Not Connected",
     "account": "Account",

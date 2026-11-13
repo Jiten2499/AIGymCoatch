@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using FluentAssertions;
-using LifeFitAI.Application.Gym;
+using LifeFitAI.Application.Authorization;
 using LifeFitAI.Application.Identity;
 using LifeFitAI.Application.Licensing;
 using LifeFitAI.Application.Platform;
@@ -47,10 +47,8 @@ public sealed class GoogleDriveStorageTests
     [Fact]
     public async Task FeatureDisabled_BlocksConnectionAndUpload()
     {
-        var guard = Substitute.For<IOperationGuard>();
-        guard.AllowAsync(Arg.Any<string>(), FeatureCodes.GoogleDriveStorage, Arg.Any<CancellationToken>()).Returns(Result.Failure(GymErrors.FeatureDisabled));
-        var query = new StorageConnectionQueryHandler(guard, Actor(_tenantA), Substitute.For<ITenantStorageConnectionRepository>(), OAuth(true));
-        (await query.Handle(new GetGoogleDriveConnectionQuery(), CancellationToken.None)).Error.Should().Be(StorageErrors.FeatureDisabled);
+        var query = new StorageConnectionQueryHandler(Actor(_tenantA), Roles(false), Permissions(false), Substitute.For<ITenantStorageConnectionRepository>(), OAuth(true));
+        (await query.Handle(new GetGoogleDriveConnectionQuery(), CancellationToken.None)).Error.Should().Be(IdentityErrors.Forbidden);
 
         var features = Substitute.For<IFeatureFlagService>();
         features.IsEnabledAsync(_tenantA, FeatureCodes.GoogleDriveStorage, Arg.Any<CancellationToken>()).Returns(false);
@@ -88,10 +86,10 @@ public sealed class GoogleDriveStorageTests
     [Fact]
     public async Task Upload_RequiresConnectedDriveAndPersistsMetadata()
     {
-        var connection = TenantStorageConnection.Create(Guid.NewGuid(), _tenantA, StorageProviderKind.GoogleDrive);
+        var connection = PlatformStorageConnection.Create(Guid.NewGuid(), StorageProviderKind.GoogleDrive);
         connection.Connect("biz@example.com", "protected", "drive.file", "root", "members", "comms", "gym", "other", _userId, _utc);
         var repo = Substitute.For<ITenantStorageConnectionRepository>();
-        repo.GetAsync(_tenantA, StorageProviderKind.GoogleDrive, Arg.Any<CancellationToken>()).Returns(connection);
+        repo.GetPlatformAsync(StorageProviderKind.GoogleDrive, Arg.Any<CancellationToken>()).Returns(connection);
         repo.GetFileByLogicalKeyAsync(_tenantA, Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns((StoredFile?)null);
         var oauth = OAuth(true);
         oauth.RefreshAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(Result.Success(new GoogleTokenSet("access", null, "drive.file", 3600)));
@@ -113,18 +111,19 @@ public sealed class GoogleDriveStorageTests
     [Fact]
     public async Task Disconnect_ClearsSecrets()
     {
-        var connection = TenantStorageConnection.Create(Guid.NewGuid(), _tenantA, StorageProviderKind.GoogleDrive);
+        var connection = PlatformStorageConnection.Create(Guid.NewGuid(), StorageProviderKind.GoogleDrive);
+        connection.SetApp("client-id", "http://127.0.0.1:8080/callback", "p:secret");
         connection.Connect("biz@example.com", "protected", "drive.file", "root", "m", "c", "g", "o", _userId, _utc);
         var repo = Substitute.For<ITenantStorageConnectionRepository>();
-        repo.GetAsync(_tenantA, StorageProviderKind.GoogleDrive, Arg.Any<CancellationToken>()).Returns(connection);
-        var guard = Substitute.For<IOperationGuard>();
-        guard.AllowAsync(PermissionCodes.IntegrationManage, FeatureCodes.GoogleDriveStorage, Arg.Any<CancellationToken>()).Returns(Result.Success());
-        var handler = new StorageConnectionCommandHandler(guard, Actor(_tenantA), repo, OAuth(true), Substitute.For<IGoogleDriveApiClient>(), Protector(), Audit(), Unit(), Clock(), Substitute.For<IClientContext>());
+        repo.GetPlatformAsync(StorageProviderKind.GoogleDrive, Arg.Any<CancellationToken>()).Returns(connection);
+        var handler = new StorageConnectionCommandHandler(Actor(_tenantA), Roles(true), Permissions(true), repo, OAuth(true), Substitute.For<IGoogleDriveApiClient>(), Protector(), Audit(), Unit(), Clock(), Substitute.For<IClientContext>());
         var result = await handler.Handle(new DisconnectGoogleDriveCommand(), CancellationToken.None);
         result.IsSuccess.Should().BeTrue();
         connection.Status.Should().Be(StorageConnectionStatus.NotConnected);
         connection.ProtectedRefreshToken.Should().BeNull();
         connection.ProgressFolderId.Should().BeNull();
+        connection.ClientId.Should().Be("client-id");
+        connection.ProtectedClientSecret.Should().Be("p:secret");
     }
 
     [Fact]
@@ -138,12 +137,12 @@ public sealed class GoogleDriveStorageTests
         StorageKeys.IsSafeLogicalKey(tenant, key).Should().BeTrue();
         StorageKeys.CategoryFromKey(key).Should().Be("progress");
 
-        var connection = TenantStorageConnection.Create(Guid.NewGuid(), tenant, StorageProviderKind.GoogleDrive);
+        var connection = PlatformStorageConnection.Create(Guid.NewGuid(), StorageProviderKind.GoogleDrive);
         connection.Connect("biz@example.com", "protected", "drive.file", "root", "members", "comms", "gym", "other", _userId, _utc);
         connection.SetProgressFolder("folder-9", "Progress");
         connection.FolderForCategory("progress").Should().Be("folder-9");
         var repo = Substitute.For<ITenantStorageConnectionRepository>();
-        repo.GetAsync(tenant, StorageProviderKind.GoogleDrive, Arg.Any<CancellationToken>()).Returns(connection);
+        repo.GetPlatformAsync(StorageProviderKind.GoogleDrive, Arg.Any<CancellationToken>()).Returns(connection);
         repo.GetFileByLogicalKeyAsync(tenant, key, Arg.Any<CancellationToken>()).Returns((StoredFile?)null);
         var features = Substitute.For<IFeatureFlagService>();
         features.IsEnabledAsync(tenant, FeatureCodes.GoogleDriveStorage, Arg.Any<CancellationToken>()).Returns(true);
@@ -175,26 +174,23 @@ public sealed class GoogleDriveStorageTests
     }
 
     [Fact]
-    public async Task FolderChange_UsesTheActorTenantAndRejectsAnotherTenantFile()
+    public async Task FolderChange_UsesThePlatformConnection()
     {
-        var connection = TenantStorageConnection.Create(Guid.NewGuid(), _tenantA, StorageProviderKind.GoogleDrive);
+        var connection = PlatformStorageConnection.Create(Guid.NewGuid(), StorageProviderKind.GoogleDrive);
         connection.Connect("biz@example.com", "protected", "drive.file", "root", "members", "comms", "gym", "other", _userId, _utc);
         var repo = Substitute.For<ITenantStorageConnectionRepository>();
-        repo.GetAsync(_tenantA, StorageProviderKind.GoogleDrive, Arg.Any<CancellationToken>()).Returns(connection);
+        repo.GetPlatformAsync(StorageProviderKind.GoogleDrive, Arg.Any<CancellationToken>()).Returns(connection);
         var oauth = OAuth(true);
         oauth.RefreshAsync("refresh", Arg.Any<CancellationToken>()).Returns(Result.Success(new GoogleTokenSet("access", null, "drive.file", 3600)));
         var drive = Substitute.For<IGoogleDriveApiClient>();
         drive.DescribeFolderAsync("access", "folder-9", Arg.Any<CancellationToken>()).Returns(Result.Success(new GoogleDriveFolder("folder-9", "Front desk")));
         var secrets = Substitute.For<IStorageSecretProtector>();
         secrets.Unprotect("protected").Returns("refresh");
-        var guard = Substitute.For<IOperationGuard>();
-        guard.AllowAsync(PermissionCodes.IntegrationManage, FeatureCodes.GoogleDriveStorage, Arg.Any<CancellationToken>()).Returns(Result.Success());
-        var handler = new GoogleDriveSettingsHandler(guard, Actor(_tenantA), repo, oauth, drive, secrets, Audit(), Unit(), Clock(), Substitute.For<IClientContext>());
+        var handler = new GoogleDriveSettingsHandler(Actor(_tenantA), Roles(true), Permissions(true), repo, oauth, drive, secrets, Audit(), Unit(), Clock(), Substitute.For<IClientContext>());
         var changed = await handler.Handle(new ChangeGoogleDriveFolderCommand("folder-9"), CancellationToken.None);
         changed.IsSuccess.Should().BeTrue();
         changed.Value.ProgressFolderName.Should().Be("Front desk");
-        connection.TenantId.Should().Be(_tenantA);
-        await repo.DidNotReceive().GetAsync(_tenantB, Arg.Any<StorageProviderKind>(), Arg.Any<CancellationToken>());
+        await repo.DidNotReceive().GetAsync(Arg.Any<Guid>(), Arg.Any<StorageProviderKind>(), Arg.Any<CancellationToken>());
 
         var toggled = await handler.Handle(new UpdateProgressPhotoStorageCommand(false), CancellationToken.None);
         toggled.Value.StoreProgressPhotos.Should().BeFalse();
@@ -203,18 +199,26 @@ public sealed class GoogleDriveStorageTests
     [Fact]
     public async Task Authorization_ForbiddenWithoutPermission()
     {
-        var guard = Substitute.For<IOperationGuard>();
-        guard.AllowAsync(PermissionCodes.IntegrationManage, FeatureCodes.GoogleDriveStorage, Arg.Any<CancellationToken>()).Returns(Result.Failure(IdentityErrors.Forbidden));
-        var handler = new StorageConnectionCommandHandler(guard, Actor(_tenantA), Substitute.For<ITenantStorageConnectionRepository>(), OAuth(true), Substitute.For<IGoogleDriveApiClient>(), Protector(), Audit(), Unit(), Clock(), Substitute.For<IClientContext>());
+        var handler = new StorageConnectionCommandHandler(Actor(_tenantA), Roles(false), Permissions(false), Substitute.For<ITenantStorageConnectionRepository>(), OAuth(true), Substitute.For<IGoogleDriveApiClient>(), Protector(), Audit(), Unit(), Clock(), Substitute.For<IClientContext>());
         (await handler.Handle(new BeginGoogleDriveConnectionCommand("Web", null), CancellationToken.None)).Error.Should().Be(IdentityErrors.Forbidden);
     }
 
-    private StorageConnectionCommandHandler Handler(ITenantStorageConnectionRepository repo, IGoogleDriveOAuthService oauth, IGoogleDriveApiClient drive)
+    [Fact]
+    public async Task SaveApp_KeepsTheSecretOffTheResponse()
     {
-        var guard = Substitute.For<IOperationGuard>();
-        guard.AllowAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(Result.Success());
-        return new StorageConnectionCommandHandler(guard, Actor(_tenantA), repo, oauth, drive, Protector(), Audit(), Unit(), Clock(), Substitute.For<IClientContext>());
+        var repo = Substitute.For<ITenantStorageConnectionRepository>();
+        repo.GetPlatformAsync(StorageProviderKind.GoogleDrive, Arg.Any<CancellationToken>()).Returns((PlatformStorageConnection?)null);
+        var handler = new GoogleDriveAppHandler(Actor(_tenantA), Roles(true), Permissions(true), repo, OAuth(false), Protector(), Audit(), Unit(), Clock(), Substitute.For<IClientContext>());
+        var result = await handler.Handle(new SaveGoogleDriveAppCommand("client-id", "super-secret", "http://127.0.0.1:8080/api/v1/integrations/google-drive/callback"), CancellationToken.None);
+        result.IsSuccess.Should().BeTrue();
+        result.Value.ClientId.Should().Be("client-id");
+        result.Value.HasClientSecret.Should().BeTrue();
+        result.Value.ToString().Should().NotContain("super-secret");
+        await repo.Received().AddPlatformAsync(Arg.Is<PlatformStorageConnection>(item => item.ProtectedClientSecret == "p:super-secret"), Arg.Any<CancellationToken>());
     }
+
+    private StorageConnectionCommandHandler Handler(ITenantStorageConnectionRepository repo, IGoogleDriveOAuthService oauth, IGoogleDriveApiClient drive) =>
+        new(Actor(_tenantA), Roles(true), Permissions(true), repo, oauth, drive, Protector(), Audit(), Unit(), Clock(), Substitute.For<IClientContext>());
 
     private ICurrentActor Actor(Guid tenantId)
     {
@@ -252,10 +256,27 @@ public sealed class GoogleDriveStorageTests
     {
         var oauth = Substitute.For<IGoogleDriveOAuthService>();
         oauth.IsConfigured.Returns(configured);
-        oauth.WebSuccessRedirectUri.Returns("http://localhost:3000/business/integrations");
+        oauth.RedirectUri.Returns("http://127.0.0.1:8080/api/v1/integrations/google-drive/callback");
+        oauth.HasAppAsync(Arg.Any<CancellationToken>()).Returns(configured);
+        oauth.WebSuccessRedirectUri.Returns("http://localhost:3000/admin/integrations");
         oauth.MobileSuccessRedirectUri.Returns("lifefit://integrations/google-drive");
         oauth.BuildAuthorizationUrl(Arg.Any<string>(), Arg.Any<string>()).Returns("https://accounts.google.com/o/oauth2/v2/auth?x=1");
         return oauth;
+    }
+
+    private static IRoleRepository Roles(bool superAdmin)
+    {
+        var roles = Substitute.For<IRoleRepository>();
+        roles.GetRoleNamesAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(superAdmin ? new[] { RoleNames.SuperAdmin } : new[] { RoleNames.GymOwner });
+        return roles;
+    }
+
+    private static IPermissionService Permissions(bool allowed)
+    {
+        var permissions = Substitute.For<IPermissionService>();
+        permissions.HasPermissionAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), PermissionCodes.PlatformAdmin, Arg.Any<CancellationToken>()).Returns(allowed);
+        return permissions;
     }
 
     private static string Hash(string value) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)));

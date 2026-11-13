@@ -20,9 +20,13 @@ public interface IGoogleDriveOAuthService
 {
     bool IsConfigured { get; }
 
+    string RedirectUri { get; }
+
     string WebSuccessRedirectUri { get; }
 
     string MobileSuccessRedirectUri { get; }
+
+    Task<bool> HasAppAsync(CancellationToken cancellationToken);
 
     string BuildAuthorizationUrl(string state, string codeChallenge);
 
@@ -63,7 +67,7 @@ public interface IGoogleDriveApiClient
 
 public static class StorageMaps
 {
-    public static StorageConnectionResponse ToResponse(TenantStorageConnection? connection, bool canConnect) =>
+    public static StorageConnectionResponse ToResponse(PlatformStorageConnection? connection, bool canConnect, string? defaultRedirect = null) =>
         connection is null
             ? new StorageConnectionResponse(
                 StorageProviderKind.GoogleDrive.ToString(),
@@ -73,7 +77,8 @@ public static class StorageMaps
                 null,
                 null,
                 null,
-                canConnect)
+                canConnect,
+                RedirectUri: defaultRedirect)
             : new StorageConnectionResponse(
                 connection.Provider.ToString(),
                 connection.Status.ToString(),
@@ -85,7 +90,10 @@ public static class StorageMaps
                 canConnect,
                 connection.StoreProgressPhotos,
                 connection.ProgressFolderId,
-                connection.ProgressFolderName);
+                connection.ProgressFolderName,
+                connection.ClientId,
+                !string.IsNullOrWhiteSpace(connection.ProtectedClientSecret),
+                connection.RedirectUri ?? defaultRedirect);
 
     public static StoredFileResponse ToResponse(StoredFile file) =>
         new(

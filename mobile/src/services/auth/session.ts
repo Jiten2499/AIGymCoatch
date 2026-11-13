@@ -76,7 +76,9 @@ async function refreshOnce(): Promise<string | null> {
     await applyAuth(response, true);
     return response.accessToken;
   } catch (error) {
-    console.error('Session refresh failed', error instanceof Error ? error.message : 'Request failed');
+    if (typeof __DEV__ !== 'undefined' && __DEV__ && process.env.NODE_ENV !== 'test') {
+      console.error('Session refresh failed', error instanceof Error ? error.message : 'Request failed');
+    }
     await clearSession();
     useSessionStore.getState().clearSession();
     useWorkspaceStore.getState().reset();

@@ -29,7 +29,11 @@ public sealed class MemberPtAssignmentConfiguration : IEntityTypeConfiguration<M
         builder.ToTable("MemberPtAssignments", "app");
         builder.HasKey(entity => entity.Id);
         builder.Property(entity => entity.Price).HasPrecision(19, 4);
+        builder.Property(entity => entity.AmountPaid).HasPrecision(19, 4);
         builder.Property(entity => entity.Currency).HasMaxLength(3).IsRequired();
+        builder.Property(entity => entity.PaymentMethod).HasConversion<string>().HasMaxLength(32);
+        builder.Property(entity => entity.PaymentReferenceNumber).HasMaxLength(100);
+        builder.Property(entity => entity.PaymentNotes).HasMaxLength(2000);
         builder.Property(entity => entity.PackageName).HasMaxLength(200).IsRequired();
         builder.Property(entity => entity.CancellationReason).HasMaxLength(500);
         builder.Property(entity => entity.PaymentStatus).HasConversion<string>().HasMaxLength(16);
@@ -39,6 +43,27 @@ public sealed class MemberPtAssignmentConfiguration : IEntityTypeConfiguration<M
         builder.HasOne<MemberProfile>().WithMany().HasForeignKey(entity => entity.MemberProfileId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<PtPackage>().WithMany().HasForeignKey(entity => entity.PtPackageId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<TrainerProfile>().WithMany().HasForeignKey(entity => entity.TrainerProfileId).IsRequired(false).OnDelete(DeleteBehavior.Restrict);
+        builder.HasQueryFilter(entity => entity.DeletedAt == null);
+    }
+}
+
+public sealed class MemberPtPaymentConfiguration : IEntityTypeConfiguration<MemberPtPayment>
+{
+    public void Configure(EntityTypeBuilder<MemberPtPayment> builder)
+    {
+        builder.ToTable("MemberPtPayments", "app");
+        builder.HasKey(entity => entity.Id);
+        builder.Property(entity => entity.Amount).HasPrecision(19, 4);
+        builder.Property(entity => entity.Currency).HasMaxLength(3).IsRequired();
+        builder.Property(entity => entity.PaymentMethod).HasConversion<string>().HasMaxLength(32);
+        builder.Property(entity => entity.ReferenceNumber).HasMaxLength(100);
+        builder.Property(entity => entity.Notes).HasMaxLength(2000);
+        builder.Property(entity => entity.Status).HasConversion<string>().HasMaxLength(16);
+        builder.Property(entity => entity.RowVersion).IsRowVersion();
+        builder.HasOne<Tenant>().WithMany().HasForeignKey(entity => entity.TenantId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<MemberProfile>().WithMany().HasForeignKey(entity => entity.MemberProfileId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<MemberPtAssignment>().WithMany().HasForeignKey(entity => entity.MemberPtAssignmentId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<UserAccount>().WithMany().HasForeignKey(entity => entity.ReceivedByUserId).OnDelete(DeleteBehavior.Restrict);
         builder.HasQueryFilter(entity => entity.DeletedAt == null);
     }
 }

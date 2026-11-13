@@ -15,37 +15,34 @@ public sealed class IntegrationsController : ApiControllerBase
         _configuration = configuration;
 
     [HttpGet("integrations/google-drive")]
-    [RequiresPermission(PermissionCodes.IntegrationRead)]
     public async Task<IActionResult> GetGoogleDrive(CancellationToken cancellationToken) =>
         (await Sender.Send(new GetGoogleDriveConnectionQuery(), cancellationToken)).ToActionResult();
 
+    [HttpPut("integrations/google-drive/app")]
+    public async Task<IActionResult> SaveGoogleDriveApp(SaveGoogleDriveAppRequest request, CancellationToken cancellationToken) =>
+        (await Sender.Send(new SaveGoogleDriveAppCommand(request.ClientId, request.ClientSecret, request.RedirectUri), cancellationToken)).ToActionResult();
+
     [HttpPost("integrations/google-drive/connect")]
-    [RequiresPermission(PermissionCodes.IntegrationManage)]
     public async Task<IActionResult> ConnectGoogleDrive(ConnectGoogleDriveRequest request, CancellationToken cancellationToken) =>
         (await Sender.Send(new BeginGoogleDriveConnectionCommand(request.ClientKind, request.ReturnPath), cancellationToken)).ToActionResult();
 
     [HttpPost("integrations/google-drive/test")]
-    [RequiresPermission(PermissionCodes.IntegrationManage)]
     public async Task<IActionResult> TestGoogleDrive(CancellationToken cancellationToken) =>
         (await Sender.Send(new TestGoogleDriveConnectionCommand(), cancellationToken)).ToActionResult();
 
     [HttpPost("integrations/google-drive/disconnect")]
-    [RequiresPermission(PermissionCodes.IntegrationManage)]
     public async Task<IActionResult> DisconnectGoogleDrive(CancellationToken cancellationToken) =>
         (await Sender.Send(new DisconnectGoogleDriveCommand(), cancellationToken)).ToActionResult();
 
     [HttpPut("integrations/google-drive/progress-photos")]
-    [RequiresPermission(PermissionCodes.IntegrationManage)]
     public async Task<IActionResult> ProgressPhotos(UpdateProgressPhotoStorageRequest request, CancellationToken cancellationToken) =>
         (await Sender.Send(new UpdateProgressPhotoStorageCommand(request.Enabled), cancellationToken)).ToActionResult();
 
     [HttpGet("integrations/google-drive/folders")]
-    [RequiresPermission(PermissionCodes.IntegrationManage)]
     public async Task<IActionResult> Folders(CancellationToken cancellationToken) =>
         (await Sender.Send(new ListGoogleDriveFoldersQuery(), cancellationToken)).ToActionResult();
 
     [HttpPost("integrations/google-drive/folder")]
-    [RequiresPermission(PermissionCodes.IntegrationManage)]
     public async Task<IActionResult> Folder(ChangeGoogleDriveFolderRequest request, CancellationToken cancellationToken) =>
         (await Sender.Send(new ChangeGoogleDriveFolderCommand(request.FolderId), cancellationToken)).ToActionResult();
 
@@ -59,7 +56,7 @@ public sealed class IntegrationsController : ApiControllerBase
             return Redirect(ToAbsolute(result.Value));
         }
 
-        var fallback = _configuration["GoogleDrive:WebSuccessRedirectUri"] ?? "/business/integrations";
+        var fallback = _configuration["GoogleDrive:WebSuccessRedirectUri"] ?? "/admin/integrations";
         var separator = fallback.Contains('?', StringComparison.Ordinal) ? '&' : '?';
         return Redirect(ToAbsolute($"{fallback}{separator}status=failed&error={Uri.EscapeDataString(result.Error.Code)}"));
     }
@@ -126,6 +123,8 @@ public sealed class IntegrationsController : ApiControllerBase
         return target;
     }
 }
+
+public sealed record SaveGoogleDriveAppRequest(string ClientId, string? ClientSecret, string RedirectUri);
 
 public sealed record ConnectGoogleDriveRequest(string ClientKind, string? ReturnPath);
 
