@@ -159,6 +159,22 @@ public sealed class FitnessAccessTests
     }
 
     [Fact]
+    public async Task WorkoutGeneration_BlocksASecondBusinessPlanInTheSameMonth()
+    {
+        var provider = Substitute.For<IAiProvider>();
+        var ai = Substitute.For<IAiRepository>();
+        ai.CountUsageAsync(_tenantId, _userId, AiRequestType.WorkoutGeneration, Arg.Any<DateTime>(), Arg.Any<CancellationToken>()).Returns(1);
+        var tenants = Substitute.For<ITenantRepository>();
+        tenants.GetAsync(_tenantId, Arg.Any<CancellationToken>()).Returns(Tenant.Create(_tenantId, "North Gym", TenantType.Gym));
+        var handler = AiHandler(Allow(), provider, ai, tenants: tenants);
+
+        var result = await handler.Handle(new GenerateWorkoutCommand("build my month"), CancellationToken.None);
+
+        result.Error.Code.Should().Be("ai.workout_plan_monthly_limit");
+        await provider.DidNotReceive().CompleteAsync(Arg.Any<AiCompletionRequest>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task Conversation_IsScopedToTheCurrentTenant()
     {
         var ai = Substitute.For<IAiRepository>();
@@ -228,7 +244,7 @@ public sealed class FitnessAccessTests
         return runtime;
     }
 
-    private AiCommandHandler AiHandler(IOperationGuard guard, IAiProvider provider, IAiRepository ai, IWorkoutRepository? workouts = null)
+    private AiCommandHandler AiHandler(IOperationGuard guard, IAiProvider provider, IAiRepository ai, IWorkoutRepository? workouts = null, ITenantRepository? tenants = null)
     {
         var limits = Substitute.For<IAiLimits>();
         limits.Provider.Returns("Test");
@@ -241,12 +257,26 @@ public sealed class FitnessAccessTests
         var context = Substitute.For<IAiContextBuilder>();
         context.BuildAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(new AiUserContext("Strength", "Beginner", "Moderate", "Metric", 3, 45, [], 0, 2000, 0, 120, null));
         var fitness = Substitute.For<IFitnessRepository>();
-        fitness.ListExerciseOptionsAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(new List<ExerciseOption> { new(Guid.Parse("33333333-3333-4333-8333-333333333001"), "Bench", "Strength") });
-        return new AiCommandHandler(guard, Actor(), provider, limits, new AiSafetyService(), quota, context, ai, fitness, workouts ?? Substitute.For<IWorkoutRepository>(), Substitute.For<IAuditLogRepository>(), Substitute.For<IUnitOfWork>(), Clock(), Substitute.For<IClientContext>());
+        fitness.GetAssessmentAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(CompletedAssessment());
+        fitness.ListGenerationExercisesAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(new List<GenerationExercise> { new(Guid.Parse("33333333-3333-4333-8333-333333333001"), "Bench", "Strength", "Chest", "Barbell", "Intermediate") });
+        var tenantStore = tenants ?? Substitute.For<ITenantRepository>();
+        if (tenants is null)
+        {
+            tenantStore.GetAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(Tenant.Create(_tenantId, "Ada Personal", TenantType.Platform));
+        }
+
+        return new AiCommandHandler(guard, Actor(), provider, limits, new AiSafetyService(), quota, context, ai, fitness, workouts ?? Substitute.For<IWorkoutRepository>(), tenantStore, Substitute.For<IAuditLogRepository>(), Substitute.For<IUnitOfWork>(), Clock(), Substitute.For<IClientContext>());
     }
 
     private static DashboardResponse EmptyDashboard() =>
         new(null, null, 0, 0, 0, [], new NutritionSummaryResponse(new DateOnly(2026, 10, 1), 0, 0, 0, 0, 0, 0, 0, 0), null, null);
+
+    private FitnessAssessment CompletedAssessment()
+    {
+        var assessment = FitnessAssessment.Create(Guid.NewGuid(), _userId, _tenantId);
+        assessment.ApplyDraft(new DateOnly(1996, 1, 1), "Male", 180, 80, 75, null, 18, "Nepal", UnitSystem.Metric, "Strength", null, "OneMonth", null, FitnessLevel.Intermediate, "Strength", null, """{"injuryDetails":"old ankle sprain","doctorRestrictions":"avoid jumping"}""", """{"location":"Gym","daysPerWeek":4,"durationMinutes":45,"equipment":["FullGym"]}""", null, """{"activityLevel":3}""", null, 8, 100, true);
+        return assessment;
+    }
 
     private IOperationGuard Allow()
     {

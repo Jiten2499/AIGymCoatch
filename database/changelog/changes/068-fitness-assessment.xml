@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="068-fitness-assessment" author="lifefit-architecture">
+        <comment>Ticket: LF-0068. Member fitness and nutrition assessment for AI plan readiness. One active assessment per user per tenant. Scalar personal and goal fields plus JSON sections for health, workout, diet, lifestyle, and measurements. Index review: unique (UserId, TenantId) filtered soft-delete; PK on Id. Performance note: get/upsert by UserId and TenantId.</comment>
+        <sql splitStatements="false"><![CDATA[
+            CREATE TABLE app.FitnessAssessments
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                UserId UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                DateOfBirth DATE NULL,
+                Gender NVARCHAR(32) NULL,
+                HeightCm DECIMAL(6,2) NULL,
+                CurrentWeightKg DECIMAL(8,2) NULL,
+                TargetWeightKg DECIMAL(8,2) NULL,
+                WaistCircumferenceCm DECIMAL(8,2) NULL,
+                BodyFatPercentage DECIMAL(5,2) NULL,
+                Country NVARCHAR(100) NULL,
+                MeasurementUnit NVARCHAR(16) NOT NULL,
+                PrimaryGoal NVARCHAR(64) NULL,
+                SecondaryGoal NVARCHAR(64) NULL,
+                GoalTimeline NVARCHAR(32) NULL,
+                CustomGoalTimelineDays INT NULL,
+                FitnessLevel NVARCHAR(32) NULL,
+                Priority NVARCHAR(32) NULL,
+                GoalDescription NVARCHAR(1000) NULL,
+                HealthJson NVARCHAR(MAX) NULL,
+                WorkoutJson NVARCHAR(MAX) NULL,
+                DietJson NVARCHAR(MAX) NULL,
+                LifestyleJson NVARCHAR(MAX) NULL,
+                MeasurementsJson NVARCHAR(MAX) NULL,
+                CurrentStep INT NOT NULL,
+                CompletionPercentage INT NOT NULL,
+                IsCompleted BIT NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DeletedAt DATETIME2 NULL,
+                CreatedBy UNIQUEIDENTIFIER NULL,
+                UpdatedBy UNIQUEIDENTIFIER NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_FitnessAssessments PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_FitnessAssessments_Users FOREIGN KEY (UserId) REFERENCES app.Users (Id),
+                CONSTRAINT FK_FitnessAssessments_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT CK_FitnessAssessments_Unit CHECK (MeasurementUnit IN (N'Metric', N'Imperial')),
+                CONSTRAINT CK_FitnessAssessments_Step CHECK (CurrentStep BETWEEN 1 AND 8),
+                CONSTRAINT CK_FitnessAssessments_Completion CHECK (CompletionPercentage BETWEEN 0 AND 100),
+                CONSTRAINT CK_FitnessAssessments_Height CHECK (HeightCm IS NULL OR (HeightCm >= 50 AND HeightCm <= 300)),
+                CONSTRAINT CK_FitnessAssessments_Weight CHECK (CurrentWeightKg IS NULL OR (CurrentWeightKg >= 20 AND CurrentWeightKg <= 500)),
+                CONSTRAINT CK_FitnessAssessments_TargetWeight CHECK (TargetWeightKg IS NULL OR (TargetWeightKg >= 20 AND TargetWeightKg <= 500))
+            );
+            CREATE UNIQUE INDEX UX_FitnessAssessments_User_Tenant ON app.FitnessAssessments (UserId, TenantId) WHERE DeletedAt IS NULL;
+        ]]></sql>
+        <rollback>
+            <sql>DROP TABLE IF EXISTS app.FitnessAssessments;</sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

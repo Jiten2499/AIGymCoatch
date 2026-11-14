@@ -6,7 +6,7 @@ export function AppCard({ children, style, ...rest }: ViewProps & { children: Re
   const theme = useTheme();
   return (
     <View
-      style={[{ backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radius.lg, borderWidth: 1, padding: theme.spacing.lg }, theme.shadow, style]}
+      style={[{ backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radius.lg, borderWidth: 1, gap: theme.spacing.md, padding: theme.spacing.lg }, theme.shadow, style]}
       {...rest}
     >
       {children}

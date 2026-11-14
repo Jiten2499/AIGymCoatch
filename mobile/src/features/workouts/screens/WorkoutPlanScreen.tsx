@@ -32,11 +32,20 @@ export function WorkoutPlanScreen({ navigation, route }: Props) {
           {data?.description ? <AppText>{data.description}</AppText> : null}
         </View>
         {start.isError ? <AppText accessibilityRole="alert" tone="danger">{errorText(start.error, t('common.offline'))}</AppText> : null}
-        {data?.days.map((day) => (
-          <AppCard key={day.id}>
+        {data?.days.map((day, index) => {
+          const week = Math.floor((day.dayNumber - 1) / 7) + 1;
+          const previous = data.days[index - 1];
+          const showWeek = previous == null || Math.floor((previous.dayNumber - 1) / 7) + 1 !== week;
+          const weekDays = showWeek ? data.days.filter((item) => Math.floor((item.dayNumber - 1) / 7) + 1 === week) : [];
+          const recovery = day.restDay && `${day.name} ${day.description ?? ''}`.toLowerCase().includes('recovery');
+          return (
+          <View key={day.id} style={{ gap: theme.spacing.sm }}>
+            {showWeek ? <AppText variant="label">{t('journey.weekSummary', { week, training: weekDays.filter((item) => !item.restDay).length, rest: weekDays.filter((item) => item.restDay).length })}</AppText> : null}
+          <AppCard>
             <Pressable accessibilityLabel={day.name} accessibilityRole="button" onPress={() => setOpenDay(openDay === day.id ? null : day.id)} style={{ minHeight: theme.control.minTouch, justifyContent: 'center' }}>
-              <AppText variant="label">{day.name}</AppText>
-              <AppText tone="muted">{day.restDay ? t('journey.restDay') : t('journey.exercisesDone', { count: day.exercises.length })}</AppText>
+              <AppText variant="label">{`Day ${day.dayNumber} · ${day.name}`}</AppText>
+              {day.description ? <AppText tone="muted">{day.description}</AppText> : null}
+              <AppText tone="muted">{day.restDay ? (recovery ? t('journey.activeRecovery') : t('journey.restDay')) : t('journey.exercisesDone', { count: day.exercises.length })}</AppText>
             </Pressable>
             {openDay === day.id && !day.restDay ? day.exercises.map((exercise) => <PlanExercise exercise={exercise} key={exercise.id} onOpen={() => navigation.navigate('ExerciseDetail', { exerciseId: exercise.exerciseId })} />) : null}
             {!day.restDay ? (
@@ -48,7 +57,9 @@ export function WorkoutPlanScreen({ navigation, route }: Props) {
               }} />
             ) : null}
           </AppCard>
-        ))}
+          </View>
+          );
+        })}
       </ScrollView>
     </ScreenState>
   );
@@ -63,7 +74,8 @@ function PlanExercise({ exercise, onOpen }: { exercise: ProgramExercise; onOpen:
       <Pressable accessibilityRole="button" onPress={onOpen} style={{ justifyContent: 'center', minHeight: theme.control.minTouch }}>
         <AppText>{detail.data?.name ?? t('common.loading')}</AppText>
       </Pressable>
-      <AppText tone="muted">{[exercise.sets ? t('journey.sets', { count: exercise.sets }) : null, exercise.targetReps ? t('journey.reps', { count: exercise.targetReps }) : null, exercise.restSeconds ? t('journey.rest', { count: exercise.restSeconds }) : null, detail.data?.equipment].filter(Boolean).join(' · ')}</AppText>
+      <AppText tone="muted">{[exercise.sets ? t('journey.sets', { count: exercise.sets }) : null, exercise.targetReps ? t('journey.reps', { count: exercise.targetReps }) : null, exercise.targetWeight !== null ? `${t('journey.weightLabel')}: ${exercise.targetWeight}` : null, exercise.restSeconds ? t('journey.rest', { count: exercise.restSeconds }) : null, detail.data?.equipment].filter(Boolean).join(' · ')}</AppText>
+      {exercise.notes ? <AppText tone="muted">{exercise.notes}</AppText> : null}
       {detail.data?.instructions ? <AppText tone="muted">{detail.data.instructions}</AppText> : null}
     </View>
   );

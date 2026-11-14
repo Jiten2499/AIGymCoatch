@@ -1,6 +1,8 @@
 using LifeFitAI.Api.Endpoints;
+using LifeFitAI.Application.Fitness.Workout;
 using LifeFitAI.Application.Gym;
 using LifeFitAI.Application.Gym.Trainers;
+using LifeFitAI.Domain.Fitness;
 using LifeFitAI.SharedKernel.Results;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -46,6 +48,43 @@ public sealed class TrainerMobileController : ApiControllerBase
         Response.Headers.CacheControl = "private, no-store";
         return File(result.Value.Content, result.Value.ContentType);
     }
+
+    [HttpGet("trainers/me/members/{memberId:guid}/workouts")]
+    public async Task<IActionResult> MemberWorkouts(Guid memberId, int? page, int? pageSize, CancellationToken cancellationToken) =>
+        (await Sender.Send(new ListMemberProgramsQuery(memberId, page ?? 1, pageSize ?? 20), cancellationToken)).ToActionResult();
+
+    [HttpPost("trainers/me/members/{memberId:guid}/workouts")]
+    public async Task<IActionResult> CreateMemberWorkout(Guid memberId, UpdateMemberProgramRequest request, CancellationToken cancellationToken) =>
+        (await Sender.Send(new CreateMemberProgramCommand(
+            memberId,
+            request.Name,
+            request.Description,
+            request.GoalType,
+            request.Difficulty,
+            request.DurationWeeks,
+            request.FrequencyPerWeek,
+            MemberProgramRequestMap.Days(request)), cancellationToken)).ToActionResult();
+
+    [HttpGet("trainers/me/members/{memberId:guid}/workouts/{programId:guid}")]
+    public async Task<IActionResult> MemberWorkout(Guid memberId, Guid programId, CancellationToken cancellationToken) =>
+        (await Sender.Send(new GetMemberProgramQuery(memberId, programId), cancellationToken)).ToActionResult();
+
+    [HttpPut("trainers/me/members/{memberId:guid}/workouts/{programId:guid}")]
+    public async Task<IActionResult> UpdateMemberWorkout(Guid memberId, Guid programId, UpdateMemberProgramRequest request, CancellationToken cancellationToken) =>
+        (await Sender.Send(new UpdateMemberProgramCommand(
+            memberId,
+            programId,
+            request.Name,
+            request.Description,
+            request.GoalType,
+            request.Difficulty,
+            request.DurationWeeks,
+            request.FrequencyPerWeek,
+            MemberProgramRequestMap.Days(request)), cancellationToken)).ToActionResult();
+
+    [HttpDelete("trainers/me/members/{memberId:guid}/workouts/{programId:guid}")]
+    public async Task<IActionResult> DeleteMemberWorkout(Guid memberId, Guid programId, CancellationToken cancellationToken) =>
+        (await Sender.Send(new DeleteMemberProgramCommand(memberId, programId), cancellationToken)).ToActionResult();
 
     [HttpGet("trainers/me/members/{memberId:guid}/progress")]
     public async Task<IActionResult> MemberProgress(Guid memberId, CancellationToken cancellationToken) =>
@@ -157,7 +196,52 @@ public sealed class TrainerMobileController : ApiControllerBase
         (await Sender.Send(new CancelMyTrainerSessionCommand(sessionId), cancellationToken)).ToActionResult();
 }
 
+public sealed record UpdateMemberProgramRequest(
+    string Name,
+    string? Description,
+    FitnessGoalType GoalType,
+    WorkoutDifficulty Difficulty,
+    int DurationWeeks,
+    int FrequencyPerWeek,
+    IReadOnlyList<UpdateMemberProgramDayRequest>? Days);
+
+public sealed record UpdateMemberProgramDayRequest(
+    int DayNumber,
+    string Name,
+    string? Description,
+    bool RestDay,
+    IReadOnlyList<UpdateMemberProgramExerciseRequest>? Exercises);
+
+public sealed record UpdateMemberProgramExerciseRequest(
+    Guid ExerciseId,
+    int? Sets,
+    int? TargetReps,
+    int? TargetDurationSeconds,
+    decimal? TargetDistance,
+    decimal? TargetWeight,
+    int? RestSeconds,
+    string? Notes);
+
 public sealed record ScheduleTrainerSessionRequest(Guid MemberId, DateTime StartUtc, DateTime EndUtc, string? SessionType, string? Location, string? Focus);
+
+internal static class MemberProgramRequestMap
+{
+    public static ProgramDayInput[] Days(UpdateMemberProgramRequest request) =>
+        (request.Days ?? []).Select(day => new ProgramDayInput(
+            day.DayNumber,
+            day.Name,
+            day.Description,
+            day.RestDay,
+            (day.Exercises ?? []).Select(item => new ProgramExerciseInput(
+                item.ExerciseId,
+                item.Sets,
+                item.TargetReps,
+                item.TargetDurationSeconds,
+                item.TargetDistance,
+                item.TargetWeight,
+                item.RestSeconds,
+                item.Notes)).ToArray())).ToArray();
+}
 
 public sealed record RescheduleTrainerSessionRequest(DateTime StartUtc, DateTime EndUtc);
 

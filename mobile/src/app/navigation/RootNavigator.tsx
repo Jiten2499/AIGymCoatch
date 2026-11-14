@@ -35,6 +35,7 @@ import { MembersScreen } from '../../features/members/screens/MembersScreen';
 import { ChallengeDetailScreen } from '../../features/challenges/screens/ChallengeDetailScreen';
 import { ChallengesScreen } from '../../features/challenges/screens/ChallengesScreen';
 import { DashboardScreen } from '../../features/dashboard/screens/DashboardScreen';
+import { FitnessAssessmentScreen } from '../../features/assessment/screens/FitnessAssessmentScreen';
 import { FitnessScreen } from '../../features/fitness/screens/FitnessScreen';
 import { ChatListScreen } from '../../features/chat/screens/ChatListScreen';
 import { ChatThreadScreen } from '../../features/chat/screens/ChatThreadScreen';
@@ -63,6 +64,7 @@ import { WorkoutsScreen } from '../../features/workouts/screens/WorkoutsScreen';
 import { TrainerActiveScreen } from '../../features/trainers/screens/TrainerActiveScreen';
 import { TrainerAlertsScreen } from '../../features/trainers/screens/TrainerAlertsScreen';
 import { TrainerMemberScreen } from '../../features/trainers/screens/TrainerMemberScreen';
+import { TrainerMemberPlanScreen } from '../../features/trainers/screens/TrainerMemberPlanScreen';
 import { TrainerMemberProgressScreen } from '../../features/trainers/screens/TrainerMemberProgressScreen';
 import { TrainerSessionScreen } from '../../features/trainers/screens/TrainerSessionScreen';
 import { featureCodes } from '../../constants/access';
@@ -138,6 +140,7 @@ function AuthenticatedStack() {
     <AppStack.Navigator screenOptions={{ headerShadowVisible: false }}>
       <AppStack.Screen name="Tabs" component={AppTabs} options={{ headerShown: false }} />
       <AppStack.Screen name="Fitness" component={FitnessScreen} options={{ title: t('nav.fitness') }} />
+      <AppStack.Screen name="FitnessAssessment" component={FitnessAssessmentScreen} options={{ title: t('assessment.title') }} />
       <AppStack.Screen name="WorkoutPlan" component={WorkoutPlanScreen} options={{ title: t('nav.workouts') }} />
       <AppStack.Screen name="WorkoutDay" component={WorkoutDayScreen} options={{ title: t('journey.dayTitle') }} />
       <AppStack.Screen name="ExerciseDetail" component={ExerciseDetailScreen} options={{ title: t('journey.exerciseDetail') }} />
@@ -170,6 +173,7 @@ function AuthenticatedStack() {
       <AppStack.Screen name="MyTargets" component={MyTargetsScreen} options={{ title: t('trainerTargets.title') }} />
       <AppStack.Screen name="TrainerMember" component={TrainerMemberScreen} options={{ title: t('trainer.member') }} />
       <AppStack.Screen name="TrainerMemberProgress" component={TrainerMemberProgressScreen} options={{ title: t('trainer.progress') }} />
+      <AppStack.Screen name="TrainerMemberPlan" component={TrainerMemberPlanScreen} options={{ title: t('trainer.plans') }} />
       <AppStack.Screen name="TrainerSession" component={TrainerSessionScreen} options={{ title: t('trainer.session') }} />
       <AppStack.Screen name="TrainerActive" component={TrainerActiveScreen} options={{ title: t('trainer.activeSession') }} />
       <AppStack.Screen name="TrainerAlerts" component={TrainerAlertsScreen} options={{ title: t('trainer.alerts') }} />

@@ -38,12 +38,13 @@ public sealed class AiCommandHandler :
     private readonly IAiRepository _ai;
     private readonly IFitnessRepository _fitness;
     private readonly IWorkoutRepository _workouts;
+    private readonly ITenantRepository _tenants;
     private readonly IAuditLogRepository _audit;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDateTimeProvider _clock;
     private readonly IClientContext _client;
 
-    public AiCommandHandler(IOperationGuard guard, ICurrentActor actor, IAiProvider provider, IAiLimits limits, IAiSafetyService safety, IAiQuotaService quota, IAiContextBuilder context, IAiRepository ai, IFitnessRepository fitness, IWorkoutRepository workouts, IAuditLogRepository audit, IUnitOfWork unitOfWork, IDateTimeProvider clock, IClientContext client)
+    public AiCommandHandler(IOperationGuard guard, ICurrentActor actor, IAiProvider provider, IAiLimits limits, IAiSafetyService safety, IAiQuotaService quota, IAiContextBuilder context, IAiRepository ai, IFitnessRepository fitness, IWorkoutRepository workouts, ITenantRepository tenants, IAuditLogRepository audit, IUnitOfWork unitOfWork, IDateTimeProvider clock, IClientContext client)
     {
         _guard = guard;
         _actor = actor;
@@ -55,6 +56,7 @@ public sealed class AiCommandHandler :
         _ai = ai;
         _fitness = fitness;
         _workouts = workouts;
+        _tenants = tenants;
         _audit = audit;
         _unitOfWork = unitOfWork;
         _clock = clock;
@@ -70,68 +72,8 @@ public sealed class AiCommandHandler :
     public Task<Result<AiChatResponse>> Handle(ProgressInsightCommand request, CancellationToken cancellationToken) =>
         Chat(PermissionCodes.AiUse, FeatureCodes.AiProgressInsights, AiRequestType.ProgressInsight, "Summarize my recent training consistency.", null, FitnessPrompts.Progress, false, cancellationToken);
 
-    public async Task<Result<ProgramResponse>> Handle(GenerateWorkoutCommand request, CancellationToken cancellationToken)
-    {
-        var scope = await Scope.Open(_guard, _actor, PermissionCodes.AiUse, FeatureCodes.AiWorkoutGeneration, cancellationToken).ConfigureAwait(false);
-        if (scope.IsFailure)
-        {
-            return Result.Failure<ProgramResponse>(scope.Error);
-        }
-
-        var coach = await _guard.AllowAsync(PermissionCodes.AiUse, FeatureCodes.AiCoach, cancellationToken).ConfigureAwait(false);
-        if (coach.IsFailure)
-        {
-            return Result.Failure<ProgramResponse>(coach.Error);
-        }
-
-        var quota = await _quota.AllowAsync(scope.Value.UserId, scope.Value.TenantId, cancellationToken).ConfigureAwait(false);
-        var input = _safety.Screen(request.Notes ?? "Generate a workout.");
-        if (quota.IsFailure || input.IsFailure)
-        {
-            return Result.Failure<ProgramResponse>(quota.IsFailure ? quota.Error : input.Error);
-        }
-
-        var context = await _context.BuildAsync(scope.Value.UserId, scope.Value.TenantId, cancellationToken).ConfigureAwait(false);
-        var options = await _fitness.ListExerciseOptionsAsync(scope.Value.TenantId, cancellationToken).ConfigureAwait(false);
-        var allowed = options.Select(item => item.Id).ToHashSet();
-        var completion = await CompleteAsync(FitnessPrompts.Workout(context, options), request.Notes, cancellationToken, maxTokens: 2000, trim: false).ConfigureAwait(false);
-        if (completion.IsFailure)
-        {
-            return Result.Failure<ProgramResponse>(completion.Error);
-        }
-
-        var names = options.GroupBy(item => item.Name, StringComparer.OrdinalIgnoreCase).ToDictionary(group => group.Key, group => group.First().Id, StringComparer.OrdinalIgnoreCase);
-        var parsed = WorkoutPlanParser.Parse(completion.Value.Content, allowed, names);
-        var output = _safety.Screen(completion.Value.Content);
-        if (parsed.IsFailure || output.IsFailure)
-        {
-            return Result.Failure<ProgramResponse>(parsed.IsFailure ? parsed.Error : output.Error);
-        }
-
-        ProgramResponse? created = null;
-        await _unitOfWork.ExecuteInTransactionAsync(async token =>
-        {
-            var program = WorkoutProgram.Create(Guid.NewGuid(), scope.Value.TenantId, scope.Value.UserId, parsed.Value.Name, "Generated from validated exercise ids.", Enum.TryParse<FitnessGoalType>(context.Goal, out var goal) ? goal : FitnessGoalType.GeneralFitness, WorkoutDifficulty.Beginner, 4, Math.Clamp(parsed.Value.Days.Count(day => !day.RestDay), 1, 7));
-            await _workouts.AddProgramAsync(program, token).ConfigureAwait(false);
-            await _unitOfWork.SaveChangesAsync(token).ConfigureAwait(false);
-            foreach (var dayInput in parsed.Value.Days.OrderBy(day => day.DayNumber))
-            {
-                var day = WorkoutProgramDay.Create(Guid.NewGuid(), program.Id, dayInput.DayNumber, dayInput.Name, null, dayInput.RestDay);
-                await _workouts.AddDayAsync(day, token).ConfigureAwait(false);
-                await _unitOfWork.SaveChangesAsync(token).ConfigureAwait(false);
-                var sequence = 1;
-                foreach (var item in dayInput.Exercises)
-                {
-                    await _workouts.AddProgramExerciseAsync(WorkoutProgramExercise.Create(Guid.NewGuid(), day.Id, item.ExerciseId, sequence++, item.Sets, item.TargetReps, item.TargetDurationSeconds, null, null, item.RestSeconds, null), token).ConfigureAwait(false);
-                }
-            }
-
-            await RecordUsage(scope.Value, AiRequestType.WorkoutGeneration, completion.Value, token).ConfigureAwait(false);
-            await _unitOfWork.SaveChangesAsync(token).ConfigureAwait(false);
-            created = await _workouts.GetProgramAsync(scope.Value.TenantId, scope.Value.UserId, program.Id, token).ConfigureAwait(false);
-        }, cancellationToken).ConfigureAwait(false);
-        return created is null ? Result.Failure<ProgramResponse>(AiErrors.InvalidOutput) : Result.Success(created);
-    }
+    public Task<Result<ProgramResponse>> Handle(GenerateWorkoutCommand request, CancellationToken cancellationToken) =>
+        WorkoutMonthGeneration.Create(_guard, _actor, _provider, _limits, _safety, _quota, _ai, _fitness, _workouts, _tenants, _unitOfWork, _clock, request, cancellationToken);
 
     private async Task<Result<AiChatResponse>> Chat(string permission, string feature, AiRequestType type, string message, Guid? conversationId, Func<AiUserContext, string> prompt, bool nutritionDisclaimer, CancellationToken cancellationToken)
     {

@@ -12,12 +12,15 @@ import {
   getTrainerSchedule,
   getTrainerSession,
   deleteMemberProgressPhoto,
+  getMemberProgram,
+  listMemberPrograms,
   listMemberProgress,
   listTrainerAlerts,
   listTrainerMembers,
   loadMemberProgressPhoto,
   saveMemberProgress,
   saveTrainerProgress,
+  updateMemberProgram,
   uploadMemberProgressPhoto,
   scheduleTrainerSession,
   startTrainerSession,
@@ -25,11 +28,14 @@ import {
   trainerAlertsKey,
   trainerHomeKey,
   trainerMemberKey,
+  trainerMemberProgramKey,
+  trainerMemberProgramsKey,
   trainerMembersKey,
   trainerPerformanceKey,
   trainerProfileKey,
   trainerScheduleKey,
   trainerSessionKey,
+  type MemberProgramUpdate,
 } from './workspace.api';
 
 function useTenantId() {
@@ -92,6 +98,37 @@ export function useMemberProgress(memberId: string) {
     queryKey: ['trainer-progress', tenantId, memberId],
     queryFn: ({ signal }) => listMemberProgress(memberId, signal),
     enabled: tenantId.length > 0 && memberId.length > 0,
+  });
+}
+
+export function useMemberPrograms(memberId: string) {
+  const tenantId = useTenantId();
+  return useQuery({
+    queryKey: trainerMemberProgramsKey(tenantId, memberId),
+    queryFn: ({ signal }) => listMemberPrograms(memberId, signal),
+    enabled: tenantId.length > 0 && memberId.length > 0,
+  });
+}
+
+export function useMemberProgram(memberId: string, programId: string) {
+  const tenantId = useTenantId();
+  return useQuery({
+    queryKey: trainerMemberProgramKey(tenantId, memberId, programId),
+    queryFn: ({ signal }) => getMemberProgram(memberId, programId, signal),
+    enabled: tenantId.length > 0 && memberId.length > 0 && programId.length > 0,
+  });
+}
+
+export function useUpdateMemberProgram(memberId: string, programId: string) {
+  const client = useQueryClient();
+  const tenantId = useTenantId();
+  return useMutation({
+    mutationFn: (body: MemberProgramUpdate) => updateMemberProgram(memberId, programId, body),
+    onSuccess: async (program) => {
+      client.setQueryData(trainerMemberProgramKey(tenantId, memberId, programId), program);
+      await client.invalidateQueries({ queryKey: trainerMemberProgramsKey(tenantId, memberId) });
+      await client.invalidateQueries({ queryKey: trainerMemberProgramKey(tenantId, memberId, programId) });
+    },
   });
 }
 

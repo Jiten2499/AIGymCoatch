@@ -166,6 +166,16 @@ public sealed class BusinessController : ApiControllerBase
     public async Task<IActionResult> PlanAssignees(Guid subscriptionId, CancellationToken cancellationToken) =>
         (await Sender.Send(new ListWorkspacePlanAssigneesQuery(subscriptionId), cancellationToken)).ToActionResult();
 
+    [HttpGet("business/plans/{subscriptionId:guid}/candidates")]
+    [RequiresPermission(PermissionCodes.LicenseRead)]
+    public async Task<IActionResult> PlanCandidates(Guid subscriptionId, CancellationToken cancellationToken) =>
+        (await Sender.Send(new ListWorkspacePlanCandidatesQuery(subscriptionId), cancellationToken)).ToActionResult();
+
+    [HttpPost("business/plans/{subscriptionId:guid}/assign")]
+    [RequiresPermission(PermissionCodes.LicenseManage)]
+    public async Task<IActionResult> AssignPlanUsers(Guid subscriptionId, AssignWorkspacePlanUsersRequest request, CancellationToken cancellationToken) =>
+        (await Sender.Send(new AssignWorkspacePlanUsersCommand(subscriptionId, request.UserIds), cancellationToken)).ToActionResult();
+
     [HttpPost("business/plans/{subscriptionId:guid}/revoke")]
     [RequiresPermission(PermissionCodes.LicenseManage)]
     public async Task<IActionResult> RevokePlanSeats(Guid subscriptionId, RevokeWorkspacePlanSeatsRequest request, CancellationToken cancellationToken) =>

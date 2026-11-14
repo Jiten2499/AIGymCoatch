@@ -3,12 +3,17 @@ import { fireEvent, waitFor } from '@testing-library/react-native';
 import { ApiError } from '../../../services/api/problem';
 import { useSessionStore } from '../../../store/sessionStore';
 import { renderWithProviders } from '../../../test/render';
+import { getFitnessAssessment } from '../../assessment/api/assessment.api';
 import { getProfile } from '../../fitness/api/fitness.api';
 import { listFeatureFlags } from '../../licensing/api/licenses.api';
 import { generateWorkout, listConversations } from '../api/ai.api';
 import { AiCoachScreen } from './AiCoachScreen';
 
 jest.mock('../../fitness/api/fitness.api', () => ({ getProfile: jest.fn() }));
+jest.mock('../../assessment/api/assessment.api', () => {
+  const actual = jest.requireActual<typeof import('../../assessment/api/assessment.api')>('../../assessment/api/assessment.api');
+  return { ...actual, getFitnessAssessment: jest.fn(), getFitnessAssessmentCompletion: jest.fn(), saveFitnessAssessment: jest.fn(), deleteFitnessAssessment: jest.fn() };
+});
 jest.mock('../api/ai.api', () => ({ generateWorkout: jest.fn(), coachChat: jest.fn(), progressInsight: jest.fn(), listConversations: jest.fn(), getConversation: jest.fn() }));
 jest.mock('../../licensing/api/licenses.api', () => ({ listFeatureFlags: jest.fn() }));
 const mockNavigate = jest.fn();
@@ -48,6 +53,12 @@ describe('AiCoachScreen', () => {
       { featureCode: 'AI_PROGRESS_INSIGHTS', enabled: true },
     ]);
     jest.mocked(listConversations).mockResolvedValue({ items: [], page: 1, pageSize: 20, totalCount: 0 });
+    jest.mocked(getFitnessAssessment).mockResolvedValue({
+      id: 'assessment-1234',
+      isCompleted: true,
+      updatedAt: '2026-11-01T00:00:00Z',
+      workout: { daysPerWeek: 4, equipment: ['Dumbbells'], location: 'Home' },
+    } as never);
   });
 
   it('reviews the saved profile before generation', async () => {
@@ -61,7 +72,8 @@ describe('AiCoachScreen', () => {
   it('shows a disabled-feature error from the API', async () => {
     jest.mocked(generateWorkout).mockRejectedValue(new ApiError('This feature is not enabled for the current workspace.', 403, null));
     const view = await renderWithProviders(<AiCoachScreen />);
-    fireEvent.press(await view.findByRole('button', { name: 'Generate workout plan' }));
+    expect(await view.findByText(/Using assessment/)).toBeTruthy();
+    fireEvent.press(view.getByRole('button', { name: 'Generate workout plan' }));
     expect(await view.findByText('This feature is not enabled for the current workspace.')).toBeTruthy();
     await waitFor(() => expect(mockNavigate).not.toHaveBeenCalled());
   });
@@ -83,6 +95,13 @@ describe('AiCoachScreen', () => {
     const view = await renderWithProviders(<AiCoachScreen />);
     fireEvent.press(await view.findByRole('button', { name: 'Morning plan' }, { timeout: 10000 }));
     expect(mockNavigate).toHaveBeenCalledWith('AiConversation', { conversationId: 'conversation-1' });
+  });
+
+  it('keeps generation closed until the assessment is complete', async () => {
+    jest.mocked(getFitnessAssessment).mockResolvedValue({ id: 'assessment-1234', isCompleted: false, workout: null } as never);
+    const view = await renderWithProviders(<AiCoachScreen />);
+    expect(await view.findByText('Complete the fitness and nutrition assessment before generating a plan.')).toBeTruthy();
+    expect(view.getByRole('button', { name: 'Generate workout plan' })).toBeDisabled();
   });
 
   it('hides coach chat when the workspace feature is off', async () => {

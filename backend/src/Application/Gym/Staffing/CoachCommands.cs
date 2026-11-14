@@ -186,7 +186,9 @@ public sealed class AddCoachCommandHandler : IRequestHandler<AddCoachCommand, Re
 
         var email = request.Email.Trim().ToLowerInvariant();
         var existing = await _users.GetByEmailAsync(email, cancellationToken).ConfigureAwait(false);
+        var keepsPassword = await RehireCredential.KeepsPasswordAsync(existing, _memberships, cancellationToken).ConfigureAwait(false);
         var password = existing is null ? TemporaryPassword.Create() : null;
+        var sendActivation = request.SendActivationLink || (existing is not null && !keepsPassword);
         var specialization = string.IsNullOrWhiteSpace(request.Specialization) ? null : request.Specialization.Trim();
         var joining = request.JoiningDate ?? DateOnly.FromDateTime(_clock.UtcNow);
         var designation = string.IsNullOrWhiteSpace(request.Designation) ? "Personal Trainer" : request.Designation.Trim();
@@ -258,11 +260,11 @@ public sealed class AddCoachCommandHandler : IRequestHandler<AddCoachCommand, Re
                     AuditLog.Create(Guid.NewGuid(), tenantId, _actor.UserId, "AddCoach", "TrainerProfile", trainer.Id, null, user.Email, _client.IpAddress, _client.UserAgent, _clock.UtcNow),
                     ct).ConfigureAwait(false);
                 await _unitOfWork.SaveChangesAsync(ct).ConfigureAwait(false);
-                if (request.SendActivationLink && _activation is not null)
+                if (sendActivation && _activation is not null)
                 {
                     var business = await _tenants.GetAsync(tenantId, ct).ConfigureAwait(false);
                     await _activation.SendAsync(
-                        new AccountActivationNotice(user.Id, user.Email, user.FirstName, user.LastName, RoleNames.Trainer, tenantId, business?.Name ?? "LifeFit AI", existing is not null),
+                        new AccountActivationNotice(user.Id, user.Email, user.FirstName, user.LastName, RoleNames.Trainer, tenantId, business?.Name ?? "LifeFit AI", keepsPassword),
                         ct).ConfigureAwait(false);
                 }
 

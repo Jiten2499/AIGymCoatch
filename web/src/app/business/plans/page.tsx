@@ -7,6 +7,7 @@ import { DataTable } from "../../../components/DataTable";
 import { api, ApiError } from "../../../lib/api";
 import { getSession, subscribeSession } from "../../../lib/session";
 import type { WorkspacePlan } from "../../../lib/types";
+import { AssignPlanDialog } from "./AssignPlanDialog";
 import { RevokePlanDialog } from "./RevokePlanDialog";
 
 export default function BusinessPlansPage() {
@@ -19,6 +20,7 @@ export default function BusinessPlansPage() {
     queryFn: () => api<WorkspacePlan[]>("/business/plans"),
   });
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [assigning, setAssigning] = useState(false);
   const [revoking, setRevoking] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const rows = plans.data ?? [];
@@ -60,6 +62,14 @@ export default function BusinessPlansPage() {
           <button
             className="min-h-11 rounded-full border border-line px-4 disabled:opacity-50"
             disabled={selectedRows.length !== 1}
+            onClick={() => { setNotice(null); setAssigning(true); }}
+            type="button"
+          >
+            Assign plan
+          </button>
+          <button
+            className="min-h-11 rounded-full border border-line px-4 disabled:opacity-50"
+            disabled={selectedRows.length !== 1}
             onClick={() => { setNotice(null); setRevoking(true); }}
             type="button"
           >
@@ -95,6 +105,22 @@ export default function BusinessPlansPage() {
           }}
         />
       </div>
+      {assigning && selectedRows[0] ? (
+        <AssignPlanDialog
+          onAssigned={async () => {
+            const plan = selectedRows[0];
+            setAssigning(false);
+            setSelected(new Set());
+            setNotice(`Seats on ${plan.planName} were assigned.`);
+            await client.invalidateQueries({ queryKey: ["workspace-plans", tenantId] });
+            await client.invalidateQueries({ queryKey: ["workspace-plan-candidates", plan.subscriptionId] });
+            await client.invalidateQueries({ queryKey: ["workspace-plan-assignees", plan.subscriptionId] });
+            await client.invalidateQueries({ queryKey: ["workspace-users"] });
+          }}
+          onCancel={() => setAssigning(false)}
+          plan={selectedRows[0]}
+        />
+      ) : null}
       {revoking && selectedRows[0] ? (
         <RevokePlanDialog
           onCancel={() => setRevoking(false)}

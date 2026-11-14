@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { CreatedCoach } from "../../../lib/types";
 
-export function PasswordDialog({ created, notice, onClose }: { created: CreatedCoach; notice?: string | null; onClose: () => void }) {
+export function PasswordDialog({ created, notice, activationQueued = false, onClose }: { created: CreatedCoach; notice?: string | null; activationQueued?: boolean; onClose: () => void }) {
   const password = created.temporaryPassword;
   const [copied, setCopied] = useState(false);
   return (
@@ -20,8 +20,10 @@ export function PasswordDialog({ created, notice, onClose }: { created: CreatedC
             Password
             <input aria-label="Temporary password" className="field font-mono" readOnly value={password} />
           </label>
+        ) : activationQueued ? (
+          <p className="mt-3">An activation link was queued for {created.email}. They set their own password from that email. An account that already signs in to another business keeps its current password.</p>
         ) : (
-          <p className="mt-3">This email already has an account, so no new password was created.</p>
+          <p className="mt-3">No activation email was sent. Send an activation link so they can set a password.</p>
         )}
         <div className="mt-6 flex justify-end gap-3">
           {password ? (

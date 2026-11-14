@@ -112,6 +112,55 @@ public sealed class WorkspacePlanTests
         foreignSeat.IsActive.Should().BeTrue();
     }
 
+    [Fact]
+    public async Task Owner_ListsPeopleWhoDoNotAlreadyHoldTheSelectedPlan()
+    {
+        var actor = Actor();
+        var subscription = Subscription.ForTenant(Guid.NewGuid(), actor.TenantId!.Value, Guid.NewGuid(), DateTime.UtcNow, 5);
+        var open = new TenantMemberOption(Guid.NewGuid(), "open@example.com", "Grace", "Hopper");
+        var held = new TenantMemberOption(Guid.NewGuid(), "held@example.com", "Ada", "Lovelace");
+        var store = Substitute.For<ILicenseAdminStore>();
+        store.GetTenantSubscriptionAsync(actor.TenantId.Value, subscription.Id, Arg.Any<CancellationToken>()).Returns(subscription);
+        store.ListMembersAsync(actor.TenantId.Value, Arg.Any<CancellationToken>()).Returns(new[] { open, held });
+        store.ActiveUserPlansAsync(actor.TenantId.Value, Arg.Any<CancellationToken>()).Returns(new Dictionary<Guid, UserPlanAssignment> { [open.UserId] = new(Guid.NewGuid(), "Starter") });
+        store.ListActivePlanAssigneesAsync(actor.TenantId.Value, subscription.Id, Arg.Any<CancellationToken>()).Returns(new[] { new WorkspacePlanAssignee(Guid.NewGuid(), held.UserId, held.Email, held.FirstName, held.LastName, DateTime.UtcNow) });
+        var handler = new ListWorkspacePlanCandidatesQueryHandler(actor, Permissions(licenseRead: true), Tenants(actor), store);
+
+        var listed = await handler.Handle(new ListWorkspacePlanCandidatesQuery(subscription.Id), CancellationToken.None);
+
+        listed.IsSuccess.Should().BeTrue();
+        listed.Value.Should().ContainSingle(item => item.Email == "open@example.com" && item.CurrentPlan == "Starter");
+    }
+
+    [Fact]
+    public async Task Owner_AssignsTheSelectedPlanToChosenMembers()
+    {
+        var actor = Actor();
+        var userId = Guid.NewGuid();
+        var subscription = Subscription.ForTenant(Guid.NewGuid(), actor.TenantId!.Value, Guid.NewGuid(), DateTime.UtcNow, 5);
+        var store = Substitute.For<ILicenseAdminStore>();
+        store.GetTenantSubscriptionAsync(actor.TenantId.Value, subscription.Id, Arg.Any<CancellationToken>()).Returns(subscription);
+        store.ActiveSeatsForUserAsync(actor.TenantId.Value, userId, Arg.Any<CancellationToken>()).Returns(Array.Empty<SubscriptionSeat>());
+        store.ActiveSeatCountAsync(subscription.Id, Arg.Any<CancellationToken>()).Returns(1);
+        store.ReserveSeatAsync(actor.TenantId.Value, subscription.Id, userId, actor.UserId, Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+            .Returns(SeatReservation.Ok(SubscriptionSeat.Create(Guid.NewGuid(), subscription.Id, userId, actor.UserId, DateTime.UtcNow)));
+        var unitOfWork = Substitute.For<IUnitOfWork>();
+        unitOfWork.ExecuteInTransactionAsync(Arg.Any<Func<CancellationToken, Task>>(), Arg.Any<CancellationToken>())
+            .Returns(call => call.Arg<Func<CancellationToken, Task>>()(CancellationToken.None));
+        var handler = new AssignWorkspacePlanUsersCommandHandler(actor, Permissions(licenseManage: true), Tenants(actor), Members(), store, Substitute.For<IAuditLogRepository>(), Substitute.For<IPermissionCacheInvalidator>(), unitOfWork, Clock(), Substitute.For<IClientContext>());
+
+        var assigned = await handler.Handle(new AssignWorkspacePlanUsersCommand(subscription.Id, [userId]), CancellationToken.None);
+        var outsider = Guid.NewGuid();
+        var members = Substitute.For<ITenantMembershipRepository>();
+        members.GetActiveAsync(actor.TenantId.Value, outsider, Arg.Any<CancellationToken>()).Returns((TenantMember?)null);
+        var rejectedHandler = new AssignWorkspacePlanUsersCommandHandler(actor, Permissions(licenseManage: true), Tenants(actor), members, store, Substitute.For<IAuditLogRepository>(), Substitute.For<IPermissionCacheInvalidator>(), unitOfWork, Clock(), Substitute.For<IClientContext>());
+        var rejected = await rejectedHandler.Handle(new AssignWorkspacePlanUsersCommand(subscription.Id, [outsider]), CancellationToken.None);
+
+        assigned.IsSuccess.Should().BeTrue();
+        await store.Received(1).ReserveSeatAsync(actor.TenantId.Value, subscription.Id, userId, actor.UserId, Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
+        rejected.Error.Code.Should().Be("license.not_found");
+    }
+
     private static FakeActor Actor() => new() { UserId = Guid.NewGuid(), TenantId = Guid.NewGuid() };
 
     private static IPermissionService Permissions(bool licenseRead = false, bool licenseManage = false)

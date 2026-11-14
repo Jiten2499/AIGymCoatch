@@ -59,6 +59,8 @@ export type AppStackParamList = {
   MyTargets: undefined;
   TrainerMember: { memberId: string };
   TrainerMemberProgress: { memberId: string; assessmentId?: string; start?: 'record' };
+  TrainerMemberPlan: { memberId: string; programId: string };
+  FitnessAssessment: undefined;
   TrainerSession: { sessionId: string };
   TrainerActive: { sessionId: string };
   TrainerAlerts: undefined;

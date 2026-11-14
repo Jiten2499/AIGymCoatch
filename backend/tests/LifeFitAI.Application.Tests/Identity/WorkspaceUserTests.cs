@@ -51,6 +51,8 @@ public sealed class WorkspaceUserTests
 
         created.IsSuccess.Should().BeTrue();
         created.Value.TemporaryPassword.Should().BeNull();
+        var account = await harness.Users.GetByEmailAsync("desk@gym.test", CancellationToken.None);
+        harness.Passwords.Verify("Correct-Horse-1", account!.PasswordHash, account.PasswordSalt).Should().BeTrue();
         (await harness.Members.GetActiveAsync(owner.TenantId, created.Value.Id, CancellationToken.None)).Should().NotBeNull();
     }
 

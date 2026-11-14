@@ -7,28 +7,29 @@ import { ScreenState } from '../../../components/feedback/ScreenState';
 import { AppText } from '../../../components/ui/AppText';
 import { MemberPhoto } from '../../../components/ui/MemberPhoto';
 import { errorText } from '../../../services/api/problem';
-import { useMemberProgress, useTrainerMember } from '../api/workspace.queries';
+import { useMemberPrograms, useMemberProgress, useTrainerMember } from '../api/workspace.queries';
 import { formatChange, formatMeasure, weightUnit } from '../progressForm';
 import { formatProgressDate } from '../progressSeries';
 import { MetricCard, ProgressButton } from '../progressUi';
 import { clock, FilterChip, StatusPill, TrainerCard, useTrainerLayout } from '../ui';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'TrainerMember'>;
-type Tab = 'details' | 'sessions' | 'packages' | 'notes' | 'progress';
+type Tab = 'details' | 'sessions' | 'packages' | 'notes' | 'progress' | 'plans';
 
-const tabs: Tab[] = ['details', 'sessions', 'packages', 'notes', 'progress'];
+const tabs: Tab[] = ['details', 'sessions', 'packages', 'notes', 'progress', 'plans'];
 
 export function TrainerMemberScreen({ route, navigation }: Props) {
   const { t } = useTranslation();
   const layout = useTrainerLayout();
   const member = useTrainerMember(route.params.memberId);
   const progress = useMemberProgress(route.params.memberId);
+  const programs = useMemberPrograms(route.params.memberId);
   const [tab, setTab] = useState<Tab>('details');
   const data = member.data;
 
   return (
     <ScreenState error={member.isError ? errorText(member.error, t('common.offline')) : null} loading={member.isLoading} onRetry={() => void member.refetch()}>
-      <ScrollView contentContainerStyle={layout.content} refreshControl={<RefreshControl onRefresh={() => { void member.refetch(); void progress.refetch(); }} refreshing={member.isRefetching || progress.isRefetching} tintColor={layout.refresh} />}>
+      <ScrollView contentContainerStyle={layout.content} refreshControl={<RefreshControl onRefresh={() => { void member.refetch(); void progress.refetch(); void programs.refetch(); }} refreshing={member.isRefetching || progress.isRefetching || programs.isRefetching} tintColor={layout.refresh} />}>
         <View style={{ alignItems: 'center', flexDirection: 'row', gap: 12 }}>
           <MemberPhoto label={data?.name ?? ''} path={data ? `/trainers/me/members/${route.params.memberId}/profile-photo` : null} size={72} />
           <AppText variant="display">{data?.name}</AppText>
@@ -89,6 +90,19 @@ export function TrainerMemberScreen({ route, navigation }: Props) {
             ) : null}
             <ProgressButton label={t('trainer.recordProgress')} onPress={() => navigation.navigate('TrainerMemberProgress', { memberId: route.params.memberId, start: 'record' })} />
             <ProgressButton label={t('trainer.viewProgress')} onPress={() => navigation.navigate('TrainerMemberProgress', { memberId: route.params.memberId })} variant="secondary" />
+          </>
+        ) : null}
+        {tab === 'plans' ? (
+          <>
+            {programs.isError ? <AppText tone="danger">{errorText(programs.error, t('common.offline'))}</AppText> : null}
+            {programs.isLoading ? <AppText tone="muted">{t('common.loading')}</AppText> : null}
+            {(programs.data?.items.length ?? 0) === 0 && !programs.isLoading ? <AppText tone="muted">{t('trainer.planEmpty')}</AppText> : null}
+            {programs.data?.items.map((item) => (
+              <TrainerCard key={item.id} onPress={() => navigation.navigate('TrainerMemberPlan', { memberId: route.params.memberId, programId: item.id })}>
+                <AppText variant="label">{item.name}</AppText>
+                <AppText tone="muted">{t(`journey.goalType.${item.goalType}`)} · {t('journey.weeks', { count: item.durationWeeks })}</AppText>
+              </TrainerCard>
+            ))}
           </>
         ) : null}
       </ScrollView>

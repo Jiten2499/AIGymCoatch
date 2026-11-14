@@ -128,7 +128,7 @@ export function AddCoachWizard({
         }
       }
 
-      return { coach, photoWarning, compensationWarning, activationQueued: draft.sendActivationLink };
+      return { coach, photoWarning, compensationWarning, activationQueued: draft.sendActivationLink || Boolean(candidate && !candidate.alreadyInWorkspace) };
     },
     onSuccess: (result) => onCreated(result),
   });
@@ -155,6 +155,7 @@ export function AddCoachWizard({
           lastName: draft.lastName || match.lastName,
           phone: draft.phone || match.phone || "",
           linkExistingUser: true,
+          sendActivationLink: true,
         });
       } else {
         update({ linkExistingUser: false });

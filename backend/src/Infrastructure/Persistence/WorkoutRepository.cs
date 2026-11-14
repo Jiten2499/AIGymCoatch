@@ -57,6 +57,37 @@ public sealed class WorkoutRepository : IWorkoutRepository
     public Task AddProgramAsync(WorkoutProgram program, CancellationToken cancellationToken) =>
         _db.WorkoutPrograms.AddAsync(program, cancellationToken).AsTask();
 
+    public Task<WorkoutProgram?> GetProgramEntityAsync(Guid tenantId, Guid userId, Guid id, CancellationToken cancellationToken) =>
+        VisiblePrograms(tenantId, userId).FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
+
+    public async Task ReplaceProgramDaysAsync(Guid programId, DateTime utcNow, CancellationToken cancellationToken)
+    {
+        var days = await _db.WorkoutProgramDays.Where(day => day.WorkoutProgramId == programId).ToListAsync(cancellationToken).ConfigureAwait(false);
+        var dayIds = days.Select(day => day.Id).ToArray();
+        var exercises = await _db.WorkoutProgramExercises.Where(item => dayIds.Contains(item.WorkoutProgramDayId)).ToListAsync(cancellationToken).ConfigureAwait(false);
+        foreach (var exercise in exercises)
+        {
+            exercise.SoftDelete(utcNow);
+        }
+
+        foreach (var day in days)
+        {
+            day.SoftDelete(utcNow);
+        }
+    }
+
+    public async Task SoftDeleteProgramAsync(Guid programId, DateTime utcNow, CancellationToken cancellationToken)
+    {
+        var program = await _db.WorkoutPrograms.FirstOrDefaultAsync(item => item.Id == programId, cancellationToken).ConfigureAwait(false);
+        if (program is null)
+        {
+            return;
+        }
+
+        await ReplaceProgramDaysAsync(programId, utcNow, cancellationToken).ConfigureAwait(false);
+        program.SoftDelete(utcNow);
+    }
+
     public Task AddDayAsync(WorkoutProgramDay day, CancellationToken cancellationToken) =>
         _db.WorkoutProgramDays.AddAsync(day, cancellationToken).AsTask();
 

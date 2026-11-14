@@ -139,6 +139,7 @@ public sealed class StaffOnboardingHandler : IRequestHandler<CreateWorkspaceUser
         }
 
         var invite = wizard && request.SendInvitation && !request.SaveAsDraft && existing is null;
+        var keepsPassword = await RehireCredential.KeepsPasswordAsync(existing, _members, cancellationToken).ConfigureAwait(false);
         var password = existing is null ? TemporaryPassword.Create() : null;
         WorkspaceUserCreated? created = null;
         try
@@ -244,7 +245,7 @@ public sealed class StaffOnboardingHandler : IRequestHandler<CreateWorkspaceUser
         {
             var business = await _tenants.GetAsync(access.Value.TenantId, cancellationToken).ConfigureAwait(false);
             await _activation.SendAsync(
-                new AccountActivationNotice(created.Id, created.Email, created.FirstName, created.LastName, request.RoleName, access.Value.TenantId, business?.Name ?? "LifeFit AI", existing is not null),
+                new AccountActivationNotice(created.Id, created.Email, created.FirstName, created.LastName, request.RoleName, access.Value.TenantId, business?.Name ?? "LifeFit AI", keepsPassword),
                 cancellationToken).ConfigureAwait(false);
         }
 

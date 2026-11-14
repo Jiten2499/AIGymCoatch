@@ -174,6 +174,8 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
 
     public DbSet<FitnessProfile> FitnessProfiles => Set<FitnessProfile>();
 
+    public DbSet<FitnessAssessment> FitnessAssessments => Set<FitnessAssessment>();
+
     public DbSet<FitnessGoal> FitnessGoals => Set<FitnessGoal>();
 
     public DbSet<BodyMeasurement> BodyMeasurements => Set<BodyMeasurement>();

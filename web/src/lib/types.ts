@@ -41,6 +41,14 @@ export type WorkspacePlanAssignee = {
   assignedAt: string;
 };
 
+export type WorkspacePlanCandidate = {
+  userId: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  currentPlan: string | null;
+};
+
 export type CreatedWorkspaceUser = {
   id: string;
   email: string;

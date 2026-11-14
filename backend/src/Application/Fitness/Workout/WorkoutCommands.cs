@@ -82,7 +82,7 @@ public sealed class CreateProgramCommandValidator : AbstractValidator<CreateProg
         RuleFor(command => command.Days).NotEmpty();
         RuleForEach(command => command.Days).ChildRules(day =>
         {
-            day.RuleFor(item => item.DayNumber).InclusiveBetween(1, 14);
+            day.RuleFor(item => item.DayNumber).InclusiveBetween(1, 31);
             day.RuleFor(item => item.Name).NotEmpty().MaximumLength(200);
         });
     }

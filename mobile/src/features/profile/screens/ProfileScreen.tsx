@@ -8,6 +8,7 @@ import { AppText } from '../../../components/ui/AppText';
 import { endSession } from '../../../services/auth/session';
 import { useSessionStore } from '../../../store/sessionStore';
 import { useWorkspaceStore } from '../../../store/workspaceStore';
+import { activeWorkspaces } from '../../tenant/activeWorkspaces';
 import { ProfilePhotoCard } from '../ProfilePhotoCard';
 
 export function ProfileScreen() {
@@ -15,7 +16,7 @@ export function ProfileScreen() {
   const { t } = useTranslation();
   const user = useSessionStore((state) => state.user);
   const current = useSessionStore((state) => state.currentTenant);
-  const workspaces = useWorkspaceStore((state) => state.workspaces);
+  const workspaces = activeWorkspaces(useWorkspaceStore((state) => state.workspaces));
   const [pending, setPending] = useState(false);
 
   return (

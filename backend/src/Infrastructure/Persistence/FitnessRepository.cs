@@ -58,6 +58,18 @@ public sealed class FitnessRepository : IFitnessRepository
         return rows.Select(exercise => new ExerciseOption(exercise.Id, exercise.Name, exercise.ExerciseType.ToString())).ToArray();
     }
 
+    public async Task<IReadOnlyList<GenerationExercise>> ListGenerationExercisesAsync(Guid tenantId, CancellationToken cancellationToken)
+    {
+        var rows = await _db.Exercises.AsNoTracking()
+            .Where(exercise => exercise.IsActive && (exercise.TenantId == null || exercise.TenantId == tenantId))
+            .OrderBy(exercise => exercise.Name)
+            .Take(120)
+            .Select(exercise => new { exercise.Id, exercise.Name, exercise.ExerciseType, exercise.MuscleGroup, exercise.Equipment, exercise.Difficulty })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        return rows.Select(exercise => new GenerationExercise(exercise.Id, exercise.Name, exercise.ExerciseType.ToString(), exercise.MuscleGroup.ToString(), exercise.Equipment, exercise.Difficulty.ToString())).ToArray();
+    }
+
     public async Task<PageResult<BodyMeasurement>> ListMeasurementsAsync(Guid tenantId, Guid userId, PageQuery page, CancellationToken cancellationToken)
     {
         var query = _db.BodyMeasurements.AsNoTracking().Where(row => row.TenantId == tenantId && row.UserId == userId);
@@ -71,6 +83,12 @@ public sealed class FitnessRepository : IFitnessRepository
 
     public Task AddScanAsync(BodyScanRecord scan, CancellationToken cancellationToken) =>
         _db.BodyScanRecords.AddAsync(scan, cancellationToken).AsTask();
+
+    public Task<FitnessAssessment?> GetAssessmentAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken) =>
+        _db.FitnessAssessments.FirstOrDefaultAsync(item => item.TenantId == tenantId && item.UserId == userId, cancellationToken);
+
+    public Task AddAssessmentAsync(FitnessAssessment assessment, CancellationToken cancellationToken) =>
+        _db.FitnessAssessments.AddAsync(assessment, cancellationToken).AsTask();
 }
 
 public sealed class NutritionRepository : INutritionRepository

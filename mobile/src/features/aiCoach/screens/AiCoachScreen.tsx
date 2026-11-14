@@ -17,6 +17,7 @@ import { featureCodes, isFeatureEnabled } from '../../../constants/access';
 import { useWorkspaceFeatures } from '../../licensing/api/featureQuery';
 import { errorText, isNotFound } from '../../../services/api/problem';
 import { formatDateTime } from '../../../services/localization/format';
+import { useFitnessAssessment } from '../../assessment/api/assessment.queries';
 import { tenantKey } from '../../fitness/api/keys';
 import { useFitnessProfile, useTenantId } from '../../fitness/api/queries';
 import { coachChat, generateWorkout, progressInsight } from '../api/ai.api';
@@ -29,6 +30,7 @@ export function AiCoachScreen() {
   const tenantId = useTenantId();
   const client = useQueryClient();
   const profile = useFitnessProfile();
+  const assessment = useFitnessAssessment();
   const features = useWorkspaceFeatures();
   const coachEnabled = isFeatureEnabled(features.data, featureCodes.aiCoach);
   const canGenerate = coachEnabled && isFeatureEnabled(features.data, featureCodes.aiWorkoutGeneration);
@@ -39,6 +41,14 @@ export function AiCoachScreen() {
   const [question, setQuestion] = useState('');
   const [conversationId, setConversationId] = useState<string | null>(null);
   const missing = profile.isError && isNotFound(profile.error);
+  const assessmentReady = assessment.data?.isCompleted === true;
+  const assessmentGaps = assessmentReady
+    ? [
+        assessment.data?.workout?.daysPerWeek ? null : t('journey.missingDays'),
+        assessment.data?.workout?.equipment?.length ? null : t('journey.missingEquipment'),
+        assessment.data?.workout?.location ? null : t('journey.missingLocation'),
+      ].filter((item): item is string => item != null)
+    : [];
   const generate = useMutation({
     mutationFn: () => generateWorkout(notes.trim() || null),
     onSuccess: async (program) => {
@@ -63,10 +73,21 @@ export function AiCoachScreen() {
         <ScrollView contentContainerStyle={{ gap: theme.spacing.lg, padding: theme.spacing.xl }} keyboardShouldPersistTaps="handled">
           <AppText variant="title">{t('journey.coachTitle')}</AppText>
           <AppText tone="muted">{t('journey.coachBody')}</AppText>
+          {assessment.isSuccess || assessment.isError ? (
+            <AppCard>
+              {assessmentReady ? (
+                <AppText>{t('journey.assessmentReady', { id: (assessment.data?.id ?? '').slice(0, 8), date: assessment.data?.updatedAt ? formatDateTime(new Date(assessment.data.updatedAt), i18n.language) : t('journey.saved') })}</AppText>
+              ) : (
+                <AppText>{t('journey.assessmentMissing')}</AppText>
+              )}
+              {assessmentGaps.length > 0 ? <AppText tone="muted">{t('journey.assessmentGaps', { items: assessmentGaps.join(', ') })}</AppText> : null}
+              <AppButton label={t('journey.assessmentUpdate')} onPress={() => navigation.navigate('FitnessAssessment')} variant="secondary" />
+            </AppCard>
+          ) : null}
           {missing ? (
             <AppCard>
               <AppText>{t('journey.profileEmpty')}</AppText>
-              <AppButton label={t('journey.completeProfile')} onPress={() => navigation.navigate('Fitness')} />
+              <AppButton label={t('journey.completeProfile')} onPress={() => navigation.navigate('FitnessAssessment')} />
             </AppCard>
           ) : profile.data ? (
             <AppCard>
@@ -84,7 +105,7 @@ export function AiCoachScreen() {
           {canGenerate ? (
             <>
               {generate.isError ? <AppText accessibilityRole="alert" tone="danger">{errorText(generate.error, t('common.offline'))}</AppText> : null}
-              <AppButton disabled={missing} label={t('journey.generate')} loading={generate.isPending} onPress={() => generate.mutate()} />
+              <AppButton disabled={missing || !assessmentReady || generate.isPending} label={t('journey.generate')} loading={generate.isPending} onPress={() => { if (!generate.isPending) generate.mutate(); }} />
             </>
           ) : null}
           <AppText tone="muted">{t('journey.safety')}</AppText>

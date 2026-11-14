@@ -47,6 +47,7 @@ export default function BusinessCoachesPage() {
   const [deletedNotice, setDeletedNotice] = useState<string | null>(null);
   const [resetNotice, setResetNotice] = useState<string | null>(null);
   const [issued, setIssued] = useState<CreatedCoach | null>(null);
+  const [activationQueued, setActivationQueued] = useState(false);
   const [photoNotice, setPhotoNotice] = useState<string | null>(null);
   const rows = coaches.data?.items ?? [];
   const selectedRows = rows.filter((row) => selected.has(row.id));
@@ -170,6 +171,7 @@ export default function BusinessCoachesPage() {
           onCreated={async (result) => {
             setAdding(false);
             setIssued(result.coach);
+            setActivationQueued(result.activationQueued === true);
             setPhotoNotice([result.photoWarning, result.compensationWarning].filter(Boolean).join(" ") || null);
             setSearch("");
             setStatus("");
@@ -198,11 +200,13 @@ export default function BusinessCoachesPage() {
       ) : null}
       {issued ? (
         <PasswordDialog
+          activationQueued={activationQueued}
           created={issued}
           notice={photoNotice}
           onClose={() => {
             const createdId = issued.id;
             setIssued(null);
+            setActivationQueued(false);
             setPhotoNotice(null);
             setViewing(createdId);
           }}

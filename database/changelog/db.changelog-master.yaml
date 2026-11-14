@@ -203,5 +203,11 @@ databaseChangeLog:
   - include:
       file: changes/067-platform-google-drive.xml
       relativeToChangelogFile: true
+  - include:
+      file: changes/068-fitness-assessment.xml
+      relativeToChangelogFile: true
+  - include:
+      file: changes/069-workout-plan-month.xml
+      relativeToChangelogFile: true
 
 

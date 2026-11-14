@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="069-workout-plan-month" author="lifefit-architecture">
+        <comment>Ticket: LF-0083. Allow a 30-day AI plan and record which assessment, prompt, and model produced it. Index review: optional FK to FitnessAssessments for the source assessment; no extra index because plans are loaded by user and tenant. Performance note: generation inserts one program and up to 31 days.</comment>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE app.WorkoutProgramDays DROP CONSTRAINT CK_WorkoutProgramDays_Number;
+            ALTER TABLE app.WorkoutProgramDays ADD CONSTRAINT CK_WorkoutProgramDays_Number CHECK (DayNumber BETWEEN 1 AND 31);
+
+            ALTER TABLE app.WorkoutPrograms ADD
+                SourceAssessmentId UNIQUEIDENTIFIER NULL,
+                PromptVersion NVARCHAR(40) NULL,
+                GenerationModel NVARCHAR(100) NULL,
+                PlanStartDate DATE NULL;
+            ALTER TABLE app.WorkoutPrograms ADD CONSTRAINT FK_WorkoutPrograms_FitnessAssessments FOREIGN KEY (SourceAssessmentId) REFERENCES app.FitnessAssessments (Id);
+        ]]></sql>
+        <rollback>
+            <sql splitStatements="false"><![CDATA[
+                ALTER TABLE app.WorkoutPrograms DROP CONSTRAINT FK_WorkoutPrograms_FitnessAssessments;
+                ALTER TABLE app.WorkoutPrograms DROP COLUMN PlanStartDate, GenerationModel, PromptVersion, SourceAssessmentId;
+                ALTER TABLE app.WorkoutProgramDays DROP CONSTRAINT CK_WorkoutProgramDays_Number;
+                ALTER TABLE app.WorkoutProgramDays ADD CONSTRAINT CK_WorkoutProgramDays_Number CHECK (DayNumber BETWEEN 1 AND 14);
+            ]]></sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

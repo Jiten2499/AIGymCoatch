@@ -94,6 +94,8 @@ public sealed record AssignWorkspacePlanRequest(Guid SubscriptionId);
 
 public sealed record RevokeWorkspacePlanSeatsRequest(Guid[] SeatIds);
 
+public sealed record AssignWorkspacePlanUsersRequest(Guid[] UserIds);
+
 public sealed record AddMemberRequest(string Email, string RoleName);
 
 public sealed record AssignRoleRequest(Guid UserId, string RoleName);

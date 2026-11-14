@@ -16,8 +16,15 @@ public static class AiErrors
 {
     public static readonly Error Unavailable = new("ai.unavailable", "The AI service is not available.");
     public static readonly Error Quota = new("ai.quota", "The AI usage limit for this workspace has been reached.");
+    public static readonly Error WorkoutPlanMonthlyLimit = new("ai.workout_plan_monthly_limit", "In a business workspace you can generate one AI workout plan per calendar month.");
     public static readonly Error Safety = new("ai.safety", AiSafetyPolicy.Refusal);
     public static readonly Error InvalidOutput = new("ai.invalid_output", "The AI response could not be applied.");
+    public static readonly Error AssessmentRequired = new("ai.assessment_required", "Complete your fitness and nutrition assessment before generating a workout plan.");
+    public static readonly Error MedicalClearance = new("ai.medical_clearance", "A clinician should clear exercise before a plan is generated from these restrictions.");
+    public static readonly Error NoMatchingExercises = new("ai.no_matching_exercises", "No catalog exercises match the equipment in the assessment.");
+    public static readonly Error FrequencyMismatch = new("ai.invalid_output", "The workout plan did not match the weekly training frequency from the assessment.");
+    public static readonly Error RestrictedExercise = new("ai.invalid_output", "The workout plan included an exercise the assessment says to avoid.");
+    public static readonly Error NoProgression = new("ai.invalid_output", "The workout plan repeated the same sessions without weekly progression.");
 }
 
 public interface IAiLimits
@@ -89,11 +96,17 @@ public interface IFitnessRepository
 
     Task<IReadOnlyList<ExerciseOption>> ListExerciseOptionsAsync(Guid tenantId, CancellationToken cancellationToken);
 
+    Task<IReadOnlyList<GenerationExercise>> ListGenerationExercisesAsync(Guid tenantId, CancellationToken cancellationToken);
+
     Task<PageResult<BodyMeasurement>> ListMeasurementsAsync(Guid tenantId, Guid userId, PageQuery page, CancellationToken cancellationToken);
 
     Task AddMeasurementAsync(BodyMeasurement measurement, CancellationToken cancellationToken);
 
     Task AddScanAsync(BodyScanRecord scan, CancellationToken cancellationToken);
+
+    Task<FitnessAssessment?> GetAssessmentAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken);
+
+    Task AddAssessmentAsync(FitnessAssessment assessment, CancellationToken cancellationToken);
 }
 
 public interface IWorkoutRepository
@@ -105,6 +118,12 @@ public interface IWorkoutRepository
     Task<bool> ProgramVisibleAsync(Guid tenantId, Guid userId, Guid id, CancellationToken cancellationToken);
 
     Task AddProgramAsync(WorkoutProgram program, CancellationToken cancellationToken);
+
+    Task<WorkoutProgram?> GetProgramEntityAsync(Guid tenantId, Guid userId, Guid id, CancellationToken cancellationToken);
+
+    Task ReplaceProgramDaysAsync(Guid programId, DateTime utcNow, CancellationToken cancellationToken);
+
+    Task SoftDeleteProgramAsync(Guid programId, DateTime utcNow, CancellationToken cancellationToken);
 
     Task AddDayAsync(WorkoutProgramDay day, CancellationToken cancellationToken);
 
@@ -167,6 +186,8 @@ public interface IAiRepository
     Task AddUsageAsync(AiUsageRecord usage, CancellationToken cancellationToken);
 
     Task<int> CountUsageAsync(Guid tenantId, Guid userId, DateTime fromUtc, CancellationToken cancellationToken);
+
+    Task<int> CountUsageAsync(Guid tenantId, Guid userId, AiRequestType type, DateTime fromUtc, CancellationToken cancellationToken);
 
     Task<int> CountTenantUsageAsync(Guid tenantId, DateTime fromUtc, CancellationToken cancellationToken);
 }

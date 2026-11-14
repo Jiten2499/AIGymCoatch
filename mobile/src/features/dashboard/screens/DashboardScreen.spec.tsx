@@ -10,11 +10,6 @@ import { DashboardScreen } from './DashboardScreen';
 
 jest.mock('../../licensing/api/licenses.api', () => ({ listFeatureFlags: jest.fn() }));
 jest.mock('../../profile/photo', () => ({ useMyProfilePhoto: () => ({ data: null }) }));
-jest.mock('../../communications/api/communications.api', () => ({
-  listMemberCommunications: jest.fn(async () => ({ items: [], page: 1, pageSize: 20, totalCount: 0 })),
-  getMemberCommunication: jest.fn(),
-  markCommunicationRead: jest.fn(),
-}));
 jest.mock('../../fitness/api/fitness.api', () => ({
   getDashboard: jest.fn(),
   getProfile: jest.fn(),

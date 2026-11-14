@@ -78,5 +78,5 @@ describe('WorkoutPlanScreen', () => {
     fireEvent.press(view.getByRole('button', { name: 'Start workout' }));
     await waitFor(() => expect(startProgram).toHaveBeenCalledWith('program-1', 'day-1'));
     await waitFor(() => expect(navigation.navigate).toHaveBeenCalledWith('WorkoutSession', { sessionId: 'session-1' }));
-  });
+  }, 20000);
 });

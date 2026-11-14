@@ -279,8 +279,8 @@ export function AccessReviewStep({
       </FormField>
       {mode === "edit" && draft.planName && !draft.subscriptionId ? <p className="text-sm text-muted">Current plan: {draft.planName}</p> : null}
       {mode === "create" && candidate?.alreadyInWorkspace ? <p role="alert">That person already belongs to this workspace.</p> : null}
-      {mode === "create" && candidate && !candidate.alreadyInWorkspace ? <p role="status">An existing LifeFit account was found and will be reused for this coach.</p> : null}
-      {mode === "create" && !candidate ? <p className="text-sm text-muted">A new login will be created if this email is not registered yet.</p> : null}
+      {mode === "create" && candidate && !candidate.alreadyInWorkspace ? <p role="status">This email already has a LifeFit account. An activation link will be emailed so they can set a password, unless they already sign in to another business.</p> : null}
+      {mode === "create" && !candidate ? <p className="text-sm text-muted">A new login will be created. Send the activation email so they can set a password.</p> : null}
       {mode === "edit" ? <p className="text-sm text-muted">Email stays with the existing LifeFit account.</p> : null}
       {mode === "create" ? (
         <label className="flex min-h-11 items-center gap-3 text-sm">

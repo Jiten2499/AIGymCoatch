@@ -45,8 +45,8 @@ public sealed class AiLimits : IAiLimits
         var value = options.Value;
         Provider = string.IsNullOrWhiteSpace(value.Provider) ? "Unconfigured" : value.Provider;
         Model = string.IsNullOrWhiteSpace(value.Model) ? "unconfigured" : value.Model;
-        MaxTokens = Math.Clamp(value.MaxTokens, 1, 4000);
-        MaxPromptCharacters = Math.Clamp(value.MaxPromptCharacters, 200, 8000);
+        MaxTokens = Math.Clamp(value.MaxTokens, 1, 12000);
+        MaxPromptCharacters = Math.Clamp(value.MaxPromptCharacters, 200, 16000);
         DailyRequestLimit = Math.Max(0, value.DailyRequestLimit);
         MonthlyRequestLimit = Math.Max(0, value.MonthlyRequestLimit);
         TenantDailyRequestLimit = Math.Max(0, value.TenantDailyRequestLimit);
@@ -96,7 +96,7 @@ public sealed class OpenAiCompatibleAiProvider : IAiProvider
 
             var model = string.IsNullOrWhiteSpace(settings.Model) ? request.Model : settings.Model;
             var reasoningModel = model.Contains("gpt-oss", StringComparison.OrdinalIgnoreCase);
-            var maxTokens = reasoningModel ? Math.Clamp(Math.Max(request.MaxTokens, 2000) + 1500, 1, 4000) : request.MaxTokens;
+            var maxTokens = reasoningModel ? Math.Clamp(Math.Max(request.MaxTokens, 2000) + 1500, 1, 12000) : Math.Clamp(request.MaxTokens, 1, 12000);
             var timeoutSeconds = reasoningModel ? Math.Max(settings.TimeoutSeconds, 45) : settings.TimeoutSeconds;
             for (var attempt = 1; attempt <= 2; attempt++)
             {

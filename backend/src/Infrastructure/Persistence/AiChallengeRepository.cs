@@ -49,6 +49,9 @@ public sealed class AiRepository : IAiRepository
     public Task<int> CountUsageAsync(Guid tenantId, Guid userId, DateTime fromUtc, CancellationToken cancellationToken) =>
         _db.AiUsageRecords.CountAsync(item => item.TenantId == tenantId && item.UserId == userId && item.CreatedAt >= fromUtc, cancellationToken);
 
+    public Task<int> CountUsageAsync(Guid tenantId, Guid userId, AiRequestType type, DateTime fromUtc, CancellationToken cancellationToken) =>
+        _db.AiUsageRecords.CountAsync(item => item.TenantId == tenantId && item.UserId == userId && item.RequestType == type && item.CreatedAt >= fromUtc, cancellationToken);
+
     public Task<int> CountTenantUsageAsync(Guid tenantId, DateTime fromUtc, CancellationToken cancellationToken) =>
         _db.AiUsageRecords.CountAsync(item => item.TenantId == tenantId && item.CreatedAt >= fromUtc, cancellationToken);
 }

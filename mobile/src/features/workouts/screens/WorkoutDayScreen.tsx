@@ -52,6 +52,7 @@ function DayExercise({ exercise, onOpen }: { exercise: ProgramExercise; onOpen: 
     exercise.sets ? t('journey.sets', { count: exercise.sets }) : null,
     exercise.targetReps ? t('journey.reps', { count: exercise.targetReps }) : null,
     exercise.targetWeight !== null ? `${t('journey.weightLabel')}: ${exercise.targetWeight}` : null,
+    exercise.targetDurationSeconds ? t('journey.minutes', { count: Math.round(exercise.targetDurationSeconds / 60) }) : null,
     exercise.restSeconds ? t('journey.rest', { count: exercise.restSeconds }) : null,
   ].filter(Boolean).join(' · ');
   return (
@@ -60,6 +61,7 @@ function DayExercise({ exercise, onOpen }: { exercise: ProgramExercise; onOpen: 
         <View style={{ gap: theme.spacing.xs, minHeight: theme.control.minTouch, justifyContent: 'center' }}>
           <AppText variant="label">{detail.data?.name ?? t('common.loading')}</AppText>
           {targets ? <AppText tone="muted">{targets}</AppText> : null}
+          {exercise.notes ? <AppText tone="muted">{exercise.notes}</AppText> : null}
         </View>
       </AppCard>
     </Pressable>

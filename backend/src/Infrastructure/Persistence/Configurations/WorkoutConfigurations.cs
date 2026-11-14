@@ -16,7 +16,10 @@ public sealed class WorkoutProgramConfiguration : IEntityTypeConfiguration<Worko
         builder.Property(entity => entity.GoalType).HasConversion<string>().HasMaxLength(32);
         builder.Property(entity => entity.Difficulty).HasConversion<string>().HasMaxLength(32);
         builder.Property(entity => entity.Status).HasConversion<string>().HasMaxLength(32);
+        builder.Property(entity => entity.PromptVersion).HasMaxLength(40);
+        builder.Property(entity => entity.GenerationModel).HasMaxLength(100);
         builder.Property(entity => entity.RowVersion).IsRowVersion();
+        builder.HasOne<FitnessAssessment>().WithMany().HasForeignKey(entity => entity.SourceAssessmentId).IsRequired(false).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Tenant>().WithMany().HasForeignKey(entity => entity.TenantId).IsRequired(false).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<UserAccount>().WithMany().HasForeignKey(entity => entity.UserId).IsRequired(false).OnDelete(DeleteBehavior.Restrict);
         builder.HasQueryFilter(entity => entity.DeletedAt == null);

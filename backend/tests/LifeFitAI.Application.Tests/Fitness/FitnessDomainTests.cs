@@ -90,12 +90,14 @@ public sealed class FitnessDomainTests
     public void WorkoutParser_RejectsUnknownExerciseIdsAndClampsVolume()
     {
         var allowed = Guid.Parse("33333333-3333-4333-8333-333333333001");
-        var json = "{\"name\":\"Plan\",\"days\":[{\"dayNumber\":1,\"name\":\"Push\",\"restDay\":false,\"exercises\":[{\"exerciseId\":\"" + allowed + "\",\"sets\":99,\"targetReps\":200,\"restSeconds\":900}]}]}";
+        var json = "{\"name\":\"Plan\",\"days\":[{\"dayNumber\":1,\"name\":\"Push\",\"restDay\":false,\"exercises\":[{\"exerciseId\":\"" + allowed + "\",\"sets\":99,\"targetReps\":200,\"restSeconds\":900,\"targetWeight\":42.5,\"notes\":\"wrap wrists; tempo 3-1-1\"}]}]}";
         var parsed = WorkoutPlanParser.Parse(json, new HashSet<Guid> { allowed });
         parsed.IsSuccess.Should().BeTrue();
         parsed.Value.Days[0].Exercises[0].Sets.Should().Be(10);
         parsed.Value.Days[0].Exercises[0].TargetReps.Should().Be(100);
         parsed.Value.Days[0].Exercises[0].RestSeconds.Should().Be(600);
+        parsed.Value.Days[0].Exercises[0].TargetWeight.Should().Be(42.5m);
+        parsed.Value.Days[0].Exercises[0].Notes.Should().Contain("wrap");
 
         var unknown = WorkoutPlanParser.Parse(json.Replace(allowed.ToString(), Guid.NewGuid().ToString(), StringComparison.Ordinal), new HashSet<Guid> { allowed });
         unknown.IsFailure.Should().BeTrue();

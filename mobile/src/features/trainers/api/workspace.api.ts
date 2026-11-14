@@ -1,4 +1,6 @@
 import { apiClient } from '../../../services/api/client';
+import type { PageResult } from '../../../types/api';
+import type { WorkoutProgram } from '../../fitness/types';
 
 export type TrainerSession = {
   id: string;
@@ -159,6 +161,33 @@ export const trainerSessionKey = (tenantId: string, sessionId: string) => ['trai
 export const trainerPerformanceKey = (tenantId: string, from: string, to: string) => ['trainer-performance', tenantId, from, to] as const;
 export const trainerAlertsKey = (tenantId: string) => ['trainer-alerts', tenantId] as const;
 export const trainerProfileKey = (tenantId: string) => ['trainer-profile', tenantId] as const;
+export const trainerMemberProgramsKey = (tenantId: string, memberId: string) => ['trainer-member-programs', tenantId, memberId] as const;
+export const trainerMemberProgramKey = (tenantId: string, memberId: string, programId: string) => ['trainer-member-program', tenantId, memberId, programId] as const;
+
+export type MemberProgramUpdate = {
+  name: string;
+  description: string | null;
+  goalType: string;
+  difficulty: string;
+  durationWeeks: number;
+  frequencyPerWeek: number;
+  days: {
+    dayNumber: number;
+    name: string;
+    description: string | null;
+    restDay: boolean;
+    exercises: {
+      exerciseId: string;
+      sets: number | null;
+      targetReps: number | null;
+      targetDurationSeconds: number | null;
+      targetDistance: number | null;
+      targetWeight: number | null;
+      restSeconds: number | null;
+      notes: string | null;
+    }[];
+  }[];
+};
 
 export async function getTrainerHome(signal?: AbortSignal) {
   const response = await apiClient.get<TrainerHome>(`${root}/home`, { signal });
@@ -227,6 +256,21 @@ export async function completeTrainerSession(sessionId: string, notes: string, e
 
 export async function cancelTrainerSession(sessionId: string) {
   await apiClient.post(`${root}/sessions/${sessionId}/cancel`);
+}
+
+export async function listMemberPrograms(memberId: string, signal?: AbortSignal) {
+  const response = await apiClient.get<PageResult<WorkoutProgram>>(`${root}/members/${memberId}/workouts`, { params: { page: 1, pageSize: 50 }, signal });
+  return response.data;
+}
+
+export async function getMemberProgram(memberId: string, programId: string, signal?: AbortSignal) {
+  const response = await apiClient.get<WorkoutProgram>(`${root}/members/${memberId}/workouts/${programId}`, { signal });
+  return response.data;
+}
+
+export async function updateMemberProgram(memberId: string, programId: string, body: MemberProgramUpdate) {
+  const response = await apiClient.put<WorkoutProgram>(`${root}/members/${memberId}/workouts/${programId}`, body);
+  return response.data;
 }
 
 export async function listMemberProgress(memberId: string, signal?: AbortSignal) {

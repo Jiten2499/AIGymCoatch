@@ -11,6 +11,8 @@ public sealed record ExerciseResponse(Guid Id, string Name, string? Description,
 
 public sealed record ExerciseOption(Guid Id, string Name, string ExerciseType);
 
+public sealed record GenerationExercise(Guid Id, string Name, string ExerciseType, string MuscleGroup, string? Equipment, string Difficulty);
+
 public sealed record ProgramExerciseResponse(Guid Id, Guid ExerciseId, int Sequence, int? Sets, int? TargetReps, int? TargetDurationSeconds, decimal? TargetDistance, decimal? TargetWeight, int? RestSeconds, string? Notes);
 
 public sealed record ProgramDayResponse(Guid Id, int DayNumber, string Name, string? Description, bool RestDay, IReadOnlyList<ProgramExerciseResponse> Exercises);

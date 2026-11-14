@@ -26,6 +26,7 @@ const mockMember = {
 jest.mock('../api/workspace.queries', () => ({
   useTrainerMember: () => mockMember,
   useMemberProgress: () => ({ data: [], isError: false, isLoading: false, isRefetching: false, error: null, refetch: jest.fn() }),
+  useMemberPrograms: () => ({ data: { items: [], page: 1, pageSize: 50, totalCount: 0 }, isError: false, isLoading: false, isRefetching: false, error: null, refetch: jest.fn() }),
 }));
 
 function renderScreen() {

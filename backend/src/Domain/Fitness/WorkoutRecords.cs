@@ -26,6 +26,14 @@ public sealed class WorkoutProgram : BaseEntity
 
     public ProgramStatus Status { get; private set; }
 
+    public Guid? SourceAssessmentId { get; private set; }
+
+    public string? PromptVersion { get; private set; }
+
+    public string? GenerationModel { get; private set; }
+
+    public DateOnly? PlanStartDate { get; private set; }
+
     public static WorkoutProgram Create(Guid id, Guid? tenantId, Guid? userId, string name, string? description, FitnessGoalType goal, WorkoutDifficulty difficulty, int durationWeeks, int frequency) =>
         new()
         {
@@ -40,6 +48,24 @@ public sealed class WorkoutProgram : BaseEntity
             FrequencyPerWeek = frequency,
             Status = ProgramStatus.Active,
         };
+
+    public void AttachGeneration(Guid assessmentId, string promptVersion, string? model, DateOnly start)
+    {
+        SourceAssessmentId = assessmentId;
+        PromptVersion = promptVersion.Trim();
+        GenerationModel = string.IsNullOrWhiteSpace(model) ? null : model.Trim();
+        PlanStartDate = start;
+    }
+
+    public void Update(string name, string? description, FitnessGoalType goal, WorkoutDifficulty difficulty, int durationWeeks, int frequency)
+    {
+        Name = name.Trim();
+        Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
+        GoalType = goal;
+        Difficulty = difficulty;
+        DurationWeeks = durationWeeks;
+        FrequencyPerWeek = frequency;
+    }
 
     public bool VisibleTo(Guid tenantId, Guid userId) =>
         TenantId is null || TenantId == tenantId && (UserId is null || UserId == userId);
@@ -114,6 +140,17 @@ public sealed class WorkoutProgramExercise : BaseEntity
             RestSeconds = rest,
             Notes = notes,
         };
+
+    public void Update(int? sets, int? reps, int? duration, decimal? distance, decimal? weight, int? rest, string? notes)
+    {
+        Sets = sets;
+        TargetReps = reps;
+        TargetDurationSeconds = duration;
+        TargetDistance = distance;
+        TargetWeight = weight;
+        RestSeconds = rest;
+        Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+    }
 }
 
 public sealed class WorkoutSession : BaseEntity

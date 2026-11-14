@@ -5,9 +5,25 @@ namespace LifeFitAI.Application.Fitness.Ai;
 
 public static class WorkoutPlanParser
 {
-    public static Result<GeneratedProgram> Parse(string? json, IReadOnlySet<Guid> allowedIds, IReadOnlyDictionary<string, Guid>? exerciseNames = null)
+    public static Result<GeneratedProgram> ParseMonth(string? json, IReadOnlySet<Guid> allowedIds, IReadOnlyDictionary<string, Guid>? exerciseNames = null)
     {
-        if (string.IsNullOrWhiteSpace(json) || allowedIds.Count == 0 || ExtractJson(json) is not string text)
+        var parsed = Parse(json, allowedIds, exerciseNames, 31);
+        if (parsed.IsFailure)
+        {
+            return parsed;
+        }
+
+        var days = parsed.Value.Days.OrderBy(day => day.DayNumber).ToArray();
+        var sequential = days.Length == 30 && days.Select((day, index) => day.DayNumber == index + 1).All(match => match);
+        var volume = sequential && days.Where(day => !day.RestDay).SelectMany(day => day.Exercises).All(item => item.TargetReps is not null || item.TargetDurationSeconds is not null);
+        return sequential && volume && days.Any(day => day.RestDay)
+            ? Result.Success(new GeneratedProgram(parsed.Value.Name, days))
+            : Result.Failure<GeneratedProgram>(AiErrors.InvalidOutput);
+    }
+
+    public static Result<GeneratedProgram> Parse(string? json, IReadOnlySet<Guid> allowedIds, IReadOnlyDictionary<string, Guid>? exerciseNames = null, int maxDays = 14)
+    {
+        if (string.IsNullOrWhiteSpace(json) || allowedIds.Count == 0 || PlanJson.Extract(json) is not string text)
         {
             return Result.Failure<GeneratedProgram>(AiErrors.InvalidOutput);
         }
@@ -25,7 +41,7 @@ public static class WorkoutPlanParser
         using (document)
         {
             var root = document.RootElement;
-            if (root.ValueKind != JsonValueKind.Object || !TryArray(root, out var dayElements, "days", "workouts", "schedule") || dayElements.Count is < 1 or > 14)
+            if (root.ValueKind != JsonValueKind.Object || !PlanJson.Array(root, out var dayElements, "days", "workouts", "schedule") || dayElements.Count < 1 || dayElements.Count > maxDays)
             {
                 return Result.Failure<GeneratedProgram>(AiErrors.InvalidOutput);
             }
@@ -33,7 +49,7 @@ public static class WorkoutPlanParser
             var days = new List<GeneratedDay>();
             for (var index = 0; index < dayElements.Count; index++)
             {
-                if (!TryDay(dayElements[index], index, allowedIds, exerciseNames, out var day))
+                if (!TryDay(dayElements[index], index, allowedIds, exerciseNames, maxDays, out var day))
                 {
                     return Result.Failure<GeneratedProgram>(AiErrors.InvalidOutput);
                 }
@@ -46,12 +62,12 @@ public static class WorkoutPlanParser
                 return Result.Failure<GeneratedProgram>(AiErrors.InvalidOutput);
             }
 
-            var name = Text(root, "name", "title", "programName") ?? "Workout plan";
+            var name = PlanJson.Text(root, "name", "title", "programName") ?? "Workout plan";
             return Result.Success(new GeneratedProgram(name.Trim(), days));
         }
     }
 
-    private static bool TryDay(JsonElement day, int index, IReadOnlySet<Guid> allowedIds, IReadOnlyDictionary<string, Guid>? exerciseNames, out GeneratedDay parsed)
+    private static bool TryDay(JsonElement day, int index, IReadOnlySet<Guid> allowedIds, IReadOnlyDictionary<string, Guid>? exerciseNames, int maxDays, out GeneratedDay parsed)
     {
         parsed = new GeneratedDay(0, string.Empty, false, []);
         if (day.ValueKind != JsonValueKind.Object)
@@ -59,21 +75,34 @@ public static class WorkoutPlanParser
             return false;
         }
 
-        var number = Integer(day, "dayNumber", "day", "number") ?? index + 1;
-        if (number is < 1 or > 14)
+        var number = PlanJson.Integer(day, "dayNumber", "day", "number") ?? index + 1;
+        if (number < 1 || number > maxDays)
         {
             return false;
         }
 
-        var rest = Flag(day, "restDay", "rest");
+        var rest = PlanJson.Flag(day, "restDay", "rest");
         var exercises = new List<GeneratedExercise>();
-        if (!rest && TryArray(day, out var items, "exercises", "items", "movements"))
+        if (!rest)
         {
-            foreach (var item in items)
+            foreach (var keys in new[] { new[] { "warmup", "warmUp" }, ["exercises", "items", "movements"], ["cardio"], ["cooldown", "coolDown"] })
             {
-                if (item.ValueKind == JsonValueKind.Object && TryResolve(item, allowedIds, exerciseNames, out var exercise))
+                if (!PlanJson.Array(day, out var items, keys))
                 {
-                    exercises.Add(exercise);
+                    continue;
+                }
+
+                foreach (var item in items)
+                {
+                    if (item.ValueKind == JsonValueKind.Object && TryResolve(item, allowedIds, exerciseNames, out var exercise))
+                    {
+                        exercises.Add(exercise);
+                    }
+
+                    if (exercises.Count == 12)
+                    {
+                        break;
+                    }
                 }
 
                 if (exercises.Count == 12)
@@ -88,14 +117,16 @@ public static class WorkoutPlanParser
             return false;
         }
 
-        parsed = new GeneratedDay(number, (Text(day, "name", "title") ?? $"Day {number}").Trim(), rest, exercises);
+        var name = (PlanJson.Text(day, "name", "title") ?? $"Day {number}").Trim();
+        var description = PlanJson.Text(day, "recoveryInstructions", "description", "workoutDescription");
+        parsed = new GeneratedDay(number, name.Length <= 200 ? name : name[..200], rest, exercises, string.IsNullOrWhiteSpace(description) ? null : description.Trim());
         return true;
     }
 
     private static bool TryResolve(JsonElement item, IReadOnlySet<Guid> allowedIds, IReadOnlyDictionary<string, Guid>? exerciseNames, out GeneratedExercise exercise)
     {
-        exercise = new GeneratedExercise(Guid.Empty, 0, null, null, 0);
-        foreach (var candidate in new[] { Text(item, "exerciseId", "id", "exercise"), Text(item, "name", "exerciseName", "title") })
+        exercise = new GeneratedExercise(Guid.Empty, 0, null, null, null, 0, null);
+        foreach (var candidate in new[] { PlanJson.Text(item, "exerciseId", "id", "exercise"), PlanJson.Text(item, "name", "exerciseName", "title") })
         {
             if (Guid.TryParse(candidate, out var exerciseId) && allowedIds.Contains(exerciseId))
             {
@@ -103,7 +134,7 @@ public static class WorkoutPlanParser
                 return true;
             }
 
-            if (TryMatchName(candidate, allowedIds, exerciseNames, out exerciseId))
+            if (PlanJson.Match(candidate, allowedIds, exerciseNames, out exerciseId))
             {
                 exercise = Build(item, exerciseId);
                 return true;
@@ -115,175 +146,36 @@ public static class WorkoutPlanParser
 
     private static GeneratedExercise Build(JsonElement item, Guid exerciseId)
     {
-        var reps = Integer(item, "targetReps", "reps");
-        var duration = Integer(item, "targetDurationSeconds", "durationSeconds");
+        var reps = PlanJson.Integer(item, "targetReps", "reps");
+        var duration = PlanJson.Integer(item, "targetDurationSeconds", "durationSeconds", "duration");
+        var weight = PlanJson.Decimal(item, "targetWeight", "weight", "load");
+        var notes = PlanJson.Text(item, "notes", "cues", "instruction", "instructions") ?? string.Empty;
+        var rpe = PlanJson.Decimal(item, "rpe", "intensity");
+        if (rpe is not null)
+        {
+            notes = $"RPE {Math.Clamp(rpe.Value, 1, 10):0.#}. {notes}";
+        }
+
+        var repsText = PlanJson.Text(item, "targetReps", "reps");
+        if (repsText is not null && repsText.Contains('-', StringComparison.Ordinal))
+        {
+            notes = $"{repsText}. {notes}";
+        }
+
+        notes = notes.Trim();
         return new GeneratedExercise(
             exerciseId,
-            Math.Clamp(Integer(item, "sets") ?? 3, 1, 10),
+            Math.Clamp(PlanJson.Integer(item, "sets") ?? 3, 1, 10),
             reps is null ? null : Math.Clamp(reps.Value, 1, 100),
             duration is null ? null : Math.Clamp(duration.Value, 1, 7200),
-            Math.Clamp(Integer(item, "restSeconds", "rest") ?? 60, 0, 600));
-    }
-
-    private static bool TryMatchName(string? candidate, IReadOnlySet<Guid> allowedIds, IReadOnlyDictionary<string, Guid>? exerciseNames, out Guid exerciseId)
-    {
-        exerciseId = Guid.Empty;
-        if (string.IsNullOrWhiteSpace(candidate) || exerciseNames is null)
-        {
-            return false;
-        }
-
-        var trimmed = candidate.Trim();
-        if (exerciseNames.TryGetValue(trimmed, out exerciseId) && allowedIds.Contains(exerciseId))
-        {
-            return true;
-        }
-
-        var normalized = Normalize(trimmed);
-        Guid? match = null;
-        var distance = int.MaxValue;
-        foreach (var pair in exerciseNames)
-        {
-            if (!allowedIds.Contains(pair.Value))
-            {
-                continue;
-            }
-
-            var key = Normalize(pair.Key);
-            if (key.Length == 0 || (!key.Contains(normalized, StringComparison.Ordinal) && !normalized.Contains(key, StringComparison.Ordinal)))
-            {
-                continue;
-            }
-
-            var gap = Math.Abs(key.Length - normalized.Length);
-            if (gap < distance)
-            {
-                match = pair.Value;
-                distance = gap;
-            }
-            else if (gap == distance && match != pair.Value)
-            {
-                match = null;
-            }
-        }
-
-        if (match is null)
-        {
-            return false;
-        }
-
-        exerciseId = match.Value;
-        return true;
-    }
-
-    private static string Normalize(string value)
-    {
-        var chars = value.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray();
-        return new string(chars);
-    }
-
-    private static bool TryArray(JsonElement element, out List<JsonElement> items, params string[] names)
-    {
-        items = [];
-        var value = Property(element, names);
-        if (value is null || value.Value.ValueKind != JsonValueKind.Array)
-        {
-            return false;
-        }
-
-        items = value.Value.EnumerateArray().ToList();
-        return true;
-    }
-
-    private static string? Text(JsonElement element, params string[] names)
-    {
-        var value = Property(element, names);
-        if (value is null)
-        {
-            return null;
-        }
-
-        return value.Value.ValueKind switch
-        {
-            JsonValueKind.String => value.Value.GetString(),
-            JsonValueKind.Number => value.Value.GetRawText(),
-            _ => null,
-        };
-    }
-
-    private static int? Integer(JsonElement element, params string[] names)
-    {
-        var value = Property(element, names);
-        if (value is null)
-        {
-            return null;
-        }
-
-        if (value.Value.ValueKind == JsonValueKind.Number && value.Value.TryGetInt32(out var number))
-        {
-            return number;
-        }
-
-        return value.Value.ValueKind == JsonValueKind.String && int.TryParse(value.Value.GetString(), out var parsed) ? parsed : null;
-    }
-
-    private static bool Flag(JsonElement element, params string[] names)
-    {
-        var value = Property(element, names);
-        if (value is null)
-        {
-            return false;
-        }
-
-        if (value.Value.ValueKind is JsonValueKind.True)
-        {
-            return true;
-        }
-
-        return value.Value.ValueKind == JsonValueKind.String && bool.TryParse(value.Value.GetString(), out var flag) && flag;
-    }
-
-    private static JsonElement? Property(JsonElement element, params string[] names)
-    {
-        foreach (var property in element.EnumerateObject())
-        {
-            if (names.Any(name => property.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
-            {
-                return property.Value;
-            }
-        }
-
-        return null;
-    }
-
-    private static string? ExtractJson(string json)
-    {
-        var text = json.Trim();
-        const string finalChannel = "<|channel|>final<|message|>";
-        var channel = text.LastIndexOf(finalChannel, StringComparison.Ordinal);
-        if (channel >= 0)
-        {
-            text = text[(channel + finalChannel.Length)..].Trim();
-        }
-
-        if (!text.StartsWith('{'))
-        {
-            var start = text.IndexOf('{');
-            var end = text.LastIndexOf('}');
-            if (start < 0 || end <= start)
-            {
-                return null;
-            }
-
-            text = text[start..(end + 1)];
-        }
-
-        return text;
+            weight is null ? null : Math.Clamp(weight.Value, 0, 1000),
+            Math.Clamp(PlanJson.Integer(item, "restSeconds", "rest") ?? 60, 0, 600),
+            notes.Length == 0 ? null : notes[..Math.Min(notes.Length, 240)]);
     }
 }
 
 public sealed record GeneratedProgram(string Name, IReadOnlyList<GeneratedDay> Days);
 
-public sealed record GeneratedDay(int DayNumber, string Name, bool RestDay, IReadOnlyList<GeneratedExercise> Exercises);
+public sealed record GeneratedDay(int DayNumber, string Name, bool RestDay, IReadOnlyList<GeneratedExercise> Exercises, string? Description = null);
 
-public sealed record GeneratedExercise(Guid ExerciseId, int Sets, int? TargetReps, int? TargetDurationSeconds, int RestSeconds);
+public sealed record GeneratedExercise(Guid ExerciseId, int Sets, int? TargetReps, int? TargetDurationSeconds, decimal? TargetWeight, int RestSeconds, string? Notes);
