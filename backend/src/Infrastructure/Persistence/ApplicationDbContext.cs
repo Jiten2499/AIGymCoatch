@@ -214,6 +214,12 @@ public sealed class ApplicationDbContext : DbContext, IApplicationDbContext
 
     public DbSet<Notification> Notifications => Set<Notification>();
 
+    public DbSet<LifeFitAI.Domain.Platform.PushDevice> PushDevices => Set<LifeFitAI.Domain.Platform.PushDevice>();
+
+    public DbSet<LifeFitAI.Domain.Platform.PushDelivery> PushDeliveries => Set<LifeFitAI.Domain.Platform.PushDelivery>();
+
+    public DbSet<LifeFitAI.Domain.Platform.NotificationPreference> NotificationPreferences => Set<LifeFitAI.Domain.Platform.NotificationPreference>();
+
     public DbSet<LifeFitAI.Domain.Chat.ChatPermissionRule> ChatPermissionRules => Set<LifeFitAI.Domain.Chat.ChatPermissionRule>();
 
     public DbSet<LifeFitAI.Domain.Chat.ChatConversation> ChatConversations => Set<LifeFitAI.Domain.Chat.ChatConversation>();

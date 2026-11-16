@@ -37,7 +37,7 @@ public sealed record NutritionSummaryResponse(DateOnly Date, decimal Calories, d
 
 public sealed record ChallengeResponse(Guid Id, string Name, string? Description, ChallengeType ChallengeType, DateOnly StartDate, DateOnly EndDate, decimal TargetValue, ChallengeStatus Status, bool IsSystem, decimal? CurrentValue, DateTime? CompletedAt);
 
-public sealed record NotificationResponse(Guid Id, NotificationType Type, string Title, string Message, bool IsRead, DateTime CreatedAt);
+public sealed record NotificationResponse(Guid Id, NotificationType Type, string Title, string Message, bool IsRead, DateTime CreatedAt, string? ReferenceType = null, Guid? ReferenceId = null);
 
 public sealed record NotificationSummaryResponse(int UnreadCount, DateTime? LatestActivityAt, DateTime ServerTimeUtc);
 

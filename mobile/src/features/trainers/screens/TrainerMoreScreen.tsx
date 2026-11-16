@@ -18,7 +18,7 @@ import { useMyTrainerPhoto, useTrainerProfile } from '../api/workspace.queries';
 import { TrainerCard, useTrainerLayout } from '../ui';
 
 type Navigation = CompositeNavigationProp<BottomTabNavigationProp<TrainerTabParamList, 'More'>, NativeStackNavigationProp<AppStackParamList>>;
-type StackLink = 'TrainerAlerts' | 'MyTargets' | 'MyLeaves' | 'ApplyLeave' | 'Profile' | 'Settings' | 'Notifications' | 'Chats' | 'TrainerSchedule' | 'TrainerPerformance';
+type StackLink = 'TrainerAlerts' | 'MyTargets' | 'MyLeaves' | 'ApplyLeave' | 'Profile' | 'Settings' | 'Notifications' | 'TrainerSchedule' | 'TrainerPerformance';
 type MoreLink = { route: StackLink; label: string };
 
 export function TrainerMoreScreen() {
@@ -33,7 +33,6 @@ export function TrainerMoreScreen() {
   const [pending, setPending] = useState(false);
   const data = profile.data;
   const leaveEnabled = features.data?.[featureCodes.staffLeave] === true;
-  const chatEnabled = features.data?.[featureCodes.gymChat] === true;
   const links = useMemo((): MoreLink[] => {
     const items: MoreLink[] = [
       { route: 'Profile', label: t('nav.profile') },
@@ -47,12 +46,9 @@ export function TrainerMoreScreen() {
     if (leaveEnabled) {
       items.push({ route: 'MyLeaves', label: t('nav.myLeaves') }, { route: 'ApplyLeave', label: t('nav.applyLeave') });
     }
-    if (chatEnabled) {
-      items.push({ route: 'Chats', label: t('nav.chat') });
-    }
 
     return items;
-  }, [chatEnabled, leaveEnabled, t]);
+  }, [leaveEnabled, t]);
 
   return (
     <ScrollView

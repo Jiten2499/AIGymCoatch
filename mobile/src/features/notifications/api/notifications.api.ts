@@ -24,3 +24,23 @@ export async function markNotificationRead(id: string, signal?: AbortSignal): Pr
   const response = await apiClient.post<AppNotification>(`/notifications/${id}/read`, null, { signal });
   return response.data;
 }
+
+export type NotificationPreferences = {
+  chatEnabled: boolean;
+  workoutRemindersEnabled: boolean;
+  workoutUpdatesEnabled: boolean;
+  progressEnabled: boolean;
+  accountEnabled: boolean;
+  soundEnabled: boolean;
+  vibrationEnabled: boolean;
+};
+
+export async function getNotificationPreferences(signal?: AbortSignal): Promise<NotificationPreferences> {
+  const response = await apiClient.get<NotificationPreferences>('/notifications/preferences', { signal });
+  return response.data;
+}
+
+export async function updateNotificationPreferences(preferences: NotificationPreferences): Promise<NotificationPreferences> {
+  const response = await apiClient.put<NotificationPreferences>('/notifications/preferences', preferences);
+  return response.data;
+}

@@ -1,4 +1,5 @@
 import { apiClient } from './client';
+import { toApiError } from './problem';
 
 export async function imageDataUri(path: string, signal?: AbortSignal): Promise<string | null> {
   try {
@@ -9,7 +10,11 @@ export async function imageDataUri(path: string, signal?: AbortSignal): Promise<
       return null;
     }
     return `data:${type};base64,${encodeBase64(bytes)}`;
-  } catch {
+  } catch (error) {
+    const apiError = toApiError(error);
+    if (apiError.offline) {
+      throw apiError;
+    }
     return null;
   }
 }

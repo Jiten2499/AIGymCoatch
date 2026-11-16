@@ -48,8 +48,9 @@ public sealed class AiCommandHandler :
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDateTimeProvider _clock;
     private readonly IClientContext _client;
+    private readonly IChallengeRepository _challenges;
 
-    public AiCommandHandler(IOperationGuard guard, ICurrentActor actor, IAiProvider provider, IAiLimits limits, IAiSafetyService safety, IAiQuotaService quota, IAiContextBuilder context, IAiRepository ai, IFitnessRepository fitness, IWorkoutRepository workouts, ITenantRepository tenants, IAuditLogRepository audit, IUnitOfWork unitOfWork, IDateTimeProvider clock, IClientContext client)
+    public AiCommandHandler(IOperationGuard guard, ICurrentActor actor, IAiProvider provider, IAiLimits limits, IAiSafetyService safety, IAiQuotaService quota, IAiContextBuilder context, IAiRepository ai, IFitnessRepository fitness, IWorkoutRepository workouts, ITenantRepository tenants, IAuditLogRepository audit, IUnitOfWork unitOfWork, IDateTimeProvider clock, IClientContext client, IChallengeRepository challenges)
     {
         _guard = guard;
         _actor = actor;
@@ -66,6 +67,7 @@ public sealed class AiCommandHandler :
         _unitOfWork = unitOfWork;
         _clock = clock;
         _client = client;
+        _challenges = challenges;
     }
 
     public Task<Result<AiChatResponse>> Handle(CoachChatCommand request, CancellationToken cancellationToken) =>
@@ -78,7 +80,7 @@ public sealed class AiCommandHandler :
         Chat(PermissionCodes.AiUse, FeatureCodes.AiProgressInsights, AiRequestType.ProgressInsight, "Summarize my recent training consistency.", null, FitnessPrompts.Progress, false, cancellationToken);
 
     public Task<Result<ProgramResponse>> Handle(GenerateWorkoutCommand request, CancellationToken cancellationToken) =>
-        WorkoutMonthGeneration.Create(_guard, _actor, _provider, _limits, _safety, _quota, _ai, _fitness, _workouts, _tenants, _unitOfWork, _clock, request, cancellationToken);
+        WorkoutMonthGeneration.Create(_guard, _actor, _provider, _limits, _safety, _quota, _ai, _fitness, _workouts, _tenants, _unitOfWork, _clock, _challenges, request, cancellationToken);
 
     private async Task<Result<AiChatResponse>> Chat(string permission, string feature, AiRequestType type, string message, Guid? conversationId, Func<AiUserContext, string> prompt, bool nutritionDisclaimer, CancellationToken cancellationToken)
     {

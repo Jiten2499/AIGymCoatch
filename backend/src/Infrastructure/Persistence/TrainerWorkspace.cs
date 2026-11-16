@@ -1,4 +1,5 @@
 using LifeFitAI.Application.Gym.Trainers;
+using LifeFitAI.Domain.Fitness;
 using LifeFitAI.Domain.Gym;
 using LifeFitAI.Domain.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -160,6 +161,13 @@ public sealed partial class TrainerWorkspace : ITrainerWorkspace
 
         var opened = TrainerMemberAssignment.Start(Guid.NewGuid(), tenantId, next, memberId, start, assignedBy);
         _db.TrainerMemberAssignments.Add(opened);
+        if (member?.UserId is Guid memberUserId)
+        {
+            var notice = Notification.Create(Guid.NewGuid(), memberUserId, tenantId, NotificationType.TrainerAssigned, "Trainer assigned", "A trainer was assigned to your membership.", DateTime.UtcNow);
+            notice.Bind("TrainerProfile", next, $"trainer.assigned:{opened.Id:D}");
+            _db.Notifications.Add(notice);
+        }
+
         return opened;
     }
 

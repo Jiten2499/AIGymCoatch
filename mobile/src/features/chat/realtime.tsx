@@ -3,8 +3,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
 import { acceptCircularEvent, refreshCircularQueries, type CircularPublishedEvent } from '../communications/realtime';
-import { tenantKey } from '../fitness/api/keys';
 import { useSessionStore } from '../../store/sessionStore';
+import { invalidateChatLists } from './api/queries';
 import { chatHubUrl } from './api/chat.api';
 
 const RealtimeContext = createContext<HubConnection | null>(null);
@@ -30,6 +30,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       const current = useSessionStore.getState().currentTenant?.id ?? '';
       if (current) {
         refreshCircularQueries(client, current);
+        invalidateChatLists(client, current);
       }
     };
     const onPublished = (event: CircularPublishedEvent) => {
@@ -39,6 +40,9 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       }
     };
     hub.on('CircularPublished', onPublished);
+    hub.on('MessageReceived', refresh);
+    hub.on('MessageRead', refresh);
+    hub.on('ConversationUpdated', refresh);
     hub.onreconnected(refresh);
     const appState = AppState.addEventListener('change', (status) => {
       if (status === 'active') {
@@ -46,7 +50,17 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       }
     });
     let stopped = false;
-    void hub.start().then(() => {
+    let started = false;
+    const start = new Promise<void>((resolve) => {
+      setTimeout(resolve, 800);
+    }).then(() => {
+      if (stopped) {
+        return undefined;
+      }
+      started = true;
+      return hub.start();
+    });
+    void start.then(() => {
       if (!stopped) {
         setConnection(hub);
       }
@@ -56,7 +70,15 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       stopped = true;
       appState.remove();
       hub.off('CircularPublished', onPublished);
-      void hub.stop();
+      hub.off('MessageReceived', refresh);
+      hub.off('MessageRead', refresh);
+      hub.off('ConversationUpdated', refresh);
+      void start.then(() => {
+        if (started) {
+          return hub.stop();
+        }
+        return undefined;
+      }).catch(() => undefined);
       setConnection(null);
     };
   }, [client, tenantId, token]);
@@ -77,10 +99,7 @@ export function useChatRealtime(conversationId?: string, onTyping?: (name: strin
     }
 
     const refresh = () => {
-      void client.invalidateQueries({ queryKey: tenantKey(tenantId, 'chat-inbox') });
-      if (conversationId) {
-        void client.invalidateQueries({ queryKey: tenantKey(tenantId, 'chat-messages', conversationId) });
-      }
+      invalidateChatLists(client, tenantId, conversationId);
     };
     const onStarted = () => typingRef.current?.('typing');
     const onStopped = () => typingRef.current?.(null);

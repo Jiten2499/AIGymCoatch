@@ -61,6 +61,7 @@ public sealed class TrainerMemberProgramHandlers :
     private readonly IUnitOfWork _unitOfWork;
     private readonly IDateTimeProvider _clock;
     private readonly IClientContext _client;
+    private readonly IChallengeRepository _notifications;
 
     public TrainerMemberProgramHandlers(
         ICurrentActor actor,
@@ -70,7 +71,8 @@ public sealed class TrainerMemberProgramHandlers :
         IAuditLogRepository audit,
         IUnitOfWork unitOfWork,
         IDateTimeProvider clock,
-        IClientContext client)
+        IClientContext client,
+        IChallengeRepository notifications)
     {
         _actor = actor;
         _store = store;
@@ -80,6 +82,7 @@ public sealed class TrainerMemberProgramHandlers :
         _unitOfWork = unitOfWork;
         _clock = clock;
         _client = client;
+        _notifications = notifications;
     }
 
     public async Task<Result<PageResult<ProgramResponse>>> Handle(ListMemberProgramsQuery request, CancellationToken cancellationToken)
@@ -127,6 +130,7 @@ public sealed class TrainerMemberProgramHandlers :
             await _workouts.AddProgramAsync(program, token).ConfigureAwait(false);
             await _unitOfWork.SaveChangesAsync(token).ConfigureAwait(false);
             await WriteDays(program.Id, request.Days, token).ConfigureAwait(false);
+            await NotifyPlan(member.Value.TenantId, member.Value.UserId, program.Id, false, token).ConfigureAwait(false);
             await Audit("MemberProgramCreated", program.Id, request.MemberId, token).ConfigureAwait(false);
             await _unitOfWork.SaveChangesAsync(token).ConfigureAwait(false);
             created = await _workouts.GetProgramAsync(member.Value.TenantId, member.Value.UserId, program.Id, token).ConfigureAwait(false);
@@ -162,6 +166,7 @@ public sealed class TrainerMemberProgramHandlers :
             await _workouts.ReplaceProgramDaysAsync(entity.Id, _clock.UtcNow, token).ConfigureAwait(false);
             await _unitOfWork.SaveChangesAsync(token).ConfigureAwait(false);
             await WriteDays(entity.Id, request.Days, token).ConfigureAwait(false);
+            await NotifyPlan(member.Value.TenantId, member.Value.UserId, entity.Id, true, token).ConfigureAwait(false);
             await Audit("MemberProgramUpdated", entity.Id, request.MemberId, token).ConfigureAwait(false);
             await _unitOfWork.SaveChangesAsync(token).ConfigureAwait(false);
             updated = await _workouts.GetProgramAsync(member.Value.TenantId, member.Value.UserId, entity.Id, token).ConfigureAwait(false);
@@ -260,6 +265,13 @@ public sealed class TrainerMemberProgramHandlers :
         }
 
         return Result.Success(new TrainerProgramScope(tenantId, trainer.Id));
+    }
+
+    private Task NotifyPlan(Guid tenantId, Guid userId, Guid programId, bool updated, CancellationToken cancellationToken)
+    {
+        var notice = Notification.Create(Guid.NewGuid(), userId, tenantId, NotificationType.WorkoutPlanUpdated, updated ? "Workout plan updated" : "Workout plan ready", updated ? "Your workout plan was updated." : "A trainer published a workout plan.", _clock.UtcNow);
+        notice.Bind("WorkoutProgram", programId, $"workout.plan.updated:{programId:D}:{_clock.UtcNow.Ticks}");
+        return _notifications.AddNotificationAsync(notice, cancellationToken);
     }
 
     private Task Audit(string action, Guid programId, Guid memberId, CancellationToken cancellationToken) =>

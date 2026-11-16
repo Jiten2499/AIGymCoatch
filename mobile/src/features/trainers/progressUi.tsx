@@ -51,6 +51,22 @@ export function MetricCard({ label, value, detail }: { label: string; value: str
   );
 }
 
+export function CompactChoice({ options, value, onChange }: { options: { id: string; label: string }[]; value: string; onChange: (id: string) => void }) {
+  const theme = useTheme();
+  return (
+    <View style={{ alignSelf: 'flex-start', backgroundColor: theme.colors.surfaceMuted, borderRadius: theme.radius.pill, flexDirection: 'row', padding: 3 }}>
+      {options.map((option) => {
+        const selected = option.id === value;
+        return (
+          <Pressable accessibilityRole="button" accessibilityState={{ selected }} key={option.id} onPress={() => onChange(option.id)} style={{ alignItems: 'center', backgroundColor: selected ? theme.colors.accent : 'transparent', borderRadius: theme.radius.pill, justifyContent: 'center', minHeight: 32, paddingHorizontal: theme.spacing.md }}>
+            <AppText style={{ color: selected ? theme.colors.onAccent : theme.colors.text }} variant="label">{option.label}</AppText>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 export function Segmented({ options, value, onChange }: { options: { id: string; label: string }[]; value: string; onChange: (id: string) => void }) {
   const theme = useTheme();
   return (

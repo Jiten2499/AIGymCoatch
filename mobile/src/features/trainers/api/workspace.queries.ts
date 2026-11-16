@@ -82,7 +82,6 @@ export function useMyTrainerPhoto(enabled = true) {
   return useQuery({
     queryKey: ['trainer-self-photo', tenantId],
     enabled: enabled && tenantId.length > 0,
-    retry: false,
     queryFn: ({ signal }) => imageDataUri('/trainers/me/profile-photo', signal),
   });
 }

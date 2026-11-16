@@ -66,7 +66,17 @@
     "languageFallback": "Hindi and Nepali use English until those translations are reviewed.",
     "account": "Account",
     "preferencesLocal": "Appearance, accent, and language stay on this device.",
-    "notificationsDeferred": "Notification delivery preferences are not available yet."
+    "notificationsDeferred": "Notification delivery follows these preferences and the phone permission.",
+    "notifications": "Notifications",
+    "notificationsLoading": "Loading notification preferences.",
+    "notificationsBlocked": "Phone notifications are off. GrowFit will deliver alerts after you allow them in system settings.",
+    "chatEnabled": "Chat notifications",
+    "workoutRemindersEnabled": "Workout reminders",
+    "workoutUpdatesEnabled": "Workout plan updates",
+    "progressEnabled": "Progress notifications",
+    "accountEnabled": "Account notifications",
+    "soundEnabled": "Sound",
+    "vibrationEnabled": "Vibration"
   },
   "workspace": {
     "current": "Current workspace",

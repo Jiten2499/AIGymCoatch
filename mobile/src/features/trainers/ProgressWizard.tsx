@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Image, Pressable, View } from 'react-native';
+import { Image, Pressable, ScrollView, View } from 'react-native';
 import { FormField } from '../../components/forms/FormField';
 import { AppText } from '../../components/ui/AppText';
 import { AppTextInput } from '../../components/ui/AppTextInput';
@@ -12,7 +12,7 @@ import { pickProgressPhotos, progressPhotoMax } from './progressPhotos';
 import { ProgressPhotoView } from './ProgressPhotoView';
 import { convertLength, formatProgressDate, lengthToCentimetres, trimNumber, type LengthUnit } from './progressSeries';
 import { dayKey } from './ui';
-import { ProgressButton, ProgressPanel, ScoreSlider, StepIndicator } from './progressUi';
+import { CompactChoice, ProgressButton, ProgressPanel, ScoreSlider, StepIndicator } from './progressUi';
 
 type LengthKey = 'height' | 'waist' | 'chest' | 'hip' | 'arm' | 'rightArm' | 'thigh' | 'rightThigh';
 type ScoreKey = 'strength' | 'endurance' | 'flexibility' | 'core';
@@ -140,21 +140,23 @@ export function ProgressWizard({ memberId, assessmentId, existing, onDone, onCan
   };
 
   const addPhotos = async (source: 'camera' | 'library') => {
-    if (!consent) {
-      setError(t('trainer.consentOff'));
-      return;
-    }
     const picked = await pickProgressPhotos(source, slots);
     const problem = picked.find((item) => 'error' in item);
     if (problem && 'error' in problem) {
       setError(t(problem.error === 'size' ? 'trainer.photoSize' : problem.error === 'type' ? 'trainer.photoType' : 'trainer.photoPermission'));
     }
-    setDrafts((current) => [...current, ...picked.flatMap((item) => ('uri' in item ? [{ key: `${item.fileName}-${item.uri}`, uri: item.uri, mimeType: item.mimeType, fileName: item.fileName }] : []))]);
+    const added = picked.flatMap((item) => ('uri' in item ? [{ key: `${item.fileName}-${item.uri}`, uri: item.uri, mimeType: item.mimeType, fileName: item.fileName }] : []));
+    if (added.length > 0) {
+      setConsent(true);
+      setError(null);
+    }
+    setDrafts((current) => [...current, ...added]);
   };
 
   return (
-    <View style={{ gap: theme.spacing.lg }}>
+    <View style={{ flex: 1, gap: theme.spacing.lg }}>
       <StepIndicator labels={labels} onStep={(next) => { if (next < step || validateMeasures()) setStep(next); }} step={step} />
+      <ScrollView keyboardShouldPersistTaps="handled" style={{ flex: 1 }} contentContainerStyle={{ gap: theme.spacing.lg, paddingBottom: theme.spacing.xl }}>
       {step === 0 ? <Measurements date={date} lengths={lengths} unit={unit} weight={weight} onDate={setDate} onLength={(key, value) => setLengths((current) => ({ ...current, [key]: value }))} onUnit={changeUnit} onWeight={setWeight} /> : null}
       {step === 1 ? (
         <View style={{ gap: theme.spacing.lg }}>
@@ -170,13 +172,16 @@ export function ProgressWizard({ memberId, assessmentId, existing, onDone, onCan
       ) : null}
       {step === 2 ? (
         <View style={{ gap: theme.spacing.md }}>
-          <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: consent }} onPress={() => setConsent((value) => !value)}>
-            <AppText>{consent ? t('trainer.consentOn') : t('trainer.consentOff')}</AppText>
+          <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: consent }} onPress={() => setConsent((value) => !value)} style={{ alignItems: 'center', flexDirection: 'row', gap: theme.spacing.sm }}>
+            <View style={{ alignItems: 'center', borderColor: theme.colors.accent, borderRadius: 4, borderWidth: 2, height: 22, justifyContent: 'center', width: 22 }}>
+              {consent ? <AppText variant="label">✓</AppText> : null}
+            </View>
+            <AppText style={{ flex: 1 }}>{consent ? t('trainer.consentOn') : t('trainer.consentOff')}</AppText>
           </Pressable>
           <AppText tone="muted">{t('trainer.photoConsentNote')}</AppText>
           <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
-            <ProgressButton disabled={!consent || slots <= 0} label={t('trainer.takePhoto')} onPress={() => { void addPhotos('camera'); }} variant="secondary" />
-            <ProgressButton disabled={!consent || slots <= 0} label={t('trainer.choosePhoto')} onPress={() => { void addPhotos('library'); }} variant="secondary" />
+            <ProgressButton disabled={slots <= 0} label={t('trainer.takePhoto')} onPress={() => { void addPhotos('camera'); }} variant="secondary" />
+            <ProgressButton disabled={slots <= 0} label={t('trainer.choosePhoto')} onPress={() => { void addPhotos('library'); }} variant="secondary" />
           </View>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
             {assessmentId ? existingPhotos.map((photoId) => (
@@ -213,6 +218,7 @@ export function ProgressWizard({ memberId, assessmentId, existing, onDone, onCan
       {error ? <AppText accessibilityRole="alert" tone="danger">{error}</AppText> : null}
       {save.isError ? <AppText accessibilityRole="alert" tone="danger">{t('common.errorTitle')}</AppText> : null}
       {save.isPending ? <AppText tone="muted">{t('trainer.uploading')}</AppText> : null}
+      </ScrollView>
       <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
         <ProgressButton label={t('trainer.back')} onPress={() => { if (step === 0) onCancel(); else setStep((value) => value - 1); }} variant="secondary" />
         {step < 3 ? <ProgressButton label={t(step === 0 ? 'trainer.nextAssessments' : step === 1 ? 'trainer.nextPhotos' : 'trainer.nextReview')} onPress={() => { if (step > 0 || validateMeasures()) setStep((value) => value + 1); }} /> : <ProgressButton label={t('trainer.saveProgress')} loading={save.isPending} onPress={submit} />}
@@ -237,13 +243,12 @@ function Measurements({ date, weight, lengths, unit, onDate, onWeight, onLength,
         <View style={{ flex: 1 }}><Field label={`${t('trainer.weight')} (kg)`} onChange={onWeight} value={weight} /></View>
         <View style={{ flex: 1 }}><Field label={`${t('trainer.height')} (${unit})`} onChange={(value) => onLength('height', value)} value={lengths.height} /></View>
       </View>
-      <View style={{ alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' }}>
-        <AppText variant="title">{t('trainer.bodyMeasurements')}</AppText>
-        <View style={{ flexDirection: 'row', gap: theme.spacing.xs }}>
-          <ProgressButton label={t('trainer.centimetres')} onPress={() => onUnit('cm')} variant={unit === 'cm' ? 'primary' : 'secondary'} />
-          <ProgressButton label={t('trainer.inches')} onPress={() => onUnit('in')} variant={unit === 'in' ? 'primary' : 'secondary'} />
-        </View>
-      </View>
+      <AppText variant="title">{t('trainer.bodyMeasurements')}</AppText>
+      <CompactChoice
+        onChange={(id) => { if (id === 'cm' || id === 'in') onUnit(id); }}
+        options={[{ id: 'cm', label: t('trainer.centimetres') }, { id: 'in', label: t('trainer.inches') }]}
+        value={unit}
+      />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
         {fields.map((field) => (
           <View key={field.key} style={{ width: '48%' }}>

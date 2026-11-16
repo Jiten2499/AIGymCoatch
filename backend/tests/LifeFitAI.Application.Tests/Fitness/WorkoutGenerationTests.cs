@@ -149,7 +149,7 @@ public sealed class WorkoutGenerationTests
         ai.AddUsageAsync(Arg.Any<AiUsageRecord>(), Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
         var clock = Substitute.For<IDateTimeProvider>();
         clock.UtcNow.Returns(_now);
-        return new AiCommandHandler(guard, actor, provider, limits, new AiSafetyService(), quota, Substitute.For<IAiContextBuilder>(), ai, fitness, workouts, tenants, Substitute.For<IAuditLogRepository>(), unit, clock, Substitute.For<IClientContext>());
+        return new AiCommandHandler(guard, actor, provider, limits, new AiSafetyService(), quota, Substitute.For<IAiContextBuilder>(), ai, fitness, workouts, tenants, Substitute.For<IAuditLogRepository>(), unit, clock, Substitute.For<IClientContext>(), Substitute.For<IChallengeRepository>());
     }
 
     private IFitnessRepository FitnessWith(FitnessAssessment assessment)

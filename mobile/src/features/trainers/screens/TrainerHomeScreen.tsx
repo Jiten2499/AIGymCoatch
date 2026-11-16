@@ -4,6 +4,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NotificationBellButton } from '../../../app/navigation/NotificationBellButton';
 import type { AppStackParamList, TrainerTabParamList } from '../../../app/navigation/types';
 import { useTheme } from '../../../app/providers/ThemeProvider';
@@ -22,7 +23,8 @@ type Navigation = CompositeNavigationProp<BottomTabNavigationProp<TrainerTabPara
 export function TrainerHomeScreen() {
   const theme = useTheme();
   const { t } = useTranslation();
-  const layout = useTrainerLayout({ topInset: true });
+  const layout = useTrainerLayout();
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation<Navigation>();
   const user = useSessionStore((state) => state.user);
   const photo = useMyProfilePhoto();
@@ -33,8 +35,8 @@ export function TrainerHomeScreen() {
 
   return (
     <ScreenState error={home.isError ? errorText(home.error, t('common.offline')) : null} loading={home.isLoading} onRetry={() => void home.refetch()}>
-      <ScrollView contentContainerStyle={layout.content} refreshControl={<RefreshControl onRefresh={() => void home.refetch()} refreshing={home.isRefetching} tintColor={layout.refresh} />}>
-        <View style={{ alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' }}>
+      <View style={{ backgroundColor: theme.colors.background, flex: 1 }}>
+        <View style={{ alignItems: 'center', backgroundColor: theme.colors.background, flexDirection: 'row', justifyContent: 'space-between', paddingBottom: theme.spacing.md, paddingHorizontal: theme.spacing.xl, paddingTop: insets.top + theme.spacing.md }}>
           <View>
             <AppText tone="accent" variant="title">Growfit</AppText>
             <AppText tone="muted" variant="caption">{t('trainer.roleLabel')}</AppText>
@@ -44,6 +46,7 @@ export function TrainerHomeScreen() {
             <AppAvatar label={`${user?.firstName ?? ''} ${user?.lastName ?? ''}`} size={40} uri={avatar} />
           </View>
         </View>
+        <ScrollView contentContainerStyle={layout.content} refreshControl={<RefreshControl onRefresh={() => void home.refetch()} refreshing={home.isRefetching} tintColor={layout.refresh} />} style={{ flex: 1 }}>
         <View style={{ alignItems: 'center', flexDirection: 'row', gap: 12 }}>
           <AppAvatar label={name} size={72} uri={avatar} />
           <View style={{ flex: 1, gap: 4 }}>
@@ -66,7 +69,8 @@ export function TrainerHomeScreen() {
           <QuickAction icon="dumbbell" label={t('trainer.library')} onPress={() => navigation.navigate('TrainerExerciseLibrary', {})} />
           <QuickAction icon="clipboard" label={t('trainer.plans')} onPress={() => navigation.navigate('Plans')} />
         </View>
-      </ScrollView>
+        </ScrollView>
+      </View>
     </ScreenState>
   );
 }

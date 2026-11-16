@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { apiClient } from '../../services/api/client';
+import { imageDataUri } from '../../services/api/image';
 import { useSessionStore } from '../../store/sessionStore';
 import type { UserProfile } from '../../types/api';
 
@@ -15,7 +16,6 @@ export function useMyProfilePhoto() {
   return useQuery({
     queryKey: profilePhotoKey,
     enabled: hasPhoto,
-    retry: false,
     queryFn: ({ signal }) => loadMyProfilePhoto(signal),
   });
 }
@@ -89,19 +89,8 @@ async function removeMyProfilePhoto() {
   return response.data;
 }
 
-async function loadMyProfilePhoto(signal?: AbortSignal): Promise<string | null> {
-  try {
-    const response = await apiClient.get<ArrayBuffer>('/users/me/photo', { responseType: 'arraybuffer', signal });
-    const bytes = new Uint8Array(response.data);
-    let binary = '';
-    bytes.forEach((value) => {
-      binary += String.fromCharCode(value);
-    });
-    const type = String(response.headers['content-type'] ?? 'image/jpeg');
-    return `data:${type};base64,${globalThis.btoa(binary)}`;
-  } catch {
-    return null;
-  }
+function loadMyProfilePhoto(signal?: AbortSignal): Promise<string | null> {
+  return imageDataUri('/users/me/photo', signal);
 }
 
 function remember(hasPhoto: boolean) {

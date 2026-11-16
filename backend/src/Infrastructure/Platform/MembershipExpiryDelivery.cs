@@ -34,6 +34,7 @@ public static class MembershipExpiryDelivery
         }
 
         var notification = Notification.Create(Guid.NewGuid(), payload.UserId, payload.TenantId, NotificationType.MembershipReminder, payload.Title, payload.Message, utcNow);
+        notification.Bind("GymMembership", payload.MembershipId, $"membership.expiry:{payload.MembershipId:D}:{payload.ReminderType}");
         services.GetRequiredService<ApplicationDbContext>().Notifications.Add(notification);
         message.MarkDispatched(JsonSerializer.Serialize(payload with { NotificationId = notification.Id }), utcNow);
     }

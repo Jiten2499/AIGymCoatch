@@ -1,7 +1,7 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { tenantKey } from '../../fitness/api/keys';
 import { useTenantId } from '../../fitness/api/queries';
-import { listChatInbox, listChatMessages, markChatRead, openChat, searchChatRecipients, sendChatAttachment, sendChatMessage } from './chat.api';
+import { getChatSummary, listChatInbox, listChatMessages, markChatRead, openChat, searchChatRecipients, sendChatAttachment, sendChatMessage } from './chat.api';
 
 export function chatInboxKey(tenantId: string, filter: string, term: string) {
   return tenantKey(tenantId, 'chat-inbox', filter, term);
@@ -9,6 +9,27 @@ export function chatInboxKey(tenantId: string, filter: string, term: string) {
 
 export function chatMessagesKey(tenantId: string, conversationId: string) {
   return tenantKey(tenantId, 'chat-messages', conversationId);
+}
+
+export function chatSummaryKey(tenantId: string) {
+  return tenantKey(tenantId, 'chat-summary');
+}
+
+export function invalidateChatLists(client: QueryClient, tenantId: string, conversationId?: string): void {
+  void client.invalidateQueries({ queryKey: chatSummaryKey(tenantId) });
+  void client.invalidateQueries({ queryKey: tenantKey(tenantId, 'chat-inbox') });
+  if (conversationId) {
+    void client.invalidateQueries({ queryKey: chatMessagesKey(tenantId, conversationId) });
+  }
+}
+
+export function useChatSummary(enabled = true) {
+  const tenantId = useTenantId();
+  return useQuery({
+    queryKey: chatSummaryKey(tenantId),
+    enabled: Boolean(tenantId) && enabled,
+    queryFn: ({ signal }) => getChatSummary(signal),
+  });
 }
 
 export function useChatInbox(filter: string, term: string, enabled = true) {
@@ -44,7 +65,7 @@ export function useOpenChat() {
   return useMutation({
     mutationFn: (recipientUserId: string) => openChat(recipientUserId),
     onSuccess: async () => {
-      await client.invalidateQueries({ queryKey: tenantKey(tenantId, 'chat-inbox') });
+      invalidateChatLists(client, tenantId);
     },
   });
 }
@@ -55,8 +76,7 @@ export function useSendChatMessage(conversationId: string) {
   return useMutation({
     mutationFn: (body: string) => sendChatMessage(conversationId, body, `${Date.now()}-${conversationId}`),
     onSuccess: async () => {
-      await client.invalidateQueries({ queryKey: chatMessagesKey(tenantId, conversationId) });
-      await client.invalidateQueries({ queryKey: tenantKey(tenantId, 'chat-inbox') });
+      invalidateChatLists(client, tenantId, conversationId);
     },
   });
 }
@@ -68,8 +88,7 @@ export function useSendChatAttachment(conversationId: string) {
     mutationFn: (file: { uri: string; fileName: string; contentType: string }) =>
       sendChatAttachment(conversationId, file.uri, file.fileName, file.contentType, `${Date.now()}-file-${conversationId}`),
     onSuccess: async () => {
-      await client.invalidateQueries({ queryKey: chatMessagesKey(tenantId, conversationId) });
-      await client.invalidateQueries({ queryKey: tenantKey(tenantId, 'chat-inbox') });
+      invalidateChatLists(client, tenantId, conversationId);
     },
   });
 }
@@ -80,8 +99,7 @@ export function useMarkChatRead(conversationId: string) {
   return useMutation({
     mutationFn: (messageId: string) => markChatRead(conversationId, messageId),
     onSuccess: async () => {
-      await client.invalidateQueries({ queryKey: tenantKey(tenantId, 'chat-inbox') });
-      await client.invalidateQueries({ queryKey: chatMessagesKey(tenantId, conversationId) });
+      invalidateChatLists(client, tenantId, conversationId);
     },
   });
 }

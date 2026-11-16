@@ -304,4 +304,12 @@ Replacement production build:
 - `versionCode`: **11**
 - Logs: https://expo.dev/accounts/growfit24/projects/growfit/builds/7b00a525-12b8-4fa1-a01a-a3b5ca315733
 
-Upload the store images from `store/play/` in Play Console; they are not inside the AAB. Do not submit this build to production until you approve it. The submit profile stays on the internal track as a draft.
+Current production build, including the trainer loading fix (retry a dropped connection and refetch without using recent apps):
+
+- Build id: `e4ad5541-bff9-498d-87ee-e508d69d2343`
+- `versionCode`: **12**
+- Finished: 2026-11-16 16:56 IST
+- Artifact: https://expo.dev/artifacts/eas/tHH2rBkPKrApTvuPsdrPj2YbcuZB5b-1E4B8hxu_Lng.aab
+- Logs: https://expo.dev/accounts/growfit24/projects/growfit/builds/e4ad5541-bff9-498d-87ee-e508d69d2343
+
+Upload the store images from `store/play/` in Play Console; they are not inside the AAB. This AAB was not submitted. The submit profile stays on the internal track as a draft.

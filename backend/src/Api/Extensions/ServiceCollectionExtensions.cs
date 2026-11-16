@@ -200,6 +200,7 @@ public static class ServiceCollectionExtensions
             options.AddPolicy("auth", http => RateLimitPartition.GetFixedWindowLimiter("auth:" + Partition(http), _ => Window(limits.AuthPermitLimit, limits.AuthWindowSeconds)));
             options.AddPolicy("ai", http => RateLimitPartition.GetFixedWindowLimiter("ai:" + Partition(http), _ => Window(limits.AiPermitLimit, limits.AiWindowSeconds)));
             options.AddPolicy("checkin", http => RateLimitPartition.GetFixedWindowLimiter("checkin:" + Partition(http), _ => Window(limits.CheckInPermitLimit, limits.CheckInWindowSeconds)));
+            options.AddPolicy("push", http => RateLimitPartition.GetFixedWindowLimiter("push:" + Partition(http), _ => Window(30, 60)));
         });
     }
 

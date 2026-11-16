@@ -8,6 +8,7 @@ export type TrainerIconName =
   | 'sliders'
   | 'dumbbell'
   | 'clipboard'
+  | 'chat'
   | 'pencil'
   | 'plus'
   | 'trash'
@@ -40,6 +41,7 @@ export function TrainerIcon({ name, color, size = 22 }: IconProps) {
       {name === 'sliders' ? <Path {...common} d="M4 7h16M4 17h16M8 7v4M16 13v4" /> : null}
       {name === 'dumbbell' ? <Path {...common} d="M6 8v8M18 8v8M4 10v4M20 10v4M6 12h12" /> : null}
       {name === 'clipboard' ? <Path {...common} d="M9 4h6a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1M8 6H6v14h12V6h-2M9 12h6M9 16h4" /> : null}
+      {name === 'chat' ? <Path {...common} d="M5 6h14a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H9l-4 3v-3H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1z" /> : null}
       {name === 'pencil' ? <Path {...common} d="M12 20h8M16.5 3.5a2 2 0 0 1 3 3L8 18l-4 1 1-4z" /> : null}
       {name === 'plus' ? <Path {...common} d="M12 5v14M5 12h14" /> : null}
       {name === 'trash' ? <Path {...common} d="M4 7h16M9 7V5h6v2M8 7l1 12h6l1-12" /> : null}

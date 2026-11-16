@@ -1,4 +1,4 @@
-export const notificationTypes = ['WorkoutReminder', 'MembershipReminder', 'ChallengeReminder', 'AiRecommendation', 'WorkoutCompleted'] as const;
+export const notificationTypes = ['WorkoutReminder', 'MembershipReminder', 'ChallengeReminder', 'AiRecommendation', 'WorkoutCompleted', 'StaffLeaveUpdate', 'ChatMessage', 'WorkoutPlanUpdated', 'TrainerAssigned', 'ProgressMilestone'] as const;
 
 export type NotificationType = (typeof notificationTypes)[number];
 

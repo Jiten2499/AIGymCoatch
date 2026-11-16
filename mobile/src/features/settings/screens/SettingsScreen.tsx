@@ -5,6 +5,7 @@ import { useTheme } from '../../../app/providers/ThemeProvider';
 import { AppButton } from '../../../components/ui/AppButton';
 import { AppCard } from '../../../components/ui/AppCard';
 import { AppText } from '../../../components/ui/AppText';
+import { NotificationPreferencesCard } from '../NotificationPreferences';
 import { endSession } from '../../../services/auth/session';
 import { supportedLocales, type LocaleId } from '../../../services/localization/i18n';
 import { usePreferencesStore } from '../../../store/preferencesStore';
@@ -57,7 +58,7 @@ export function SettingsScreen() {
       <AppCard>
         <AppText variant="title">{t('settings.account')}</AppText>
         <AppText tone="muted">{t('settings.preferencesLocal')}</AppText>
-        <AppText tone="muted">{t('settings.notificationsDeferred')}</AppText>
+        <NotificationPreferencesCard />
         <AppButton label={t('profile.logout')} loading={signingOut} onPress={() => { setSigningOut(true); void endSession(); }} />
       </AppCard>
     </ScrollView>

@@ -212,7 +212,8 @@ public sealed class TrainerMemberProgramTests
             new AuditLogRepository(db),
             new Unit(db),
             clock,
-            client);
+            client,
+            new ChallengeRepository(db));
         return new Harness(handlers, member.Id);
     }
 

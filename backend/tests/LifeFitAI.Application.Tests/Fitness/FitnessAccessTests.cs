@@ -265,7 +265,7 @@ public sealed class FitnessAccessTests
             tenantStore.GetAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(Tenant.Create(_tenantId, "Ada Personal", TenantType.Platform));
         }
 
-        return new AiCommandHandler(guard, Actor(), provider, limits, new AiSafetyService(), quota, context, ai, fitness, workouts ?? Substitute.For<IWorkoutRepository>(), tenantStore, Substitute.For<IAuditLogRepository>(), Substitute.For<IUnitOfWork>(), Clock(), Substitute.For<IClientContext>());
+        return new AiCommandHandler(guard, Actor(), provider, limits, new AiSafetyService(), quota, context, ai, fitness, workouts ?? Substitute.For<IWorkoutRepository>(), tenantStore, Substitute.For<IAuditLogRepository>(), Substitute.For<IUnitOfWork>(), Clock(), Substitute.For<IClientContext>(), Substitute.For<IChallengeRepository>());
     }
 
     private static DashboardResponse EmptyDashboard() =>

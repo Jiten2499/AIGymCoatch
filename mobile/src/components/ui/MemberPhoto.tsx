@@ -6,7 +6,6 @@ export function MemberPhoto({ label, path, size }: { label: string; path: string
   const photo = useQuery({
     queryKey: ['auth-image', path],
     enabled: Boolean(path),
-    retry: false,
     queryFn: ({ signal }) => imageDataUri(path ?? '', signal),
   });
   return <AppAvatar label={label} size={size} uri={photo.data} />;

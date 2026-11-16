@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0081" author="lifefit-architecture">
+        <comment>
+            Ticket: LF-0081. Device tokens, delivery receipts, and notification preferences for Expo push.
+            Existing app.Notifications stays the history record. Index review: PK_PushDevices; UX_PushDevices_User_Installation
+            so one installation updates in place; UX_PushDevices_ActiveToken so a live token belongs to one account;
+            IX_PushDevices_User_Tenant_Active for recipient lookup; PK_PushDeliveries; UX_PushDeliveries_Notification_Device
+            to stop duplicate sends; IX_PushDeliveries_Status_UpdatedAt for receipt polling; PK_NotificationPreferences;
+            UX_Notifications_Dedup for one history row per event. Performance note: dispatch reads active devices for one user
+            and a small page of accepted tickets.
+        </comment>
+        <sql><![CDATA[
+            SET QUOTED_IDENTIFIER ON;
+            IF COL_LENGTH(N'app.Notifications', N'DedupKey') IS NULL
+                ALTER TABLE app.Notifications ADD ReferenceType NVARCHAR(64) NULL, ReferenceId UNIQUEIDENTIFIER NULL, DedupKey NVARCHAR(120) NULL;
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'UX_Notifications_Dedup' AND object_id = OBJECT_ID(N'app.Notifications'))
+                CREATE UNIQUE INDEX UX_Notifications_Dedup ON app.Notifications (TenantId, UserId, DedupKey) WHERE DedupKey IS NOT NULL;
+            IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_Notifications_Type' AND parent_object_id = OBJECT_ID(N'app.Notifications'))
+                ALTER TABLE app.Notifications DROP CONSTRAINT CK_Notifications_Type;
+            ALTER TABLE app.Notifications ADD CONSTRAINT CK_Notifications_Type CHECK (Type IN (N'WorkoutReminder', N'MembershipReminder', N'ChallengeReminder', N'AiRecommendation', N'WorkoutCompleted', N'StaffLeaveUpdate', N'ChatMessage', N'WorkoutPlanUpdated', N'TrainerAssigned', N'ProgressMilestone'));
+
+            IF OBJECT_ID(N'app.PushDevices', N'U') IS NULL
+            CREATE TABLE app.PushDevices
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                UserId UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                InstallationId NVARCHAR(64) NOT NULL,
+                ExpoPushToken NVARCHAR(200) NOT NULL,
+                Platform NVARCHAR(16) NOT NULL,
+                AppVersion NVARCHAR(32) NULL,
+                IsActive BIT NOT NULL,
+                LastRegisteredAt DATETIME2 NOT NULL,
+                LastSeenAt DATETIME2 NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                DisabledAt DATETIME2 NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_PushDevices PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_PushDevices_Users FOREIGN KEY (UserId) REFERENCES app.Users (Id),
+                CONSTRAINT FK_PushDevices_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT CK_PushDevices_Platform CHECK (Platform IN (N'android', N'ios'))
+            );
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'UX_PushDevices_User_Installation' AND object_id = OBJECT_ID(N'app.PushDevices'))
+                CREATE UNIQUE INDEX UX_PushDevices_User_Installation ON app.PushDevices (UserId, InstallationId);
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'UX_PushDevices_ActiveToken' AND object_id = OBJECT_ID(N'app.PushDevices'))
+                CREATE UNIQUE INDEX UX_PushDevices_ActiveToken ON app.PushDevices (ExpoPushToken) WHERE IsActive = 1;
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_PushDevices_User_Tenant_Active' AND object_id = OBJECT_ID(N'app.PushDevices'))
+                CREATE INDEX IX_PushDevices_User_Tenant_Active ON app.PushDevices (UserId, TenantId, IsActive);
+
+            IF OBJECT_ID(N'app.PushDeliveries', N'U') IS NULL
+            CREATE TABLE app.PushDeliveries
+            (
+                Id UNIQUEIDENTIFIER NOT NULL,
+                NotificationId UNIQUEIDENTIFIER NOT NULL,
+                DeviceId UNIQUEIDENTIFIER NOT NULL,
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                Status NVARCHAR(32) NOT NULL,
+                TicketId NVARCHAR(120) NULL,
+                ReceiptError NVARCHAR(200) NULL,
+                AttemptCount INT NOT NULL,
+                CreatedAt DATETIME2 NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                RowVersion ROWVERSION NOT NULL,
+                CONSTRAINT PK_PushDeliveries PRIMARY KEY CLUSTERED (Id),
+                CONSTRAINT FK_PushDeliveries_Notifications FOREIGN KEY (NotificationId) REFERENCES app.Notifications (Id),
+                CONSTRAINT FK_PushDeliveries_PushDevices FOREIGN KEY (DeviceId) REFERENCES app.PushDevices (Id),
+                CONSTRAINT FK_PushDeliveries_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id),
+                CONSTRAINT CK_PushDeliveries_Status CHECK (Status IN (N'Queued', N'Accepted', N'Failed', N'ProviderConfirmed'))
+            );
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'UX_PushDeliveries_Notification_Device' AND object_id = OBJECT_ID(N'app.PushDeliveries'))
+                CREATE UNIQUE INDEX UX_PushDeliveries_Notification_Device ON app.PushDeliveries (NotificationId, DeviceId);
+            IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_PushDeliveries_Status_UpdatedAt' AND object_id = OBJECT_ID(N'app.PushDeliveries'))
+                CREATE INDEX IX_PushDeliveries_Status_UpdatedAt ON app.PushDeliveries (Status, UpdatedAt);
+
+            IF OBJECT_ID(N'app.NotificationPreferences', N'U') IS NULL
+            CREATE TABLE app.NotificationPreferences
+            (
+                TenantId UNIQUEIDENTIFIER NOT NULL,
+                UserId UNIQUEIDENTIFIER NOT NULL,
+                ChatEnabled BIT NOT NULL,
+                WorkoutRemindersEnabled BIT NOT NULL,
+                WorkoutUpdatesEnabled BIT NOT NULL,
+                ProgressEnabled BIT NOT NULL,
+                AccountEnabled BIT NOT NULL,
+                SoundEnabled BIT NOT NULL,
+                VibrationEnabled BIT NOT NULL,
+                UpdatedAt DATETIME2 NOT NULL,
+                CONSTRAINT PK_NotificationPreferences PRIMARY KEY CLUSTERED (TenantId, UserId),
+                CONSTRAINT FK_NotificationPreferences_Users FOREIGN KEY (UserId) REFERENCES app.Users (Id),
+                CONSTRAINT FK_NotificationPreferences_Tenants FOREIGN KEY (TenantId) REFERENCES app.Tenants (Id)
+            );
+        ]]></sql>
+        <rollback>
+            <sql>
+                DROP TABLE app.NotificationPreferences;
+                DROP TABLE app.PushDeliveries;
+                DROP TABLE app.PushDevices;
+                DROP INDEX UX_Notifications_Dedup ON app.Notifications;
+                ALTER TABLE app.Notifications DROP CONSTRAINT CK_Notifications_Type;
+                ALTER TABLE app.Notifications ADD CONSTRAINT CK_Notifications_Type CHECK (Type IN (N'WorkoutReminder', N'MembershipReminder', N'ChallengeReminder', N'AiRecommendation', N'WorkoutCompleted', N'StaffLeaveUpdate', N'ChatMessage'));
+                ALTER TABLE app.Notifications DROP COLUMN DedupKey, ReferenceId, ReferenceType;
+            </sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

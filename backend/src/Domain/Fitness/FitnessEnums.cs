@@ -125,6 +125,9 @@ public enum NotificationType
     WorkoutCompleted = 5,
     StaffLeaveUpdate = 6,
     ChatMessage = 7,
+    WorkoutPlanUpdated = 8,
+    TrainerAssigned = 9,
+    ProgressMilestone = 10,
 }
 
 public enum AiMessageRole

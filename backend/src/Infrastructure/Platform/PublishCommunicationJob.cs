@@ -123,6 +123,7 @@ public sealed class OutboxDispatcher : BackgroundService
 
             if (message.MessageType == "Chat.Message")
             {
+                ScheduleChatPush(scheduler, message, clock.UtcNow);
                 message.MarkDispatched(message.Payload, clock.UtcNow);
                 continue;
             }
@@ -165,6 +166,32 @@ public sealed class OutboxDispatcher : BackgroundService
         if (pending.Count > 0)
         {
             await unit.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private static void ScheduleChatPush(IBackgroundJobScheduler scheduler, LifeFitAI.Domain.Platform.OutboxMessage message, DateTime utcNow)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(message.Payload);
+            if (!document.RootElement.TryGetProperty("notificationId", out var notification) || !notification.TryGetGuid(out var notificationId) || notificationId == Guid.Empty)
+            {
+                return;
+            }
+
+            var tenantId = Guid.Empty;
+            if (document.RootElement.TryGetProperty("tenantId", out var tenant))
+            {
+                tenant.TryGetGuid(out tenantId);
+            }
+            scheduler.Schedule<LifeFitAI.Infrastructure.Notifications.PushDispatchJob>(
+                new BackgroundJobMetadata("Push.Deliver", LifeFitAI.Domain.Platform.SystemJobCatalog.NotificationsQueue, tenantId == Guid.Empty ? message.TenantId : tenantId, null, "Notification", notificationId.ToString("D"), null),
+                job => job.DeliverAsync(notificationId),
+                utcNow);
+        }
+        catch (JsonException)
+        {
+            // The saved notification is still dispatched by the maintenance sweep.
         }
     }
 }

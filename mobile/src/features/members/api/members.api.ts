@@ -1,4 +1,5 @@
 import { apiClient } from '../../../services/api/client';
+import { imageDataUri } from '../../../services/api/image';
 import type { PageResult } from '../../../types/api';
 import { tenantKey } from '../../fitness/api/keys';
 
@@ -96,17 +97,6 @@ export async function removeMemberPhoto(id: string): Promise<MemberDetails> {
   return response.data;
 }
 
-export async function loadMemberPhoto(id: string, signal?: AbortSignal): Promise<string | null> {
-  try {
-    const response = await apiClient.get<ArrayBuffer>(`/members/${id}/profile-photo`, { responseType: 'arraybuffer', signal });
-    const bytes = new Uint8Array(response.data);
-    let binary = '';
-    bytes.forEach((value) => {
-      binary += String.fromCharCode(value);
-    });
-    const type = String(response.headers['content-type'] ?? 'image/jpeg');
-    return `data:${type};base64,${globalThis.btoa(binary)}`;
-  } catch {
-    return null;
-  }
+export function loadMemberPhoto(id: string, signal?: AbortSignal): Promise<string | null> {
+  return imageDataUri(`/members/${id}/profile-photo`, signal);
 }

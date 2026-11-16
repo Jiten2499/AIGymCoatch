@@ -108,6 +108,12 @@ public sealed class Notification
 
     public DateTime? ReadAt { get; private set; }
 
+    public string? ReferenceType { get; private set; }
+
+    public Guid? ReferenceId { get; private set; }
+
+    public string? DedupKey { get; private set; }
+
     public static Notification Create(Guid id, Guid userId, Guid tenantId, NotificationType type, string title, string message, DateTime utcNow) =>
         new()
         {
@@ -120,6 +126,13 @@ public sealed class Notification
             IsRead = false,
             CreatedAt = utcNow,
         };
+
+    public void Bind(string referenceType, Guid referenceId, string dedupKey)
+    {
+        ReferenceType = referenceType.Length <= 64 ? referenceType : referenceType[..64];
+        ReferenceId = referenceId;
+        DedupKey = dedupKey.Length <= 120 ? dedupKey : dedupKey[..120];
+    }
 
     public void MarkRead(DateTime utcNow)
     {

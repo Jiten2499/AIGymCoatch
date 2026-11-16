@@ -150,7 +150,9 @@ public sealed class SessionLifecycleHandler :
             var today = DateOnly.FromDateTime(_clock.UtcNow);
             var earlier = await _workouts.CompletedCountAsync(scope.Value.TenantId, scope.Value.UserId, today.ToDateTime(TimeOnly.MinValue), cancellationToken).ConfigureAwait(false);
             await _challenges.RecordWorkoutProgressAsync(scope.Value.TenantId, scope.Value.UserId, earlier <= 1, _clock.UtcNow, cancellationToken).ConfigureAwait(false);
-            await _challenges.AddNotificationAsync(Notification.Create(Guid.NewGuid(), scope.Value.UserId, scope.Value.TenantId, NotificationType.WorkoutCompleted, "Workout completed", "A workout was recorded.", _clock.UtcNow), cancellationToken).ConfigureAwait(false);
+            var recorded = Notification.Create(Guid.NewGuid(), scope.Value.UserId, scope.Value.TenantId, NotificationType.WorkoutCompleted, "Workout completed", "A workout was recorded.", _clock.UtcNow);
+            recorded.Bind("WorkoutSession", session.Id, $"workout.completed:{session.Id:D}");
+            await _challenges.AddNotificationAsync(recorded, cancellationToken).ConfigureAwait(false);
             await _audit.AddAsync(AuditLog.Create(Guid.NewGuid(), scope.Value.TenantId, scope.Value.UserId, "workout.completed", "WorkoutSession", session.Id, null, null, _client.IpAddress, _client.UserAgent, _clock.UtcNow), cancellationToken).ConfigureAwait(false);
         }
 

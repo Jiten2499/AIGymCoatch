@@ -140,6 +140,11 @@ public static class DependencyInjection
         services.Configure<AiOptions>(configuration.GetSection(AiOptions.SectionName));
         services.AddSingleton<IAiLimits, AiLimits>();
         services.AddHttpClient("llm", client => client.Timeout = TimeSpan.FromSeconds(60));
+        services.AddHttpClient("expo-push", client =>
+        {
+            client.BaseAddress = new Uri("https://exp.host/--/api/v2/");
+            client.Timeout = TimeSpan.FromSeconds(20);
+        });
         services.AddScoped<ILlmConnectionStore, LlmConnectionStore>();
         services.AddSingleton<ILlmSecretProtector, DataProtectionLlmSecretProtector>();
         services.AddScoped<ILlmProbe, OpenAiCompatibleLlmProbe>();
@@ -150,6 +155,9 @@ public static class DependencyInjection
         services.AddScoped<INutritionRepository, NutritionRepository>();
         services.AddScoped<IAiRepository, AiRepository>();
         services.AddScoped<IChallengeRepository, ChallengeRepository>();
+        services.AddScoped<LifeFitAI.Application.Notifications.IPushStore, LifeFitAI.Infrastructure.Notifications.PushStore>();
+        services.AddScoped<LifeFitAI.Infrastructure.Notifications.IExpoPushClient, LifeFitAI.Infrastructure.Notifications.ExpoPushClient>();
+        services.AddScoped<LifeFitAI.Infrastructure.Notifications.PushDispatchJob>();
         services.AddScoped<LifeFitAI.Application.Chat.IChatRepository, ChatRepository>();
         services.AddScoped<LifeFitAI.Application.Chat.ChatMessageService>();
         services.AddScoped<LifeFitAI.Application.Chat.IChatNotifier, LifeFitAI.Application.Chat.NoopChatNotifier>();
@@ -231,6 +239,7 @@ public static class DependencyInjection
         services.AddHostedService<TokenCleanupJob>();
         services.AddHostedService<CommunicationPublishJob>();
         services.AddHostedService<OutboxDispatcher>();
+        services.AddHostedService<LifeFitAI.Infrastructure.Notifications.PushMaintenanceWorker>();
         services.AddHostedService<SystemJobRegistrar>();
         services.AddPlatformTelemetry(configuration);
 

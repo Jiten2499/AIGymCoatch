@@ -23,6 +23,7 @@ internal static class WorkoutMonthGeneration
         ITenantRepository tenants,
         IUnitOfWork unitOfWork,
         IDateTimeProvider clock,
+        IChallengeRepository challenges,
         GenerateWorkoutCommand request,
         CancellationToken cancellationToken)
     {
@@ -120,7 +121,7 @@ internal static class WorkoutMonthGeneration
             return Result.Failure<ProgramResponse>(rules.Error);
         }
 
-        return await SaveAsync(scope.Value, briefResult.Value, parsed.Value, completion, limits, ai, workouts, unitOfWork, clock, cancellationToken).ConfigureAwait(false);
+        return await SaveAsync(scope.Value, briefResult.Value, parsed.Value, completion, limits, ai, workouts, challenges, unitOfWork, clock, cancellationToken).ConfigureAwait(false);
     }
 
     private static async Task<Result<ProgramResponse>> SaveAsync(
@@ -131,6 +132,7 @@ internal static class WorkoutMonthGeneration
         IAiLimits limits,
         IAiRepository ai,
         IWorkoutRepository workouts,
+        IChallengeRepository challenges,
         IUnitOfWork unitOfWork,
         IDateTimeProvider clock,
         CancellationToken cancellationToken)
@@ -172,6 +174,9 @@ internal static class WorkoutMonthGeneration
                 }
             }
 
+            var ready = Notification.Create(Guid.NewGuid(), scope.UserId, scope.TenantId, NotificationType.WorkoutPlanUpdated, "Workout plan ready", "Your workout plan is ready.", clock.UtcNow);
+            ready.Bind("WorkoutProgram", program.Id, $"workout.plan.updated:{program.Id:D}");
+            await challenges.AddNotificationAsync(ready, token).ConfigureAwait(false);
             await ai.AddUsageAsync(AiUsageRecord.Create(Guid.NewGuid(), scope.UserId, scope.TenantId, completion.Provider ?? limits.Provider, completion.Model ?? limits.Model, AiRequestType.WorkoutGeneration, completion.InputTokens, completion.OutputTokens, limits.CostPerThousandTokens, clock.UtcNow), token).ConfigureAwait(false);
             await unitOfWork.SaveChangesAsync(token).ConfigureAwait(false);
             created = await workouts.GetProgramAsync(scope.TenantId, scope.UserId, program.Id, token).ConfigureAwait(false);

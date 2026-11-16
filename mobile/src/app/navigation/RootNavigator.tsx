@@ -1,7 +1,10 @@
 import { DarkTheme, NavigationContainer, type Theme as NavigationTheme } from '@react-navigation/native';
+import { navigationRef } from './navigationRef';
+import { consumePendingPush } from '../../services/push/pushBridge';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, View } from 'react-native';
 import { ForgotPasswordScreen } from '../../features/auth/screens/ForgotPasswordScreen';
@@ -82,6 +85,7 @@ import { useWorkspaceFeatures } from '../../features/licensing/api/featureQuery'
 import { useSessionStore } from '../../store/sessionStore';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { useTheme } from '../providers/ThemeProvider';
+import { ChatTabBadge } from './ChatTabBadge';
 import { NotificationBellButton } from './NotificationBellButton';
 import { TabGlyph } from './TabGlyph';
 import { TrainerTabs } from './TrainerTabs';
@@ -119,7 +123,7 @@ function MemberTabs() {
         component={ChatListScreen}
         options={{
           title: t('nav.chat'),
-          tabBarIcon: ({ color, size }) => <TabGlyph color={color} name="chat" size={size} />,
+          tabBarIcon: ({ color, size }) => <ChatTabBadge><TabGlyph color={color} name="chat" size={size} /></ChatTabBadge>,
           tabBarButton: chatEnabled ? undefined : () => null,
         }}
       />
@@ -225,6 +229,11 @@ function AuthenticatedStack() {
 export function RootNavigator() {
   const theme = useTheme();
   const status = useSessionStore((state) => state.status);
+  useEffect(() => {
+    if (status === 'authenticated') {
+      consumePendingPush();
+    }
+  }, [status]);
   const navigationTheme: NavigationTheme = {
     ...DarkTheme,
     dark: theme.scheme === 'dark',
@@ -240,7 +249,7 @@ export function RootNavigator() {
   };
 
   return (
-    <NavigationContainer theme={navigationTheme}>
+    <NavigationContainer ref={navigationRef} theme={navigationTheme} onReady={consumePendingPush}>
       <StatusBar style={theme.scheme === 'dark' ? 'light' : 'dark'} />
       {status === 'unknown' ? (
         <View style={{ alignItems: 'center', backgroundColor: theme.colors.background, flex: 1, justifyContent: 'center' }}>

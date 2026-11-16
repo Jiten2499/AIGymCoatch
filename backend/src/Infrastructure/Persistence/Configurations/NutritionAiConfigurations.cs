@@ -124,6 +124,8 @@ public sealed class NotificationConfiguration : IEntityTypeConfiguration<Notific
         builder.Property(entity => entity.Type).HasConversion<string>().HasMaxLength(32);
         builder.Property(entity => entity.Title).HasMaxLength(200).IsRequired();
         builder.Property(entity => entity.Message).HasMaxLength(1000).IsRequired();
+        builder.Property(entity => entity.ReferenceType).HasMaxLength(64);
+        builder.Property(entity => entity.DedupKey).HasMaxLength(120);
         builder.HasOne<UserAccount>().WithMany().HasForeignKey(entity => entity.UserId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Tenant>().WithMany().HasForeignKey(entity => entity.TenantId).OnDelete(DeleteBehavior.Restrict);
     }

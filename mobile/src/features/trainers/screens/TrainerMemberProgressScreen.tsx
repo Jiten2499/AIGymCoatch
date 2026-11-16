@@ -49,19 +49,23 @@ export function TrainerMemberProgressScreen({ route, navigation }: Props) {
   }
 
   return (
-    <ScrollView contentContainerStyle={[layout.content, { backgroundColor: theme.colors.background }]} refreshControl={<RefreshControl onRefresh={() => { void history.refetch(); }} refreshing={history.isRefetching} tintColor={layout.refresh} />}>
-      {photo}
+    <View style={{ backgroundColor: theme.colors.background, flex: 1 }}>
+      <View style={{ paddingHorizontal: theme.spacing.xl, paddingTop: theme.spacing.xl }}>{photo}</View>
       {phase === 'overview' ? (
-        <ProgressOverview memberId={route.params.memberId} onEdit={(assessmentId) => { setEditingId(assessmentId); setPhase('wizard'); }} records={history.data ?? []} today={dayKey(new Date())} />
+        <ScrollView contentContainerStyle={[layout.content, { paddingTop: theme.spacing.lg }]} refreshControl={<RefreshControl onRefresh={() => { void history.refetch(); }} refreshing={history.isRefetching} tintColor={layout.refresh} />} style={{ flex: 1 }}>
+          <ProgressOverview memberId={route.params.memberId} onEdit={(assessmentId) => { setEditingId(assessmentId); setPhase('wizard'); }} records={history.data ?? []} today={dayKey(new Date())} />
+        </ScrollView>
       ) : (
-        <ProgressWizard
-          assessmentId={editingId}
-          existing={history.data?.find((item) => item.id === editingId)}
-          memberId={route.params.memberId}
-          onCancel={() => { if (route.params.start === 'record' && !editingId) navigation.goBack(); else setPhase('overview'); }}
-          onDone={() => { setEditingId(undefined); setPhase('overview'); }}
-        />
+        <View style={{ flex: 1, paddingBottom: theme.spacing.lg, paddingHorizontal: theme.spacing.xl, paddingTop: theme.spacing.lg }}>
+          <ProgressWizard
+            assessmentId={editingId}
+            existing={history.data?.find((item) => item.id === editingId)}
+            memberId={route.params.memberId}
+            onCancel={() => { if (route.params.start === 'record' && !editingId) navigation.goBack(); else setPhase('overview'); }}
+            onDone={() => { setEditingId(undefined); setPhase('overview'); }}
+          />
+        </View>
       )}
-    </ScrollView>
+    </View>
   );
 }

@@ -209,5 +209,8 @@ databaseChangeLog:
   - include:
       file: changes/069-workout-plan-month.xml
       relativeToChangelogFile: true
+  - include:
+      file: changes/070-push-notifications.xml
+      relativeToChangelogFile: true
 
 

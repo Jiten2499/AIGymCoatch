@@ -8,7 +8,6 @@ export function useMyMemberPhoto() {
   const photo = useQuery({
     queryKey: ['my-member-photo', tenantId],
     enabled: signedIn,
-    retry: false,
     queryFn: ({ signal }) => imageDataUri('/members/me/profile-photo', signal),
   });
   return photo.data ?? null;

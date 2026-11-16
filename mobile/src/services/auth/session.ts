@@ -45,6 +45,8 @@ export async function restoreSession(): Promise<void> {
 }
 
 export async function endSession(): Promise<void> {
+  const { deactivatePushRegistration } = await import('../push/pushBridge');
+  await deactivatePushRegistration();
   const refreshToken = useSessionStore.getState().refreshToken;
   try {
     if (refreshToken) {
@@ -105,6 +107,8 @@ export async function applyAuth(response: AuthResponse, followTrainer = false): 
     currentTenant: response.currentTenant,
   });
   await openTrainerWorkspace(followTrainer);
+  const { syncPushRegistration } = await import('../push/pushBridge');
+  await syncPushRegistration();
 }
 
 async function openTrainerWorkspace(followTrainer: boolean): Promise<void> {

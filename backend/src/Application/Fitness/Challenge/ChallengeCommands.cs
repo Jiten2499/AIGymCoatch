@@ -142,7 +142,15 @@ public sealed class ChallengeProgressHandler :
             return Result.Failure<ChallengeResponse>(FitnessErrors.NotFound);
         }
 
+        var wasComplete = participant.CompletedAt is not null;
         participant.Record(request.Value, challenge.TargetValue, _clock.UtcNow);
+        if (!wasComplete && participant.CompletedAt is not null)
+        {
+            var milestone = Notification.Create(Guid.NewGuid(), scope.Value.UserId, scope.Value.TenantId, NotificationType.ProgressMilestone, "Progress milestone", challenge.Name, _clock.UtcNow);
+            milestone.Bind("Challenge", challenge.Id, $"progress.milestone:{challenge.Id:D}:{scope.Value.UserId:D}");
+            await _challenges.AddNotificationAsync(milestone, cancellationToken).ConfigureAwait(false);
+        }
+
         await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return Result.Success(new ChallengeResponse(challenge.Id, challenge.Name, challenge.Description, challenge.ChallengeType, challenge.StartDate, challenge.EndDate, challenge.TargetValue, challenge.Status, challenge.IsSystem, participant.CurrentValue, participant.CompletedAt));
     }
@@ -237,5 +245,5 @@ public sealed class NotificationHandler :
     }
 
     private static NotificationResponse Map(Domain.Fitness.Notification notification) =>
-        new(notification.Id, notification.Type, notification.Title, notification.Message, notification.IsRead, notification.CreatedAt);
+        new(notification.Id, notification.Type, notification.Title, notification.Message, notification.IsRead, notification.CreatedAt, notification.ReferenceType, notification.ReferenceId);
 }

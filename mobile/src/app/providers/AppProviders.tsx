@@ -2,7 +2,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, type ReactNode } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { registerSessionBridge, restoreSession } from '../../services/auth/session';
-import { subscribePushNotifications } from '../../services/push/pushBridge';
+import { startPushListeners, subscribePushNotifications } from '../../services/push/pushBridge';
 import { readPreferences } from '../../services/storage/preferences';
 import { usePreferencesStore } from '../../store/preferencesStore';
 import { useSessionStore } from '../../store/sessionStore';
@@ -25,6 +25,10 @@ export function AppProviders({ children }: { children: ReactNode }) {
   }, [hydrate]);
 
   useEffect(() => bindQueryLifecycle(), []);
+
+  useEffect(() => {
+    void startPushListeners();
+  }, []);
 
   useEffect(() => {
     return subscribePushNotifications((payload) => {
