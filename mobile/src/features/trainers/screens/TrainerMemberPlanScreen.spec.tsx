@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { userEvent } from '@testing-library/react-native';
 import { renderWithProviders } from '../../../test/render';
+import { usePlanEditStore } from '../planEditStore';
 import { TrainerMemberPlanScreen } from './TrainerMemberPlanScreen';
 import { TrainerMemberScreen } from './TrainerMemberScreen';
 
@@ -71,6 +72,7 @@ describe('trainer member plan tab', () => {
   beforeEach(() => {
     mockPrograms.data = { items: [], page: 1, pageSize: 50, totalCount: 0 };
     mockMutate.mockClear();
+    usePlanEditStore.getState().clear();
   });
 
   it('shows the empty plan state on the Plan tab', async () => {
@@ -78,7 +80,7 @@ describe('trainer member plan tab', () => {
       <TrainerMemberScreen navigation={{ navigate: jest.fn() } as never} route={{ key: 'member', name: 'TrainerMember', params: { memberId: 'member-1' } }} />,
     );
     const user = userEvent.setup();
-    await user.press(view.getByRole('button', { name: 'Plan' }));
+    await user.press(view.getByRole('button', { name: 'Workout Plan' }));
     expect(view.getByText('No workout plans are available for this member yet.')).toBeTruthy();
   }, 15000);
 
@@ -87,8 +89,7 @@ describe('trainer member plan tab', () => {
       <TrainerMemberPlanScreen navigation={{ navigate: jest.fn() } as never} route={{ key: 'plan', name: 'TrainerMemberPlan', params: { memberId: 'member-1', programId: 'program-1' } }} />,
     );
     const user = userEvent.setup();
-    await user.press(view.getByRole('button', { name: 'Edit plan' }));
-    await user.press(view.getByRole('button', { name: 'Save plan' }));
+    await user.press(await view.findByRole('button', { name: 'Save plan' }));
     expect(mockMutate).toHaveBeenCalled();
     const body = mockMutate.mock.calls[0]?.[0] as { days: { exercises: { targetWeight: number | null; notes: string | null }[] }[] };
     expect(body.days[0].exercises[0].targetWeight).toBe(40);

@@ -10,8 +10,15 @@ import { AppText } from '../../../components/ui/AppText';
 import { featureCodes } from '../../../constants/access';
 import { errorText } from '../../../services/api/problem';
 import { useExercise } from '../../fitness/api/queries';
+import { ExerciseMuscleTargets } from '../../muscles/ExerciseMuscleTargets';
+import { ScenePhoto } from '../../plan/heroes';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'ExerciseDetail'>;
+
+function instructionSteps(instructions: string): string[] {
+  const lines = instructions.split(/\n+/).map((line) => line.trim()).filter((line) => line.length > 0);
+  return lines.length > 0 ? lines : [instructions];
+}
 
 export function ExerciseDetailScreen({ route }: Props) {
   const theme = useTheme();
@@ -24,6 +31,8 @@ export function ExerciseDetailScreen({ route }: Props) {
     <ScreenState error={exercise.isError ? errorText(exercise.error, t('common.offline')) : null} loading={exercise.isLoading} onRetry={() => void exercise.refetch()}>
       <ScrollView contentContainerStyle={{ gap: theme.spacing.lg, padding: theme.spacing.xl }}>
         <AppText variant="title">{data?.name}</AppText>
+        {data ? <ScenePhoto label={`${data.name} ${data.muscleGroup}`} /> : null}
+        {data ? <ExerciseMuscleTargets exercise={data} /> : null}
         <AppCard>
           <AppText tone="muted">{data?.muscleGroup}</AppText>
           {data?.equipment ? <AppText>{t('journey.equipmentLabel')}: {data.equipment}</AppText> : null}
@@ -33,8 +42,10 @@ export function ExerciseDetailScreen({ route }: Props) {
         {data?.description ? <AppText>{data.description}</AppText> : null}
         {data?.instructions ? (
           <AppCard>
-            <AppText variant="label">{t('journey.instructions')}</AppText>
-            <AppText>{data.instructions}</AppText>
+            <AppText variant="label">{t('journey.guide')}</AppText>
+            {instructionSteps(data.instructions).map((line, index, lines) => (
+              <AppText key={line}>{lines.length > 1 ? `${index + 1}. ${line}` : line}</AppText>
+            ))}
           </AppCard>
         ) : null}
         <AppText tone="muted">{t('journey.notMedical')}</AppText>

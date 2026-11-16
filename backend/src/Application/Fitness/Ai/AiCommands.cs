@@ -16,7 +16,12 @@ public sealed class CoachChatCommandValidator : AbstractValidator<CoachChatComma
     public CoachChatCommandValidator() => RuleFor(command => command.Message).NotEmpty().MaximumLength(2000);
 }
 
-public sealed record GenerateWorkoutCommand(string? Notes) : IRequest<Result<ProgramResponse>>;
+public sealed record GenerateWorkoutCommand(string? Notes, int PlanDays = 30) : IRequest<Result<ProgramResponse>>;
+
+public sealed class GenerateWorkoutCommandValidator : AbstractValidator<GenerateWorkoutCommand>
+{
+    public GenerateWorkoutCommandValidator() => RuleFor(command => command.PlanDays).Must(days => days is 7 or 10 or 15 or 30);
+}
 
 public sealed record NutritionAdviceCommand(string? Question) : IRequest<Result<AiChatResponse>>;
 

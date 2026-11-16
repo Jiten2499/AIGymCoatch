@@ -68,6 +68,8 @@ public sealed class WorkoutGenerationTests
         var names = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase) { ["Push-up"] = _exerciseId };
         var allowed = new HashSet<Guid> { _exerciseId };
         WorkoutPlanParser.ParseMonth(MonthJson(false), allowed, names).IsSuccess.Should().BeTrue();
+        WorkoutPlanParser.ParseMonth(MonthJson(false), allowed, names, 7).IsFailure.Should().BeTrue();
+        WorkoutPlanParser.ParseMonth(WeekJson(), allowed, names, 7).IsSuccess.Should().BeTrue();
         WorkoutPlanParser.ParseMonth("{\"name\":\"Week\",\"days\":[{\"dayNumber\":1,\"name\":\"Push\",\"restDay\":false,\"exercises\":[{\"name\":\"Push-up\",\"sets\":3,\"reps\":8}]}]}", allowed, names).IsFailure.Should().BeTrue();
         WorkoutPlanParser.ParseMonth("not json", allowed, names).Error.Code.Should().Be("ai.invalid_output");
         WorkoutMonthRules.Validate(WorkoutPlanParser.ParseMonth(MonthJson(false), allowed, names).Value, 5, new Dictionary<Guid, string> { [_exerciseId] = "Push-up" }, null).IsSuccess.Should().BeTrue();
@@ -163,6 +165,14 @@ public sealed class WorkoutGenerationTests
         var assessment = FitnessAssessment.Create(Guid.NewGuid(), _userId, _tenantId);
         assessment.ApplyDraft(new DateOnly(1996, 1, 1), "Male", 180, 80, 75, null, 18, "Nepal", UnitSystem.Metric, goal, "Mobility", "OneMonth", null, level, "Strength", "Stay strong", health ?? """{"injuryDetails":"old ankle sprain"}""", workout, """{"dietType":"Vegetarian","supplements":"creatine"}""", lifestyle, null, 8, 100, true);
         return assessment;
+    }
+
+    private string WeekJson()
+    {
+        var days = Enumerable.Range(1, 7).Select(day => day == 7
+            ? """{"dayNumber":7,"name":"Rest","restDay":true,"exercises":[]}"""
+            : $$"""{"dayNumber":{{day}},"name":"Work","restDay":false,"exercises":[{"name":"Push-up","sets":3,"reps":8}]}""");
+        return "{\"name\":\"7-Day Plan\",\"days\":[" + string.Join(',', days) + "]}";
     }
 
     private string MonthJson(bool identical)

@@ -24,7 +24,7 @@ public sealed class AIController : ApiControllerBase
     [HttpPost("ai/workouts/generate")]
     [RequiresPermission(PermissionCodes.AiUse)]
     public async Task<IActionResult> GenerateWorkout(GenerateWorkoutRequest request, CancellationToken cancellationToken) =>
-        (await Sender.Send(new GenerateWorkoutCommand(request.Notes), cancellationToken)).ToActionResult();
+        (await Sender.Send(new GenerateWorkoutCommand(request.Notes, request.PlanDays ?? 30), cancellationToken)).ToActionResult();
 
     [HttpPost("ai/nutrition/advice")]
     [RequiresPermission(PermissionCodes.AiUse)]

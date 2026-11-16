@@ -5,6 +5,7 @@ import { Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useTheme } from '../../../app/providers/ThemeProvider';
 import { FeatureGate } from '../../../components/access/FeatureGate';
 import { ScreenState } from '../../../components/feedback/ScreenState';
+import { AppButton } from '../../../components/ui/AppButton';
 import { AppText } from '../../../components/ui/AppText';
 import { featureCodes } from '../../../constants/access';
 import { errorText } from '../../../services/api/problem';
@@ -28,9 +29,6 @@ export function ChatListScreen() {
   return (
     <FeatureGate code={featureCodes.gymChat}>
       <ScreenState
-        empty={!creating && inbox.isSuccess && (inbox.data?.length ?? 0) === 0}
-        emptyBody={t('chat.empty')}
-        emptyTitle={t('chat.title')}
         error={inbox.isError ? errorText(inbox.error, t('common.offline')) : null}
         loading={inbox.isLoading}
         onRetry={() => void inbox.refetch()}
@@ -51,15 +49,31 @@ export function ChatListScreen() {
                 <AppText>{t(`chat.${value}`)}</AppText>
               </Pressable>
             ))}
-            <Pressable accessibilityRole="button" onPress={() => setCreating((current) => !current)} style={{ minHeight: theme.control.minTouch, justifyContent: 'center' }}>
-              <AppText>{t('chat.newChat')}</AppText>
-            </Pressable>
           </View>
+          <AppButton label={creating ? t('common.cancel') : t('chat.newChat')} onPress={() => setCreating((current) => !current)} variant={creating ? 'secondary' : 'primary'} />
+          {!creating && inbox.isSuccess && (inbox.data?.length ?? 0) === 0 ? (
+            <View style={{ gap: theme.spacing.sm }}>
+              <AppText variant="title">{t('chat.empty')}</AppText>
+              <AppText tone="muted">{t('chat.emptyStart')}</AppText>
+            </View>
+          ) : null}
+          {creating ? (
+            <View style={{ gap: theme.spacing.sm }}>
+              <AppText variant="label">{t('chat.recipients')}</AppText>
+              {recipients.isLoading ? <AppText tone="muted">{t('common.loading')}</AppText> : null}
+              {recipients.isError ? <AppText accessibilityRole="alert" tone="danger">{errorText(recipients.error, t('common.offline'))}</AppText> : null}
+              {recipients.isSuccess && (recipients.data?.length ?? 0) === 0 ? <AppText tone="muted">{t('chat.noRecipients')}</AppText> : null}
+            </View>
+          ) : null}
           {creating ? (recipients.data ?? []).map((person) => (
             <Pressable
+              accessibilityLabel={person.displayName}
               accessibilityRole="button"
               key={person.userId}
-              onPress={() => open.mutate(person.userId, { onSuccess: (conversation) => navigation.dispatch(CommonActions.navigate({ name: 'ChatThread', params: { conversationId: conversation.conversationId, title: conversation.displayName, role: conversation.role } })) })}
+              onPress={() => open.mutate(person.userId, { onSuccess: (conversation) => {
+                setCreating(false);
+                navigation.dispatch(CommonActions.navigate({ name: 'ChatThread', params: { conversationId: conversation.conversationId, title: conversation.displayName, role: conversation.role } }));
+              } })}
             >
               <AppText>{person.displayName}</AppText>
               <AppText tone="muted">{person.role}</AppText>

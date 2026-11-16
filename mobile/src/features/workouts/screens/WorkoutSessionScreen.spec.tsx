@@ -37,6 +37,7 @@ describe('WorkoutSessionScreen', () => {
     jest.mocked(addSet).mockReset();
     jest.mocked(completeSession).mockReset();
     (navigation.replace as jest.Mock).mockClear();
+    (navigation.navigate as jest.Mock).mockClear();
     jest.mocked(getExercise).mockResolvedValue({
       id: 'exercise-1', name: 'Squat', description: null, instructions: 'Brace and sit down.', muscleGroup: 'Legs', equipment: 'Barbell', exerciseType: 'Strength', difficulty: 'Beginner', isSystem: true,
     });
@@ -84,6 +85,46 @@ describe('WorkoutSessionScreen', () => {
     });
     await fireEvent.press(view.getByRole('button', { name: 'Finish workout' }));
     await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('WorkoutSummary', { sessionId: 'session-1' }));
+  });
+
+  it('opens exercise details without leaving the active workout', async () => {
+    jest.mocked(getExercise).mockImplementation(async (id: string) => ({
+      id,
+      name: id === 'exercise-2' ? 'Bench press' : 'Squat',
+      description: null,
+      instructions: 'Brace and sit down.',
+      muscleGroup: 'Legs',
+      equipment: 'Barbell',
+      exerciseType: 'Strength',
+      difficulty: 'Beginner',
+      isSystem: true,
+    }));
+    jest.mocked(getProgram).mockResolvedValue({
+      id: 'program-1', name: 'Strength base', description: null, goalType: 'Strength', difficulty: 'Beginner', durationWeeks: 4, frequencyPerWeek: 3, status: 'Active', isOwnedByUser: true,
+      days: [{
+        id: 'day-1', dayNumber: 1, name: 'Lower body', description: null, restDay: false,
+        exercises: [
+          { id: 'item-1', exerciseId: 'exercise-1', sequence: 1, sets: 3, targetReps: 8, targetDurationSeconds: null, targetDistance: null, targetWeight: 40, restSeconds: 90, notes: null },
+          { id: 'item-2', exerciseId: 'exercise-2', sequence: 2, sets: 3, targetReps: 8, targetDurationSeconds: null, targetDistance: null, targetWeight: 20, restSeconds: 60, notes: null },
+        ],
+      }],
+    });
+    jest.mocked(getSession).mockResolvedValue({
+      id: 'session-1', workoutProgramId: 'program-1', workoutProgramDayId: 'day-1', startedAt: '2026-10-02T10:00:00Z', completedAt: null, status: 'InProgress', durationSeconds: null, notes: null,
+      exercises: [
+        { id: 'session-exercise-1', exerciseId: 'exercise-1', sequence: 1, notes: null, sets: [] },
+        { id: 'session-exercise-2', exerciseId: 'exercise-2', sequence: 2, notes: null, sets: [] },
+      ],
+    });
+    const view = await renderWithProviders(<WorkoutSessionScreen navigation={navigation} route={route} />);
+    expect(await view.findByText('Squat')).toBeTruthy();
+    await fireEvent.press(view.getByRole('button', { name: 'Next exercise' }));
+    expect(await view.findByText('Bench press')).toBeTruthy();
+    await fireEvent.press(view.getByRole('button', { name: 'Guide' }));
+    expect(navigation.navigate).toHaveBeenCalledWith('ExerciseDetail', { exerciseId: 'exercise-2' });
+    expect(navigation.replace).not.toHaveBeenCalled();
+    expect(view.getByText('Exercise 2 of 2')).toBeTruthy();
+    expect(view.getByText('Bench press')).toBeTruthy();
   });
 
   it('blocks logging when workout plans are disabled', async () => {

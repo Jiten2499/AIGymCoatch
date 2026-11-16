@@ -11,6 +11,7 @@ import { featureCodes } from '../../../constants/access';
 import { formatDate } from '../../../services/localization/format';
 import { errorText } from '../../../services/api/problem';
 import { useExercise, useSession } from '../../fitness/api/queries';
+import { ExerciseMuscleTargets } from '../../muscles/ExerciseMuscleTargets';
 import type { WorkoutSet } from '../../fitness/types';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'SessionDetail'>;
@@ -49,6 +50,7 @@ function SessionExercise({ exerciseId, sets }: { exerciseId: string; sets: Worko
   return (
     <AppCard>
       <AppText variant="label">{detail.data?.name ?? t('common.loading')}</AppText>
+      {detail.data ? <ExerciseMuscleTargets exercise={detail.data} variant="compact" /> : null}
       {sets.map((set) => (
         <AppText key={set.id} tone="muted">
           {t('journey.setLine', { number: set.setNumber, reps: set.reps ?? '—', weight: set.weight ?? '—' })}

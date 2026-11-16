@@ -50,7 +50,12 @@ internal static class WorkoutMonthGeneration
         }
 
         var quotaResult = await quota.AllowAsync(scope.Value.UserId, scope.Value.TenantId, cancellationToken).ConfigureAwait(false);
-        var notes = string.IsNullOrWhiteSpace(request.Notes) ? "Generate a 30-day workout plan." : request.Notes.Trim();
+        if (request.PlanDays is not (7 or 10 or 15 or 30))
+        {
+            return Result.Failure<ProgramResponse>(AiErrors.PlanLength);
+        }
+
+        var notes = string.IsNullOrWhiteSpace(request.Notes) ? $"Generate a {request.PlanDays}-day workout plan." : request.Notes.Trim();
         var input = safety.Screen(notes);
         if (quotaResult.IsFailure || input.IsFailure)
         {
@@ -73,7 +78,8 @@ internal static class WorkoutMonthGeneration
             return Result.Failure<ProgramResponse>(AiErrors.NoMatchingExercises);
         }
 
-        var userMessage = AssessmentWorkoutBrief.ToJson(briefResult.Value, matched.Select(item => item.Name).ToArray());
+        var userMessage = AssessmentWorkoutBrief.ToJson(briefResult.Value, matched.Select(item => item.Name).ToArray(), request.PlanDays);
+        userMessage += $"\nPlan length: build exactly {request.PlanDays} calendar days numbered 1 through {request.PlanDays}. Do not add another day.";
         if (!string.IsNullOrWhiteSpace(request.Notes))
         {
             userMessage += "\nAdditional notes: " + request.Notes.Trim();
@@ -101,14 +107,14 @@ internal static class WorkoutMonthGeneration
 
         var allowed = matched.Select(item => item.Id).ToHashSet();
         var names = matched.GroupBy(item => item.Name, StringComparer.OrdinalIgnoreCase).ToDictionary(group => group.Key, group => group.First().Id, StringComparer.OrdinalIgnoreCase);
-        var parsed = WorkoutPlanParser.ParseMonth(completion.Content, allowed, names);
+        var parsed = WorkoutPlanParser.ParseMonth(completion.Content, allowed, names, request.PlanDays);
         if (parsed.IsFailure)
         {
             return Result.Failure<ProgramResponse>(parsed.Error);
         }
 
         var ids = matched.ToDictionary(item => item.Id, item => item.Name);
-        var rules = WorkoutMonthRules.Validate(parsed.Value, briefResult.Value.DaysPerWeek, ids, briefResult.Value.Avoid);
+        var rules = WorkoutMonthRules.Validate(parsed.Value, briefResult.Value.DaysPerWeek, ids, briefResult.Value.Avoid, request.PlanDays);
         if (rules.IsFailure)
         {
             return Result.Failure<ProgramResponse>(rules.Error);
@@ -132,18 +138,19 @@ internal static class WorkoutMonthGeneration
         ProgramResponse? created = null;
         await unitOfWork.ExecuteInTransactionAsync(async token =>
         {
+            var length = plan.Days.Count;
             var training = plan.Days.Count(day => !day.RestDay);
-            var frequency = Math.Clamp((int)Math.Round(training * 7m / 30m, MidpointRounding.AwayFromZero), 1, 7);
-            var name = string.IsNullOrWhiteSpace(plan.Name) ? "30-day plan" : plan.Name.Trim();
+            var frequency = Math.Clamp((int)Math.Round(training * 7m / length, MidpointRounding.AwayFromZero), 1, 7);
+            var name = string.IsNullOrWhiteSpace(plan.Name) ? $"{length}-day plan" : plan.Name.Trim();
             var program = WorkoutProgram.Create(
                 Guid.NewGuid(),
                 scope.TenantId,
                 scope.UserId,
                 name.Length <= 200 ? name : name[..200],
-                $"30-day plan from assessment {brief.AssessmentId:N}. Prompt {FitnessPrompts.WorkoutMonthVersion}.",
+                $"{length}-day plan from assessment {brief.AssessmentId:N}. Prompt {FitnessPrompts.WorkoutMonthVersion}.",
                 AssessmentMaps.MapGoal(brief.PrimaryGoal),
                 MapDifficulty(brief.Level),
-                5,
+                Math.Max(1, (int)Math.Ceiling(length / 7m)),
                 frequency);
             program.AttachGeneration(brief.AssessmentId, FitnessPrompts.WorkoutMonthVersion, completion.Model ?? limits.Model, brief.PlanStart);
             await workouts.AddProgramAsync(program, token).ConfigureAwait(false);

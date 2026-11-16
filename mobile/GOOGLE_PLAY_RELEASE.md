@@ -11,7 +11,7 @@ This document prepares an **internal testing** release. Nothing is uploaded or p
 | Expo slug | `growfit` |
 | Deep-link scheme | `growfit` |
 | Expo SDK | 58 |
-| React Native | 0.88.0 |
+| React Native | 0.88.1 |
 | React | 19.3.0 |
 | App version (`expo.version`) | `1.0.0` |
 | Android `versionCode` (local) | `1` |
@@ -165,12 +165,12 @@ Health & Fitness (primary). Business as optional secondary if offered.
 
 | Asset | Spec | Local status |
 | --- | --- | --- |
-| High-res icon | 512 × 512 PNG | Source `assets/icon.png` is 1024×1024 — export a 512×512 for Play Console |
-| Feature graphic | 1024 × 500 | **MISSING** — design required |
-| Phone screenshots | min 2; commonly 1080 × 1920 or similar | **MISSING** — capture from build |
+| High-res icon | 512 × 512 PNG | `store/play/icon-512.png` (from the G-only launcher icon) |
+| Feature graphic | 1024 × 500 | `store/play/feature-graphic.png` |
+| Phone screenshots | min 2; commonly 1080 × 1920 or similar | **MISSING** — capture from the new build |
 | 7-inch / 10-inch tablets | Optional | Optional |
-| Adaptive icons | Present under `assets/android-icon-*.png` | Present |
-| Splash | `assets/splash-icon.png` + `#07110d` | Wired in `app.json` |
+| Adaptive icons | Present under `assets/android-icon-*.png` | Present, G symbol only, background `#06130D` |
+| Splash | `assets/splash-icon.png` + `#06130D` | Wired in `app.json` |
 
 ### App access / reviewer instructions template
 
@@ -293,3 +293,15 @@ Then download the AAB from the Expo build page and upload it manually to Google 
 - Also required: aligned Expo SDK packages, `expo-splash-screen` plugin, and `legacy-peer-deps` (`.npmrc` + EAS env)
 
 Earlier attempts (`versionCode` 2–7) failed during **Install dependencies** when the monorepo archive was huge or peer resolution failed.
+
+The branding update (launcher icon, adaptive icon, monochrome icon, splash, and login logo) landed after that AAB.
+
+`versionCode` 10 failed while bundling because `.easignore` used `store/`, which also omitted `src/store`. The ignore is now `/store/`, so only the Play listing images are left out of the archive.
+
+Replacement production build:
+
+- Build id: `7b00a525-12b8-4fa1-a01a-a3b5ca315733`
+- `versionCode`: **11**
+- Logs: https://expo.dev/accounts/growfit24/projects/growfit/builds/7b00a525-12b8-4fa1-a01a-a3b5ca315733
+
+Upload the store images from `store/play/` in Play Console; they are not inside the AAB. Do not submit this build to production until you approve it. The submit profile stays on the internal track as a draft.

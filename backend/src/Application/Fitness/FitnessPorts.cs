@@ -19,6 +19,7 @@ public static class AiErrors
     public static readonly Error WorkoutPlanMonthlyLimit = new("ai.workout_plan_monthly_limit", "In a business workspace you can generate one AI workout plan per calendar month.");
     public static readonly Error Safety = new("ai.safety", AiSafetyPolicy.Refusal);
     public static readonly Error InvalidOutput = new("ai.invalid_output", "The AI response could not be applied.");
+    public static readonly Error PlanLength = new("ai.plan_length", "Choose a workout plan of 7, 10, 15, or 30 days.");
     public static readonly Error AssessmentRequired = new("ai.assessment_required", "Complete your fitness and nutrition assessment before generating a workout plan.");
     public static readonly Error MedicalClearance = new("ai.medical_clearance", "A clinician should clear exercise before a plan is generated from these restrictions.");
     public static readonly Error NoMatchingExercises = new("ai.no_matching_exercises", "No catalog exercises match the equipment in the assessment.");

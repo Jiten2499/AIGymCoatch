@@ -164,12 +164,12 @@ public static class AssessmentWorkoutBrief
         });
     }
 
-    public static string ToJson(WorkoutBrief brief, IReadOnlyList<string> catalog) =>
+    public static string ToJson(WorkoutBrief brief, IReadOnlyList<string> catalog, int planDays = 30) =>
         JsonSerializer.Serialize(new
         {
             brief.AssessmentId,
             planStart = brief.PlanStart.ToString("yyyy-MM-dd"),
-            durationDays = 30,
+            durationDays = planDays,
             personal = new { brief.Age, brief.Gender, brief.HeightCm, brief.WeightKg, brief.TargetWeightKg, brief.BodyFat, brief.Country, brief.Bmi, brief.Bmr, brief.Tdee, brief.Activity, brief.ActivityFactor, brief.WeeklyMinutes },
             goals = new { brief.PrimaryGoal, brief.SecondaryGoal, brief.Timeline, brief.Level, brief.Priority, brief.GoalDescription },
             brief.Health,

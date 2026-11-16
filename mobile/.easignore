@@ -20,3 +20,4 @@ eas-*.txt
 *.jks
 *.keystore
 .git/
+/store/

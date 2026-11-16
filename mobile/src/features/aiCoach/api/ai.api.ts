@@ -5,8 +5,8 @@ import type { ConversationDetail, ConversationSummary } from '../types';
 
 const aiTimeout = 60_000;
 
-export async function generateWorkout(notes: string | null, signal?: AbortSignal): Promise<WorkoutProgram> {
-  const response = await apiClient.post<WorkoutProgram>('/ai/workouts/generate', { notes }, { timeout: aiTimeout, signal });
+export async function generateWorkout(notes: string | null, planDays = 30, signal?: AbortSignal): Promise<WorkoutProgram> {
+  const response = await apiClient.post<WorkoutProgram>('/ai/workouts/generate', { notes, planDays }, { timeout: aiTimeout, signal });
   return response.data;
 }
 

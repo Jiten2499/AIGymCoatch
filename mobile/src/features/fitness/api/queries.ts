@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSessionStore } from '../../../store/sessionStore';
 import { isNotFound } from '../../../services/api/problem';
 import { tenantKey } from './keys';
-import { addSet, completeSession, createGoal, getDashboard, getExercise, getProfile, getProgram, getSession, listGoals, listMeasurements, listPrograms, listRecords, listSessions, recordMeasurement, saveProfile, startProgram } from './fitness.api';
+import { addSet, completeSession, createGoal, getDashboard, getExercise, getProfile, getProgram, getSession, listExercises, listGoals, listMeasurements, listPrograms, listRecords, listSessions, recordMeasurement, saveProfile, startProgram } from './fitness.api';
 import type { FitnessProfile } from '../types';
 
 export function useTenantId(): string {
@@ -89,6 +89,15 @@ export function useExercise(exerciseId: string) {
     queryKey: tenantKey(tenantId, 'exercise', exerciseId),
     enabled: Boolean(tenantId && exerciseId),
     queryFn: ({ signal }) => getExercise(exerciseId, signal),
+  });
+}
+
+export function useExerciseCatalog(search: string) {
+  const tenantId = useTenantId();
+  return useQuery({
+    queryKey: tenantKey(tenantId, 'exercise-catalog', search),
+    enabled: Boolean(tenantId),
+    queryFn: ({ signal }) => listExercises(search, signal),
   });
 }
 

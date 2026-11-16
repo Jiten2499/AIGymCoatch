@@ -21,6 +21,7 @@ describe('LoginScreen', () => {
       fireEvent.press(view.getByRole('button', { name: 'Sign in' }));
     });
 
+    expect(view.getByRole('image', { name: 'Growfit' })).toBeTruthy();
     expect(view.getByText('Invalid email address')).toBeTruthy();
     expect(signIn).not.toHaveBeenCalled();
 

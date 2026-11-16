@@ -1,11 +1,9 @@
-import type { CompositeNavigationProp } from '@react-navigation/native';
-import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
-import type { AppStackParamList, TrainerTabParamList } from '../../../app/navigation/types';
+import type { AppStackParamList } from '../../../app/navigation/types';
 import { useTheme } from '../../../app/providers/ThemeProvider';
 import { ScreenState } from '../../../components/feedback/ScreenState';
 import { AppButton } from '../../../components/ui/AppButton';
@@ -17,7 +15,7 @@ import { useTrainerMembers, useTrainerMutations, useTrainerSchedule } from '../a
 import { Chevron } from '../../../app/navigation/TabGlyph';
 import { clock, dayKey, FilterChip, localKey, monthBounds, StatusPill, TrainerCard, useTrainerLayout } from '../ui';
 
-type Navigation = CompositeNavigationProp<BottomTabNavigationProp<TrainerTabParamList, 'Schedule'>, NativeStackNavigationProp<AppStackParamList>>;
+type Navigation = NativeStackNavigationProp<AppStackParamList>;
 type Span = 'day' | 'week' | 'month';
 
 export function TrainerScheduleScreen() {

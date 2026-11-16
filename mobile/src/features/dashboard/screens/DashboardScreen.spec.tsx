@@ -14,6 +14,7 @@ jest.mock('../../fitness/api/fitness.api', () => ({
   getDashboard: jest.fn(),
   getProfile: jest.fn(),
   listPrograms: jest.fn(),
+  listSessions: jest.fn(async () => ({ items: [], page: 1, pageSize: 20, totalCount: 0 })),
 }));
 
 jest.mock('@react-navigation/native', () => {

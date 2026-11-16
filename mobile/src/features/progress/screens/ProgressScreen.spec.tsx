@@ -16,6 +16,8 @@ jest.mock('../../fitness/api/fitness.api', () => ({
   getDashboard: jest.fn(),
   listMeasurements: jest.fn(),
   listRecords: jest.fn(),
+  listPrograms: jest.fn(async () => ({ items: [], page: 1, pageSize: 20, totalCount: 0 })),
+  listSessions: jest.fn(async () => ({ items: [], page: 1, pageSize: 20, totalCount: 0 })),
 }));
 
 const emptyDashboard = {

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../app/providers/ThemeProvider';
 import { AppText } from '../../components/ui/AppText';
 
@@ -29,12 +30,14 @@ export function formatSeconds(total: number) {
   return `${`${Math.floor(minutes / 60)}`.padStart(2, '0')}:${`${minutes % 60}`.padStart(2, '0')}:${`${seconds}`.padStart(2, '0')}`;
 }
 
-export function useTrainerLayout() {
+export function useTrainerLayout(options?: { topInset?: boolean }) {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   return {
     content: {
       gap: theme.spacing.lg,
       padding: theme.spacing.xl,
+      paddingTop: theme.spacing.xl + (options?.topInset ? insets.top : 0),
       paddingBottom: theme.spacing.xxxl,
     },
     refresh: theme.colors.accent,
@@ -99,7 +102,7 @@ export function FilterChip({ label, selected, onPress }: { label: string; select
       onPress={onPress}
       style={{ backgroundColor: selected ? theme.colors.accent : theme.colors.surfaceMuted, borderRadius: theme.radius.pill, justifyContent: 'center', minHeight: 36, paddingHorizontal: theme.spacing.md }}
     >
-      <AppText style={{ color: selected ? theme.colors.onAccent : theme.colors.text }} variant="label">{label}</AppText>
+      <AppText style={{ color: selected ? theme.colors.onAccent : theme.colors.muted }} variant="label">{label}</AppText>
     </Pressable>
   );
 }

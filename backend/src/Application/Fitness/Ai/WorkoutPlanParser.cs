@@ -5,16 +5,21 @@ namespace LifeFitAI.Application.Fitness.Ai;
 
 public static class WorkoutPlanParser
 {
-    public static Result<GeneratedProgram> ParseMonth(string? json, IReadOnlySet<Guid> allowedIds, IReadOnlyDictionary<string, Guid>? exerciseNames = null)
+    public static Result<GeneratedProgram> ParseMonth(string? json, IReadOnlySet<Guid> allowedIds, IReadOnlyDictionary<string, Guid>? exerciseNames = null, int dayCount = 30)
     {
-        var parsed = Parse(json, allowedIds, exerciseNames, 31);
+        if (dayCount is not (7 or 10 or 15 or 30))
+        {
+            return Result.Failure<GeneratedProgram>(AiErrors.PlanLength);
+        }
+
+        var parsed = Parse(json, allowedIds, exerciseNames, dayCount);
         if (parsed.IsFailure)
         {
             return parsed;
         }
 
         var days = parsed.Value.Days.OrderBy(day => day.DayNumber).ToArray();
-        var sequential = days.Length == 30 && days.Select((day, index) => day.DayNumber == index + 1).All(match => match);
+        var sequential = days.Length == dayCount && days.Select((day, index) => day.DayNumber == index + 1).All(match => match);
         var volume = sequential && days.Where(day => !day.RestDay).SelectMany(day => day.Exercises).All(item => item.TargetReps is not null || item.TargetDurationSeconds is not null);
         return sequential && volume && days.Any(day => day.RestDay)
             ? Result.Success(new GeneratedProgram(parsed.Value.Name, days))

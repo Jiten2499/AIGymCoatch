@@ -7,7 +7,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "backgroundColor": "#07110d",
+    "backgroundColor": "#06130D",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.growventur.growfit",
@@ -19,7 +19,7 @@
     "android": {
       "package": "com.growventur.growfit",
       "adaptiveIcon": {
-        "backgroundColor": "#07110d",
+        "backgroundColor": "#06130D",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -65,9 +65,9 @@
         "expo-splash-screen",
         {
           "image": "./assets/splash-icon.png",
-          "imageWidth": 200,
+          "imageWidth": 220,
           "resizeMode": "contain",
-          "backgroundColor": "#07110d"
+          "backgroundColor": "#06130D"
         }
       ]
     ],

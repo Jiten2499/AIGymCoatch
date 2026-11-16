@@ -207,6 +207,7 @@ export function FitnessAssessmentScreen({ navigation }: Props) {
             {step > 0 ? <AppButton label={t('assessment.previous')} onPress={() => setStep((value) => value - 1)} variant="secondary" /> : null}
             <AppButton label={t('assessment.saveDraft')} loading={save.isPending} onPress={() => persist(false, step + 1)} variant="secondary" />
             {step < 7 ? <AppButton label={t('assessment.continue')} loading={save.isPending} onPress={continueStep} /> : <AppButton label={t('assessment.submit')} loading={save.isPending} onPress={() => persist(true, 8)} />}
+            {assessment.data?.isCompleted ? <AppButton label={t('journey.generate')} onPress={() => navigation.navigate('PlanGenerate')} variant="secondary" /> : null}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

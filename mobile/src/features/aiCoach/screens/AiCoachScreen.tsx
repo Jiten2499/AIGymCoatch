@@ -20,6 +20,7 @@ import { formatDateTime } from '../../../services/localization/format';
 import { useFitnessAssessment } from '../../assessment/api/assessment.queries';
 import { tenantKey } from '../../fitness/api/keys';
 import { useFitnessProfile, useTenantId } from '../../fitness/api/queries';
+import { PlanLengthField } from '../../plan/PlanLengthField';
 import { coachChat, generateWorkout, progressInsight } from '../api/ai.api';
 import { useConversations } from '../api/queries';
 
@@ -38,6 +39,7 @@ export function AiCoachScreen() {
   const conversations = useConversations(1, coachEnabled);
   const prompts = ['planToday', 'consistency', 'reviewProgress', 'understandNutrition', 'recovery'] as const;
   const [notes, setNotes] = useState('');
+  const [planDays, setPlanDays] = useState(30);
   const [question, setQuestion] = useState('');
   const [conversationId, setConversationId] = useState<string | null>(null);
   const missing = profile.isError && isNotFound(profile.error);
@@ -50,7 +52,7 @@ export function AiCoachScreen() {
       ].filter((item): item is string => item != null)
     : [];
   const generate = useMutation({
-    mutationFn: () => generateWorkout(notes.trim() || null),
+    mutationFn: () => generateWorkout(notes.trim() || null, planDays),
     onSuccess: async (program) => {
       client.setQueryData(tenantKey(tenantId, 'program', program.id), program);
       await client.invalidateQueries({ queryKey: tenantKey(tenantId, 'programs') });
@@ -104,6 +106,7 @@ export function AiCoachScreen() {
           {features.isSuccess && coachEnabled && !canGenerate ? <AppText>{t('journey.featureDisabled')}</AppText> : null}
           {canGenerate ? (
             <>
+              <PlanLengthField disabled={generate.isPending} onChange={setPlanDays} value={planDays} />
               {generate.isError ? <AppText accessibilityRole="alert" tone="danger">{errorText(generate.error, t('common.offline'))}</AppText> : null}
               <AppButton disabled={missing || !assessmentReady || generate.isPending} label={t('journey.generate')} loading={generate.isPending} onPress={() => { if (!generate.isPending) generate.mutate(); }} />
             </>

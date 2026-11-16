@@ -1,82 +1,118 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useState } from 'react';
+import { useLayoutEffect, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Image, ScrollView, View } from 'react-native';
 import type { AppStackParamList } from '../../../app/navigation/types';
 import { useTheme } from '../../../app/providers/ThemeProvider';
 import { ScreenState } from '../../../components/feedback/ScreenState';
 import { AppButton } from '../../../components/ui/AppButton';
-import { AppCard } from '../../../components/ui/AppCard';
 import { AppText } from '../../../components/ui/AppText';
 import { errorText } from '../../../services/api/problem';
-import { useExercise, useProgram, useStartProgram } from '../../fitness/api/queries';
-import type { ProgramExercise } from '../../fitness/types';
+import { useFitnessAssessment } from '../../assessment/api/assessment.queries';
+import type { FitnessAssessment } from '../../assessment/types';
+import { useProgram } from '../../fitness/api/queries';
+import { CalendarIcon, ChevronIcon, ClockIcon, DumbbellIcon, FlameIcon, MuscleIcon, RunnerIcon } from '../../plan/planIcons';
+
+const summit = require('../../../../assets/journey/plan-summit.jpg') as number;
 
 type Props = NativeStackScreenProps<AppStackParamList, 'WorkoutPlan'>;
+type FocusIcon = 'flame' | 'muscle' | 'run';
 
 export function WorkoutPlanScreen({ navigation, route }: Props) {
   const theme = useTheme();
   const { t } = useTranslation();
   const program = useProgram(route.params.programId);
-  const start = useStartProgram();
-  const [openDay, setOpenDay] = useState<string | null>(null);
+  const assessment = useFitnessAssessment();
   const data = program.data;
+  const saved = assessment.data;
+  const minutes = saved?.workout?.durationMinutes ?? null;
+  const focuses = focusRows(saved, t);
+
+  useLayoutEffect(() => {
+    navigation.setOptions?.({ title: t('journey.planOverviewTitle') });
+  }, [navigation, t]);
 
   return (
-    <ScreenState error={program.isError ? errorText(program.error, t('common.offline')) : null} loading={program.isLoading} onRetry={() => void program.refetch()}>
+    <ScreenState error={program.isError ? errorText(program.error, t('common.offline')) : null} loading={program.isLoading || assessment.isLoading} onRetry={() => { void program.refetch(); void assessment.refetch(); }}>
       <ScrollView contentContainerStyle={{ gap: theme.spacing.lg, padding: theme.spacing.xl }}>
-        <View style={{ gap: theme.spacing.xs }}>
-          <AppText variant="title">{data?.name}</AppText>
-          <AppText tone="muted">{data ? t(`journey.goalType.${data.goalType}`) : ''}</AppText>
-          <AppText tone="muted">{data ? `${t('journey.weeks', { count: data.durationWeeks })} · ${t('journey.perWeek', { count: data.frequencyPerWeek })}` : ''}</AppText>
-          {data?.description ? <AppText>{data.description}</AppText> : null}
-        </View>
-        {start.isError ? <AppText accessibilityRole="alert" tone="danger">{errorText(start.error, t('common.offline'))}</AppText> : null}
-        {data?.days.map((day, index) => {
-          const week = Math.floor((day.dayNumber - 1) / 7) + 1;
-          const previous = data.days[index - 1];
-          const showWeek = previous == null || Math.floor((previous.dayNumber - 1) / 7) + 1 !== week;
-          const weekDays = showWeek ? data.days.filter((item) => Math.floor((item.dayNumber - 1) / 7) + 1 === week) : [];
-          const recovery = day.restDay && `${day.name} ${day.description ?? ''}`.toLowerCase().includes('recovery');
-          return (
-          <View key={day.id} style={{ gap: theme.spacing.sm }}>
-            {showWeek ? <AppText variant="label">{t('journey.weekSummary', { week, training: weekDays.filter((item) => !item.restDay).length, rest: weekDays.filter((item) => item.restDay).length })}</AppText> : null}
-          <AppCard>
-            <Pressable accessibilityLabel={day.name} accessibilityRole="button" onPress={() => setOpenDay(openDay === day.id ? null : day.id)} style={{ minHeight: theme.control.minTouch, justifyContent: 'center' }}>
-              <AppText variant="label">{`Day ${day.dayNumber} · ${day.name}`}</AppText>
-              {day.description ? <AppText tone="muted">{day.description}</AppText> : null}
-              <AppText tone="muted">{day.restDay ? (recovery ? t('journey.activeRecovery') : t('journey.restDay')) : t('journey.exercisesDone', { count: day.exercises.length })}</AppText>
-            </Pressable>
-            {openDay === day.id && !day.restDay ? day.exercises.map((exercise) => <PlanExercise exercise={exercise} key={exercise.id} onOpen={() => navigation.navigate('ExerciseDetail', { exerciseId: exercise.exerciseId })} />) : null}
-            {!day.restDay ? (
-              <AppButton label={t('journey.viewDay')} onPress={() => navigation.navigate('WorkoutDay', { programId: route.params.programId, dayId: day.id })} variant="secondary" />
-            ) : null}
-            {!day.restDay ? (
-              <AppButton label={t('journey.startWorkout')} loading={start.isPending} onPress={() => {
-                start.mutate({ programId: route.params.programId, dayId: day.id }, { onSuccess: (session) => navigation.navigate('WorkoutSession', { sessionId: session.id }) });
-              }} />
-            ) : null}
-          </AppCard>
+        {data ? (
+          <View style={{ borderRadius: 22, height: 176, overflow: 'hidden' }}>
+            <Image accessibilityIgnoresInvertColors resizeMode="cover" source={summit} style={{ bottom: 0, height: 250, position: 'absolute', width: '100%' }} />
+            <View style={{ gap: theme.spacing.xs, left: 16, position: 'absolute', right: '40%', top: 16 }}>
+              <View style={{ alignItems: 'center', backgroundColor: 'rgba(7,17,13,0.55)', borderRadius: 12, height: 36, justifyContent: 'center', width: 36 }}>
+                <CalendarIcon />
+              </View>
+              <AppText variant="title">{data.name}</AppText>
+              <AppText tone="muted">{t('journey.personalized')}</AppText>
+            </View>
           </View>
-          );
-        })}
+        ) : null}
+        {data ? (
+          <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+            <Stat icon={<CalendarIcon />} label={t('journey.daysLabel')} value={String(data.days.length)} />
+            <Stat icon={<DumbbellIcon />} label={t('journey.daysPerWeekLabel')} value={textOrDash(saved?.workout?.daysPerWeek)} />
+            <Stat icon={<ClockIcon />} label={t('journey.perSession')} value={minutes ? `~${minutes} min` : '—'} />
+          </View>
+        ) : null}
+        {data ? (
+          <View style={{ gap: theme.spacing.sm }}>
+            <AppText variant="label">{t('journey.planFocus')}</AppText>
+            {focuses.map((row) => (
+              <View key={row.label} style={{ alignItems: 'center', backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radius.lg, borderWidth: 1, flexDirection: 'row', gap: theme.spacing.md, minHeight: theme.control.minTouch, paddingHorizontal: theme.spacing.md, paddingVertical: theme.spacing.sm }}>
+                <View style={{ alignItems: 'center', backgroundColor: theme.colors.surfaceMuted, borderRadius: 16, height: 32, justifyContent: 'center', width: 32 }}>
+                  <FocusGlyph name={row.icon} />
+                </View>
+                <AppText style={{ flex: 1 }}>{row.label}</AppText>
+                <ChevronIcon />
+              </View>
+            ))}
+          </View>
+        ) : null}
+        {data ? <AppButton label={t('journey.viewSchedule')} onPress={() => navigation.navigate('PlanCalendar', { programId: data.id })} /> : null}
       </ScrollView>
     </ScreenState>
   );
 }
 
-function PlanExercise({ exercise, onOpen }: { exercise: ProgramExercise; onOpen: () => void }) {
+function Stat({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   const theme = useTheme();
-  const { t } = useTranslation();
-  const detail = useExercise(exercise.exerciseId);
   return (
-    <View style={{ gap: 4, paddingVertical: 8 }}>
-      <Pressable accessibilityRole="button" onPress={onOpen} style={{ justifyContent: 'center', minHeight: theme.control.minTouch }}>
-        <AppText>{detail.data?.name ?? t('common.loading')}</AppText>
-      </Pressable>
-      <AppText tone="muted">{[exercise.sets ? t('journey.sets', { count: exercise.sets }) : null, exercise.targetReps ? t('journey.reps', { count: exercise.targetReps }) : null, exercise.targetWeight !== null ? `${t('journey.weightLabel')}: ${exercise.targetWeight}` : null, exercise.restSeconds ? t('journey.rest', { count: exercise.restSeconds }) : null, detail.data?.equipment].filter(Boolean).join(' · ')}</AppText>
-      {exercise.notes ? <AppText tone="muted">{exercise.notes}</AppText> : null}
-      {detail.data?.instructions ? <AppText tone="muted">{detail.data.instructions}</AppText> : null}
+    <View style={{ alignItems: 'center', backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radius.lg, borderWidth: 1, flex: 1, gap: theme.spacing.xs, paddingVertical: theme.spacing.md }}>
+      {icon}
+      <AppText variant="title">{value}</AppText>
+      <AppText tone="muted" variant="caption">{label}</AppText>
     </View>
   );
+}
+
+function FocusGlyph({ name }: { name: FocusIcon }) {
+  if (name === 'flame') return <FlameIcon />;
+  if (name === 'run') return <RunnerIcon />;
+  return <MuscleIcon />;
+}
+
+function textOrDash(value: number | null | undefined): string {
+  return value == null ? '—' : String(value);
+}
+
+function focusRows(assessment: FitnessAssessment | null | undefined, t: (key: string) => string): { icon: FocusIcon; label: string }[] {
+  if (!assessment) return [];
+  const rows: { icon: FocusIcon; label: string }[] = [];
+  const add = (value: string | null | undefined, group: 'goals' | 'priorities' | 'styleOptions') => {
+    if (!value) return;
+    const label = t(`assessment.${group}.${value}`);
+    if (label.startsWith('assessment.') || rows.some((row) => row.label === label)) return;
+    rows.push({ icon: focusIcon(value), label });
+  };
+  add(assessment.primaryGoal, 'goals');
+  add(assessment.secondaryGoal, 'goals');
+  add(assessment.priority, 'priorities');
+  for (const style of assessment.workout?.trainingStyles ?? []) add(style, 'styleOptions');
+  return rows;
+}
+
+function focusIcon(value: string): FocusIcon {
+  if (/weightloss|fatloss|recomp/i.test(value)) return 'flame';
+  if (/endurance|cardio|hiit|athletic/i.test(value)) return 'run';
+  return 'muscle';
 }

@@ -77,6 +77,11 @@ export async function getExercise(id: string, signal?: AbortSignal): Promise<Exe
   return response.data;
 }
 
+export async function listExercises(search: string, signal?: AbortSignal): Promise<PageResult<ExerciseDetail>> {
+  const response = await apiClient.get<PageResult<ExerciseDetail>>('/exercises', { params: { search, page: 1, pageSize: 40 }, signal });
+  return response.data;
+}
+
 export async function listRecords(signal?: AbortSignal): Promise<PersonalRecord[]> {
   const response = await apiClient.get<PersonalRecord[]>('/progress/records', { signal });
   return response.data;

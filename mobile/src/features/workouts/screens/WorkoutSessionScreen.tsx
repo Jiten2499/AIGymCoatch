@@ -1,5 +1,5 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
@@ -16,6 +16,8 @@ import { AppTextInput } from '../../../components/ui/AppTextInput';
 import { featureCodes } from '../../../constants/access';
 import { errorText } from '../../../services/api/problem';
 import { useAddSet, useCompleteSession, useExercise, useProgram, useSession } from '../../fitness/api/queries';
+import { ExerciseMuscleTargets } from '../../muscles/ExerciseMuscleTargets';
+import { ScenePhoto } from '../../plan/heroes';
 
 const schema = z.object({
   reps: z.string(),
@@ -37,6 +39,8 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
   const complete = useCompleteSession();
   const [index, setIndex] = useState(0);
   const [formError, setFormError] = useState<string | null>(null);
+  const [restLeft, setRestLeft] = useState(0);
+  const [restPaused, setRestPaused] = useState(false);
   const form = useForm<SetValues>({ resolver: zodResolver(schema), defaultValues: { reps: '', weight: '', durationSeconds: '', distance: '' } });
   const current = session.data?.exercises[index] ?? null;
   const exercise = useExercise(current?.exerciseId ?? '');
@@ -68,6 +72,10 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
     }, {
       onSuccess: () => {
         form.reset();
+        if (target?.restSeconds) {
+          setRestLeft(target.restSeconds);
+          setRestPaused(false);
+        }
         if (targetSets !== null && logged + 1 >= targetSets && index < (session.data?.exercises.length ?? 1) - 1) {
           setIndex(index + 1);
         }
@@ -77,6 +85,14 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
 
   const exerciseCount = session.data?.exercises.length ?? 0;
 
+  useEffect(() => {
+    if (restLeft <= 0 || restPaused) {
+      return;
+    }
+    const timer = setInterval(() => setRestLeft((value) => Math.max(0, value - 1)), 1000);
+    return () => clearInterval(timer);
+  }, [restLeft > 0, restPaused]);
+
   return (
     <FeatureGate code={featureCodes.workoutPlans}>
     <ScreenState error={session.isError ? errorText(session.error, t('common.offline')) : null} loading={session.isLoading} onRetry={() => void session.refetch()}>
@@ -84,11 +100,23 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
         <ScrollView contentContainerStyle={{ gap: theme.spacing.lg, padding: theme.spacing.xl }} keyboardShouldPersistTaps="handled">
           <AppText tone="muted">{program.data?.name}</AppText>
           <AppText variant="title">{exercise.data?.name ?? t('journey.sessionTitle')}</AppText>
+          <ScenePhoto label={`${exercise.data?.name ?? ''} ${exercise.data?.muscleGroup ?? ''}`} onPress={current ? () => navigation.navigate('ExerciseDetail', { exerciseId: current.exerciseId }) : undefined} />
           {exerciseCount > 0 ? <AppText tone="muted">{t('journey.exerciseOf', { current: index + 1, total: exerciseCount })}</AppText> : null}
           <AppText tone="muted">{targetSets ? t('journey.setOf', { current: Math.min(logged + 1, targetSets), total: targetSets }) : t('journey.setsDone', { count: logged })}</AppText>
           {target?.targetReps ? <AppText tone="muted">{t('journey.reps', { count: target.targetReps })}</AppText> : null}
           {target?.targetWeight ? <AppText tone="muted">{t('journey.weightLabel')}: {target.targetWeight}</AppText> : null}
+          {exercise.data ? <ExerciseMuscleTargets exercise={exercise.data} variant="compact" /> : null}
           {exercise.data?.instructions ? <AppText>{exercise.data.instructions}</AppText> : null}
+          {current ? <AppButton label={t('journey.guide')} onPress={() => navigation.navigate('ExerciseDetail', { exerciseId: current.exerciseId })} variant="secondary" /> : null}
+          {restLeft > 0 ? (
+            <View style={{ gap: theme.spacing.sm }}>
+              <AppText variant="title">{t('journey.restTimer')} {formatClock(restLeft)}</AppText>
+              <AppButton label={restPaused ? t('journey.resumeTimer') : t('journey.pauseTimer')} onPress={() => setRestPaused((value) => !value)} variant="secondary" />
+            </View>
+          ) : null}
+          {current?.sets.map((set) => (
+            <AppText key={set.id} tone="accent">{t('journey.logged')} {set.setNumber}{set.reps !== null ? ` · ${set.reps}` : ''}{set.weight !== null ? ` · ${set.weight}` : ''}</AppText>
+          ))}
           <FormField label={t('journey.repsLabel')}>
             <AppTextInput accessibilityLabel={t('journey.repsLabel')} keyboardType="number-pad" onChangeText={(value) => form.setValue('reps', value)} value={form.watch('reps')} />
           </FormField>
@@ -105,9 +133,10 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
           {addSet.isError ? <AppText accessibilityRole="alert" tone="danger">{errorText(addSet.error, t('common.offline'))}</AppText> : null}
           {addSet.isSuccess ? <AppText tone="accent">{t('journey.logged')}</AppText> : null}
           <AppButton label={t('journey.logSet')} loading={addSet.isPending} onPress={() => { void submit(); }} />
-          {index < (session.data?.exercises.length ?? 0) - 1 ? (
-            <AppButton label={t('journey.nextExercise')} onPress={() => setIndex(index + 1)} variant="secondary" />
-          ) : null}
+          <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+            {index > 0 ? <AppButton label={t('journey.previousExercise')} onPress={() => setIndex(index - 1)} variant="secondary" /> : null}
+            {index < exerciseCount - 1 ? <AppButton label={t('journey.nextExercise')} onPress={() => setIndex(index + 1)} variant="secondary" /> : null}
+          </View>
           <View>
             <AppButton label={t('journey.finish')} loading={complete.isPending} onPress={() => {
               complete.mutate(route.params.sessionId, { onSuccess: () => navigation.replace('WorkoutSummary', { sessionId: route.params.sessionId }) });
@@ -119,6 +148,12 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
     </ScreenState>
     </FeatureGate>
   );
+}
+
+function formatClock(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  const remain = seconds % 60;
+  return `${String(minutes).padStart(2, '0')}:${String(remain).padStart(2, '0')}`;
 }
 
 function optionalInt(value: string): number | null | 'invalid' {

@@ -17,10 +17,8 @@ export type MemberTabParamList = {
 
 export type TrainerTabParamList = {
   Home: undefined;
-  Schedule: undefined;
   Members: undefined;
-  Performance: undefined;
-  Chats: undefined;
+  Plans: undefined;
   More: undefined;
 };
 
@@ -57,10 +55,20 @@ export type AppStackParamList = {
   Staff: undefined;
   Trainers: undefined;
   MyTargets: undefined;
-  TrainerMember: { memberId: string };
+  TrainerMember: { memberId: string; tab?: 'overview' | 'plan' | 'progress' };
   TrainerMemberProgress: { memberId: string; assessmentId?: string; start?: 'record' };
   TrainerMemberPlan: { memberId: string; programId: string };
+  TrainerPlanDay: { memberId: string; programId: string; dayNumber: number };
+  TrainerExerciseLibrary: { memberId?: string; programId?: string; dayNumber?: number; replaceIndex?: number } | undefined;
+  TrainerExerciseEdit: { memberId: string; programId: string; dayNumber: number; exerciseIndex: number };
+  TrainerPlanReview: { memberId: string; programId: string };
+  TrainerPlanHistory: { memberId: string; programId: string };
+  TrainerSchedule: undefined;
+  TrainerPerformance: undefined;
   FitnessAssessment: undefined;
+  FitnessAssessmentIntro: undefined;
+  PlanGenerate: undefined;
+  PlanCalendar: { programId: string };
   TrainerSession: { sessionId: string };
   TrainerActive: { sessionId: string };
   TrainerAlerts: undefined;

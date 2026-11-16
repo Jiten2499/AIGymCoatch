@@ -1,0 +1,53 @@
+{
+  "note": "Starter mappings for integration prototyping. Review and adjust with a qualified fitness professional before treating as authoritative.",
+  "exercises": {
+    "dumbbell-bench-press": {
+      "primaryMuscles": ["chest"],
+      "secondaryMuscles": ["shoulders", "triceps"]
+    },
+    "push-up": {
+      "primaryMuscles": ["chest"],
+      "secondaryMuscles": ["shoulders", "triceps", "core_abs", "serratus_anterior"]
+    },
+    "lat-pulldown": {
+      "primaryMuscles": ["lats"],
+      "secondaryMuscles": ["biceps", "forearms", "middle_back"]
+    },
+    "seated-cable-row": {
+      "primaryMuscles": ["middle_back", "lats"],
+      "secondaryMuscles": ["biceps", "forearms", "upper_back"]
+    },
+    "deadlift": {
+      "primaryMuscles": ["hamstrings", "glutes", "lower_back"],
+      "secondaryMuscles": ["forearms", "upper_back", "quadriceps", "core_abs"]
+    },
+    "barbell-squat": {
+      "primaryMuscles": ["quadriceps", "glutes"],
+      "secondaryMuscles": ["hamstrings", "core_abs", "adductors"]
+    },
+    "hip-thrust": {
+      "primaryMuscles": ["glutes"],
+      "secondaryMuscles": ["hamstrings", "core_abs"]
+    },
+    "shoulder-press": {
+      "primaryMuscles": ["shoulders"],
+      "secondaryMuscles": ["triceps", "upper_back", "core_abs"]
+    },
+    "biceps-curl": {
+      "primaryMuscles": ["biceps"],
+      "secondaryMuscles": ["forearms"]
+    },
+    "triceps-pushdown": {
+      "primaryMuscles": ["triceps"],
+      "secondaryMuscles": ["shoulders"]
+    },
+    "lateral-raise": {
+      "primaryMuscles": ["shoulders"],
+      "secondaryMuscles": ["upper_back"]
+    },
+    "standing-calf-raise": {
+      "primaryMuscles": ["calves"],
+      "secondaryMuscles": ["tibialis_anterior"]
+    }
+  }
+}

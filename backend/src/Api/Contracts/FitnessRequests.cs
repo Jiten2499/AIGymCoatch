@@ -36,6 +36,6 @@ public sealed record RecordChallengeProgressRequest(decimal Value);
 
 public sealed record CoachChatRequest(string Message, Guid? ConversationId);
 
-public sealed record GenerateWorkoutRequest(string? Notes);
+public sealed record GenerateWorkoutRequest(string? Notes, int? PlanDays);
 
 public sealed record NutritionAdviceRequest(string? Question);

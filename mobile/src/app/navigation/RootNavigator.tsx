@@ -36,6 +36,9 @@ import { ChallengeDetailScreen } from '../../features/challenges/screens/Challen
 import { ChallengesScreen } from '../../features/challenges/screens/ChallengesScreen';
 import { DashboardScreen } from '../../features/dashboard/screens/DashboardScreen';
 import { FitnessAssessmentScreen } from '../../features/assessment/screens/FitnessAssessmentScreen';
+import { AssessmentIntroScreen } from '../../features/plan/screens/AssessmentIntroScreen';
+import { PlanCalendarScreen } from '../../features/plan/screens/PlanCalendarScreen';
+import { PlanGenerateScreen } from '../../features/plan/screens/PlanGenerateScreen';
 import { FitnessScreen } from '../../features/fitness/screens/FitnessScreen';
 import { ChatListScreen } from '../../features/chat/screens/ChatListScreen';
 import { ChatThreadScreen } from '../../features/chat/screens/ChatThreadScreen';
@@ -63,9 +66,16 @@ import { WorkoutSummaryScreen } from '../../features/workouts/screens/WorkoutSum
 import { WorkoutsScreen } from '../../features/workouts/screens/WorkoutsScreen';
 import { TrainerActiveScreen } from '../../features/trainers/screens/TrainerActiveScreen';
 import { TrainerAlertsScreen } from '../../features/trainers/screens/TrainerAlertsScreen';
+import { TrainerExerciseEditScreen } from '../../features/trainers/screens/TrainerExerciseEditScreen';
+import { TrainerExerciseLibraryScreen } from '../../features/trainers/screens/TrainerExerciseLibraryScreen';
 import { TrainerMemberScreen } from '../../features/trainers/screens/TrainerMemberScreen';
 import { TrainerMemberPlanScreen } from '../../features/trainers/screens/TrainerMemberPlanScreen';
 import { TrainerMemberProgressScreen } from '../../features/trainers/screens/TrainerMemberProgressScreen';
+import { TrainerPerformanceScreen } from '../../features/trainers/screens/TrainerPerformanceScreen';
+import { TrainerPlanDayScreen } from '../../features/trainers/screens/TrainerPlanDayScreen';
+import { TrainerPlanHistoryScreen } from '../../features/trainers/screens/TrainerPlanHistoryScreen';
+import { TrainerPlanReviewScreen } from '../../features/trainers/screens/TrainerPlanReviewScreen';
+import { TrainerScheduleScreen } from '../../features/trainers/screens/TrainerScheduleScreen';
 import { TrainerSessionScreen } from '../../features/trainers/screens/TrainerSessionScreen';
 import { featureCodes } from '../../constants/access';
 import { useWorkspaceFeatures } from '../../features/licensing/api/featureQuery';
@@ -140,7 +150,10 @@ function AuthenticatedStack() {
     <AppStack.Navigator screenOptions={{ headerShadowVisible: false }}>
       <AppStack.Screen name="Tabs" component={AppTabs} options={{ headerShown: false }} />
       <AppStack.Screen name="Fitness" component={FitnessScreen} options={{ title: t('nav.fitness') }} />
+      <AppStack.Screen name="FitnessAssessmentIntro" component={AssessmentIntroScreen} options={{ title: t('journey.quickAssessment') }} />
       <AppStack.Screen name="FitnessAssessment" component={FitnessAssessmentScreen} options={{ title: t('assessment.title') }} />
+      <AppStack.Screen name="PlanGenerate" component={PlanGenerateScreen} options={{ title: t('journey.generate') }} />
+      <AppStack.Screen name="PlanCalendar" component={PlanCalendarScreen} options={{ title: t('journey.calendarTitle') }} />
       <AppStack.Screen name="WorkoutPlan" component={WorkoutPlanScreen} options={{ title: t('nav.workouts') }} />
       <AppStack.Screen name="WorkoutDay" component={WorkoutDayScreen} options={{ title: t('journey.dayTitle') }} />
       <AppStack.Screen name="ExerciseDetail" component={ExerciseDetailScreen} options={{ title: t('journey.exerciseDetail') }} />
@@ -174,6 +187,13 @@ function AuthenticatedStack() {
       <AppStack.Screen name="TrainerMember" component={TrainerMemberScreen} options={{ title: t('trainer.member') }} />
       <AppStack.Screen name="TrainerMemberProgress" component={TrainerMemberProgressScreen} options={{ title: t('trainer.progress') }} />
       <AppStack.Screen name="TrainerMemberPlan" component={TrainerMemberPlanScreen} options={{ title: t('trainer.plans') }} />
+      <AppStack.Screen name="TrainerPlanDay" component={TrainerPlanDayScreen} options={{ title: t('trainer.editDay') }} />
+      <AppStack.Screen name="TrainerExerciseLibrary" component={TrainerExerciseLibraryScreen} options={{ title: t('trainer.library') }} />
+      <AppStack.Screen name="TrainerExerciseEdit" component={TrainerExerciseEditScreen} options={{ title: t('trainer.editExercise') }} />
+      <AppStack.Screen name="TrainerPlanReview" component={TrainerPlanReviewScreen} options={{ title: t('trainer.reviewChanges') }} />
+      <AppStack.Screen name="TrainerPlanHistory" component={TrainerPlanHistoryScreen} options={{ title: t('trainer.history') }} />
+      <AppStack.Screen name="TrainerSchedule" component={TrainerScheduleScreen} options={{ title: t('trainer.schedule') }} />
+      <AppStack.Screen name="TrainerPerformance" component={TrainerPerformanceScreen} options={{ title: t('trainer.performance') }} />
       <AppStack.Screen name="TrainerSession" component={TrainerSessionScreen} options={{ title: t('trainer.session') }} />
       <AppStack.Screen name="TrainerActive" component={TrainerActiveScreen} options={{ title: t('trainer.activeSession') }} />
       <AppStack.Screen name="TrainerAlerts" component={TrainerAlertsScreen} options={{ title: t('trainer.alerts') }} />

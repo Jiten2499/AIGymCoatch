@@ -1,13 +1,15 @@
 import { useRoute, type RouteProp } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Dimensions, Keyboard, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { AppStackParamList } from '../../../app/navigation/types';
 import { useTheme } from '../../../app/providers/ThemeProvider';
 import { AppText } from '../../../components/ui/AppText';
 import { errorText } from '../../../services/api/problem';
 import { useSessionStore } from '../../../store/sessionStore';
+import { composerBottomPadding } from '../composerInset';
 import { useChatMessages, useMarkChatRead, useSendChatAttachment, useSendChatMessage } from '../api/queries';
 import { useChatRealtime } from '../realtime';
 
@@ -22,6 +24,7 @@ export function ChatThreadScreen() {
   const markRead = useMarkChatRead(route.params.conversationId);
   const [draft, setDraft] = useState('');
   const [typing, setTyping] = useState<string | null>(null);
+  const composerBottom = useComposerBottom(theme.spacing.md);
   useChatRealtime(route.params.conversationId, setTyping);
   const items = [...(messages.data ?? [])].reverse();
   const latestIncoming = [...items].reverse().find((item) => item.senderUserId !== userId);
@@ -51,7 +54,7 @@ export function ChatThreadScreen() {
         })}
       </ScrollView>
       {send.isError || attach.isError ? <AppText tone="danger">{errorText(send.error ?? attach.error, t('common.offline'))}</AppText> : null}
-      <View style={{ flexDirection: 'row', gap: theme.spacing.sm, padding: theme.spacing.md }}>
+      <View style={{ flexDirection: 'row', gap: theme.spacing.sm, paddingHorizontal: theme.spacing.md, paddingTop: theme.spacing.md, paddingBottom: composerBottom }}>
         <Pressable accessibilityRole="button" onPress={() => void pickImage()} style={{ justifyContent: 'center', minHeight: theme.control.minTouch }}>
           <AppText>{t('chat.attach')}</AppText>
         </Pressable>
@@ -78,4 +81,41 @@ export function ChatThreadScreen() {
     }
     attach.mutate({ uri: asset.uri, fileName: asset.fileName ?? 'photo.jpg', contentType: asset.mimeType ?? 'image/jpeg' });
   }
+}
+
+function useComposerBottom(spacing: number) {
+  const insets = useSafeAreaInsets();
+  const restingHeight = useRef(Dimensions.get('window').height);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [windowShrink, setWindowShrink] = useState(0);
+
+  useEffect(() => {
+    const measure = (keyboard: number) => {
+      const height = Dimensions.get('window').height;
+      setWindowShrink(Math.max(0, restingHeight.current - height));
+      setKeyboardHeight(keyboard);
+    };
+    const show = Keyboard.addListener('keyboardDidShow', (event) => {
+      const keyboard = event.endCoordinates.height;
+      requestAnimationFrame(() => measure(keyboard));
+    });
+    const dimensions = Dimensions.addEventListener('change', () => {
+      setWindowShrink((current) => {
+        const shrink = Math.max(0, restingHeight.current - Dimensions.get('window').height);
+        return shrink === 0 ? current : shrink;
+      });
+    });
+    const hide = Keyboard.addListener('keyboardDidHide', () => {
+      restingHeight.current = Dimensions.get('window').height;
+      setWindowShrink(0);
+      setKeyboardHeight(0);
+    });
+    return () => {
+      show.remove();
+      dimensions.remove();
+      hide.remove();
+    };
+  }, []);
+
+  return composerBottomPadding(spacing, insets.bottom, keyboardHeight, windowShrink);
 }

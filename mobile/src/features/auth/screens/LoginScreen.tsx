@@ -3,9 +3,11 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView } from 'react-native';
+import { Image, Pressable, ScrollView, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { AuthStackParamList } from '../../../app/navigation/types';
 import { useTheme } from '../../../app/providers/ThemeProvider';
+import growfitLogo from '../../../../assets/images/growfit-logo.png';
 import { FormField } from '../../../components/forms/FormField';
 import { AppButton } from '../../../components/ui/AppButton';
 import { AppText } from '../../../components/ui/AppText';
@@ -18,7 +20,10 @@ type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
 export function LoginScreen({ navigation }: Props) {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
+  const { height, width } = useWindowDimensions();
   const { t } = useTranslation();
+  const logoSize = Math.min(156, Math.round(width * 0.4), Math.round(height * 0.18));
   const [formError, setFormError] = useState<string | null>(null);
   const { control, handleSubmit, formState } = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
@@ -35,8 +40,18 @@ export function LoginScreen({ navigation }: Props) {
   });
 
   return (
-    <ScrollView contentContainerStyle={{ gap: theme.spacing.lg, padding: theme.spacing.xl }} keyboardShouldPersistTaps="handled">
-      <AppText variant="display">{t('appName')}</AppText>
+    <ScrollView
+      contentContainerStyle={{ flexGrow: 1, gap: theme.spacing.lg, padding: theme.spacing.xl, paddingTop: insets.top + theme.spacing.xl }}
+      keyboardShouldPersistTaps="handled"
+      style={{ backgroundColor: theme.colors.background, flex: 1 }}
+    >
+      <Image
+        accessibilityLabel="Growfit"
+        accessibilityRole="image"
+        resizeMode="contain"
+        source={growfitLogo}
+        style={{ alignSelf: 'center', height: logoSize, width: logoSize }}
+      />
       <AppText tone="muted">{t('auth.signIn')}</AppText>
       <Controller
         control={control}

@@ -50,6 +50,7 @@ export function WorkoutSummaryScreen({ navigation, route }: Props) {
           {features.isSuccess && insightAllowed ? <AppButton label={t('journey.feedback')} loading={insight.isPending} onPress={() => insight.mutate()} /> : null}
           {features.isSuccess && !insightAllowed ? <AppText tone="muted">{t('journey.featureDisabled')}</AppText> : null}
           {features.data?.[featureCodes.aiCoach] === true ? <AppButton label={t('coach.ask')} onPress={() => navigation.navigate('AiCoach')} variant="secondary" /> : null}
+          {data?.workoutProgramId ? <AppButton label={t('journey.openCalendar')} onPress={() => navigation.navigate('PlanCalendar', { programId: data.workoutProgramId ?? '' })} variant="secondary" /> : null}
           <AppButton label={t('nav.progress')} onPress={() => navigation.navigate('Tabs', { screen: 'Progress' })} variant="secondary" />
           <AppButton label={t('journey.historyTitle')} onPress={() => navigation.navigate('WorkoutHistory')} variant="secondary" />
           <AppButton label={t('journey.backHome')} onPress={() => navigation.navigate('Tabs', { screen: 'Dashboard' })} variant="secondary" />

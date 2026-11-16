@@ -10,7 +10,9 @@ import { AppCard } from '../../../components/ui/AppCard';
 import { AppText } from '../../../components/ui/AppText';
 import { featureCodes } from '../../../constants/access';
 import { errorText } from '../../../services/api/problem';
-import { useDashboard, useMeasurements, useRecords } from '../../fitness/api/queries';
+import { useDashboard, useMeasurements, usePrograms, useRecords, useSessions } from '../../fitness/api/queries';
+import { completedDayIds } from '../../plan/planModel';
+import { ProgressRing } from '../../plan/PlanParts';
 import { useWorkspaceFeatures } from '../../licensing/api/featureQuery';
 
 export function ProgressScreen() {
@@ -21,6 +23,12 @@ export function ProgressScreen() {
   const dashboard = useDashboard();
   const measurements = useMeasurements();
   const records = useRecords();
+  const programs = usePrograms();
+  const sessions = useSessions(1);
+  const plan = programs.data?.items[0] ?? null;
+  const done = plan ? completedDayIds(plan, sessions.data?.items ?? []).size : 0;
+  const planPercent = plan && plan.days.length > 0 ? (done / plan.days.length) * 100 : 0;
+  const minutes = (sessions.data?.items ?? []).reduce((total, session) => total + (session.durationSeconds ?? 0), 0);
   const weights = (measurements.data?.items ?? []).filter((item) => item.weight !== null).slice().reverse();
   const loading = dashboard.isLoading || measurements.isLoading || records.isLoading;
   const error = dashboard.error ?? measurements.error ?? records.error;
@@ -29,7 +37,21 @@ export function ProgressScreen() {
   return (
     <ScreenState error={error ? errorText(error, t('common.offline')) : null} loading={loading} onRetry={() => { void dashboard.refetch(); void measurements.refetch(); void records.refetch(); }}>
       <ScrollView contentContainerStyle={{ gap: theme.spacing.lg, padding: theme.spacing.xl }}>
-        <AppText variant="title">{t('nav.progress')}</AppText>
+        <AppText variant="title">{t('journey.progressTitle')}</AppText>
+        {plan ? (
+          <AppCard>
+            <View style={{ alignItems: 'center', flexDirection: 'row', gap: theme.spacing.md }}>
+              <ProgressRing percent={planPercent} />
+              <View style={{ flex: 1, gap: theme.spacing.xs }}>
+                <AppText variant="label">{plan.name}</AppText>
+                <AppText>{t('journey.workoutsOf', { done, total: plan.days.length })}</AppText>
+                {minutes > 0 ? <AppText tone="muted">{t('journey.workoutTime')}: {Math.round(minutes / 60)} min</AppText> : null}
+              </View>
+            </View>
+            <AppText tone="muted">{t('journey.keepGoing')}</AppText>
+            <AppButton label={t('journey.openCalendar')} onPress={() => navigation.navigate('PlanCalendar', { programId: plan.id })} variant="secondary" />
+          </AppCard>
+        ) : null}
         {empty ? <AppText tone="muted">{t('journey.progressEmpty')}</AppText> : null}
         <AppCard>
           <AppText variant="label">{t('journey.consistency')}</AppText>
@@ -39,7 +61,7 @@ export function ProgressScreen() {
           {dashboard.data?.currentGoal ? <AppText>{t(`journey.goalType.${dashboard.data.currentGoal.goalType}`)}</AppText> : null}
         </AppCard>
         <AppCard>
-          <AppText variant="label">{t('journey.weightTrend')}</AppText>
+          <AppText variant="label">{t('journey.weightProgress')}</AppText>
           {weights.length < 2 ? <AppText tone="muted">{t('journey.trendEmpty')}</AppText> : <WeightBars points={weights.map((item) => ({ date: item.measurementDate, weight: item.weight ?? 0 }))} />}
         </AppCard>
         <AppCard>

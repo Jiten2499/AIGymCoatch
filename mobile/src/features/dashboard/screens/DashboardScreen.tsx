@@ -7,7 +7,6 @@ import { ScrollView, View } from 'react-native';
 import type { AppStackParamList, MemberTabParamList } from '../../../app/navigation/types';
 import { useTheme } from '../../../app/providers/ThemeProvider';
 import { ScreenState } from '../../../components/feedback/ScreenState';
-import { AppAvatar } from '../../../components/ui/AppAvatar';
 import { AppButton } from '../../../components/ui/AppButton';
 import { AppCard } from '../../../components/ui/AppCard';
 import { AppText } from '../../../components/ui/AppText';
@@ -18,7 +17,9 @@ import { formatNumber } from '../../../services/localization/format';
 import { errorText, isNotFound } from '../../../services/api/problem';
 import { useWorkspaceFeatures } from '../../licensing/api/featureQuery';
 import { useFitnessAssessmentCompletion } from '../../assessment/api/assessment.queries';
-import { useDashboard, useFitnessProfile, usePrograms } from '../../fitness/api/queries';
+import { useDashboard, useFitnessProfile, usePrograms, useSessions } from '../../fitness/api/queries';
+import { CoachPhoto } from '../../plan/heroes';
+import { completedDayIds, nextTrainingDay } from '../../plan/planModel';
 import { useSessionStore } from '../../../store/sessionStore';
 import { useWorkspaceStore } from '../../../store/workspaceStore';
 import { WorkspaceSwitcher } from '../../tenant/WorkspaceSwitcher';
@@ -45,21 +46,24 @@ export function DashboardScreen() {
   const assessmentCompletion = useFitnessAssessmentCompletion();
   const dashboard = useDashboard();
   const programs = usePrograms();
+  const sessions = useSessions(1);
+  const activePlan = programs.data?.items[0] ?? null;
+  const nextDay = activePlan ? nextTrainingDay(activePlan, completedDayIds(activePlan, sessions.data?.items ?? [])) : null;
   const missingProfile = profile.isError && isNotFound(profile.error);
   const needsAssessment = missingProfile || (assessmentCompletion.data != null && !assessmentCompletion.data.isCompleted);
   const error = dashboard.isError ? errorText(dashboard.error, t('common.offline')) : null;
-  const today = programs.data?.items[0]?.days.find((day) => !day.restDay) ?? null;
+  const today = nextDay;
   const recent = dashboard.data?.recentWorkouts[0] ?? null;
 
   return (
     <ScreenState error={error} loading={dashboard.isLoading} onRetry={() => void dashboard.refetch()}>
       <ScrollView contentContainerStyle={{ gap: theme.spacing.lg, padding: theme.spacing.xl }}>
         <View style={{ alignItems: 'center', flexDirection: 'row', gap: theme.spacing.md }}>
-          <AppAvatar fallbackUri={photo.data} label={`${user?.firstName ?? ''} ${user?.lastName ?? ''}`} uri={memberPhoto} />
           <View style={{ flex: 1, gap: theme.spacing.xs }}>
             <AppText variant="display">{t('journey.greeting', { name: user?.firstName ?? '' })}</AppText>
             <AppText tone="muted">{t('journey.today')}</AppText>
           </View>
+          <CoachPhoto uri={memberPhoto ?? photo.data} />
         </View>
         <WorkspaceSwitcher onSelect={(workspace) => void switchWorkspace(workspace.id).then(applyAuth)} />
         {isTrainer ? (
@@ -72,7 +76,7 @@ export function DashboardScreen() {
         {needsAssessment ? (
           <AppCard>
             <AppText>{t('journey.profileEmpty')}</AppText>
-            <AppButton label={t('journey.completeProfile')} onPress={() => navigation.navigate('FitnessAssessment')} />
+            <AppButton label={t('journey.completeProfile')} onPress={() => navigation.navigate('FitnessAssessmentIntro')} />
           </AppCard>
         ) : null}
         <AppCard>
@@ -80,6 +84,14 @@ export function DashboardScreen() {
           <AppText>{dashboard.data?.currentGoal ? t(`journey.goalType.${dashboard.data.currentGoal.goalType}`) : t('journey.noGoal')}</AppText>
           {!dashboard.data?.currentGoal ? <AppButton label={t('journey.setGoal')} onPress={() => navigation.navigate('Fitness')} variant="secondary" /> : null}
         </AppCard>
+        {activePlan ? (
+          <AppCard>
+            <AppText variant="label">{t('journey.planCard')}</AppText>
+            <AppText>{activePlan.name}</AppText>
+            <AppText tone="accent">{t('journey.planActive')}</AppText>
+            <AppText tone="muted">{t('journey.planDay', { current: today?.dayNumber ?? activePlan.days.length, total: activePlan.days.length })}</AppText>
+          </AppCard>
+        ) : null}
         <AppCard>
           <AppText variant="label">{t('journey.thisWeek')}</AppText>
           <AppText>{t('journey.workoutsCount', { count: dashboard.data?.weeklyWorkouts ?? 0 })}</AppText>
@@ -89,11 +101,22 @@ export function DashboardScreen() {
           <AppText variant="label">{today ? today.name : t('journey.recent')}</AppText>
           {recent?.status === 'InProgress' ? (
             <AppButton label={t('journey.continueWorkout')} onPress={() => navigation.navigate('WorkoutSession', { sessionId: recent.id })} />
-          ) : today && programs.data?.items[0] ? (
-            <AppButton label={t('journey.startWorkout')} onPress={() => navigation.navigate('WorkoutPlan', { programId: programs.data.items[0].id })} />
+          ) : today && activePlan ? (
+            <AppButton label={t('journey.continueWorkout')} onPress={() => navigation.navigate('WorkoutDay', { programId: activePlan.id, dayId: today.id })} />
           ) : (
-            <AppText tone="muted">{t('journey.noWorkout')}</AppText>
+            <>
+              <AppText tone="muted">{t('journey.noWorkout')}</AppText>
+              <AppButton label={t('journey.generate')} onPress={() => navigation.navigate('PlanGenerate')} />
+            </>
           )}
+          {activePlan ? (
+            <AppButton label={t('journey.quickPlan')} onPress={() => navigation.navigate('WorkoutPlan', { programId: activePlan.id })} variant="secondary" />
+          ) : null}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
+            <AppButton label={t('journey.quickAssessment')} onPress={() => navigation.navigate('FitnessAssessmentIntro')} variant="secondary" />
+            <AppButton label={t('journey.quickProgress')} onPress={() => navigation.navigate('Progress')} variant="secondary" />
+            <AppButton label={t('journey.quickNutrition')} onPress={() => navigation.navigate('Nutrition')} variant="secondary" />
+          </View>
           <View style={{ gap: theme.spacing.sm }}>
             <AppButton label={t('journey.openCoach')} onPress={() => navigation.navigate('AiCoach')} variant="secondary" />
             <AppButton label={t('journey.historyTitle')} onPress={() => navigation.navigate('WorkoutHistory')} variant="secondary" />

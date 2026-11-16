@@ -18,8 +18,8 @@ import { useMyTrainerPhoto, useTrainerProfile } from '../api/workspace.queries';
 import { TrainerCard, useTrainerLayout } from '../ui';
 
 type Navigation = CompositeNavigationProp<BottomTabNavigationProp<TrainerTabParamList, 'More'>, NativeStackNavigationProp<AppStackParamList>>;
-type StackLink = 'TrainerAlerts' | 'MyTargets' | 'MyLeaves' | 'ApplyLeave' | 'Profile' | 'Settings' | 'Chats';
-type MoreLink = { route: StackLink | 'Schedule'; label: string };
+type StackLink = 'TrainerAlerts' | 'MyTargets' | 'MyLeaves' | 'ApplyLeave' | 'Profile' | 'Settings' | 'Notifications' | 'Chats' | 'TrainerSchedule' | 'TrainerPerformance';
+type MoreLink = { route: StackLink; label: string };
 
 export function TrainerMoreScreen() {
   const theme = useTheme();
@@ -36,6 +36,11 @@ export function TrainerMoreScreen() {
   const chatEnabled = features.data?.[featureCodes.gymChat] === true;
   const links = useMemo((): MoreLink[] => {
     const items: MoreLink[] = [
+      { route: 'Profile', label: t('nav.profile') },
+      { route: 'Notifications', label: t('nav.notifications') },
+      { route: 'Settings', label: t('nav.settings') },
+      { route: 'TrainerSchedule', label: t('trainer.schedule') },
+      { route: 'TrainerPerformance', label: t('trainer.performance') },
       { route: 'TrainerAlerts', label: t('trainer.alerts') },
       { route: 'MyTargets', label: t('trainerTargets.title') },
     ];
@@ -46,11 +51,6 @@ export function TrainerMoreScreen() {
       items.push({ route: 'Chats', label: t('nav.chat') });
     }
 
-    items.push(
-      { route: 'Profile', label: t('nav.profile') },
-      { route: 'Settings', label: t('nav.settings') },
-      { route: 'Schedule', label: t('trainer.availability') },
-    );
     return items;
   }, [chatEnabled, leaveEnabled, t]);
 
@@ -85,7 +85,7 @@ export function TrainerMoreScreen() {
       {links.map((link) => (
         <TrainerCard
           key={link.route}
-          onPress={() => (link.route === 'Schedule' ? navigation.navigate('Schedule') : navigation.navigate(link.route))}
+          onPress={() => navigation.navigate(link.route)}
         >
           <AppText>{link.label}</AppText>
         </TrainerCard>

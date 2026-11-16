@@ -4,12 +4,13 @@ namespace LifeFitAI.Application.Fitness.Ai;
 
 public static class WorkoutMonthRules
 {
-    public static Result Validate(GeneratedProgram program, int? daysPerWeek, IReadOnlyDictionary<Guid, string> names, string? avoid)
+    public static Result Validate(GeneratedProgram program, int? daysPerWeek, IReadOnlyDictionary<Guid, string> names, string? avoid, int planDays = 30)
     {
+        var span = planDays is 7 or 10 or 15 or 30 ? planDays : 30;
         if (daysPerWeek is >= 1 and <= 7)
         {
             var training = program.Days.Count(day => !day.RestDay);
-            if (Math.Abs((training * 7m / 30m) - daysPerWeek.Value) > 1.25m)
+            if (Math.Abs((training * 7m / span) - daysPerWeek.Value) > 1.25m)
             {
                 return Result.Failure(AiErrors.FrequencyMismatch);
             }
@@ -20,8 +21,15 @@ public static class WorkoutMonthRules
             return Result.Failure(AiErrors.RestrictedExercise);
         }
 
-        var weeks = new[] { Signature(program, 1, 7), Signature(program, 8, 14), Signature(program, 15, 21), Signature(program, 22, 30) };
-        return weeks.Distinct(StringComparer.Ordinal).Count() >= 2 ? Result.Success() : Result.Failure(AiErrors.NoProgression);
+        var windows = span switch
+        {
+            <= 7 => new[] { (1, span) },
+            <= 14 => new[] { (1, 7), (8, span) },
+            <= 21 => new[] { (1, 7), (8, 14), (15, span) },
+            _ => new[] { (1, 7), (8, 14), (15, 21), (22, span) },
+        };
+        var weeks = windows.Select(window => Signature(program, window.Item1, window.Item2)).Where(signature => signature.Length > 0).ToArray();
+        return weeks.Length < 2 || weeks.Distinct(StringComparer.Ordinal).Count() >= 2 ? Result.Success() : Result.Failure(AiErrors.NoProgression);
     }
 
     private static bool Conflicts(GeneratedProgram program, IReadOnlyDictionary<Guid, string> names, string? avoid)

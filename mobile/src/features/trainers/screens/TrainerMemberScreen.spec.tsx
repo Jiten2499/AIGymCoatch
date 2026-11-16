@@ -40,26 +40,22 @@ describe('trainer member tabs', () => {
     mockMember.refetch.mockClear();
   });
 
-  it('shows details first and reveals the other sections from their tabs', async () => {
+  it('shows the member overview and keeps packages, sessions, and notes with that member', async () => {
     const view = await renderScreen();
     const user = userEvent.setup();
     expect(view.getByText('+15550001111')).toBeTruthy();
-    expect(view.queryByText('PT 12')).toBeNull();
-    expect(view.queryByText('No sessions in this view.')).toBeNull();
-    expect(view.queryByText('Keep the last set controlled.')).toBeNull();
-
-    await user.press(view.getByRole('button', { name: 'Packages' }));
-    expect(view.getByText('PT 12')).toBeTruthy();
-    expect(view.queryByText('+15550001111')).toBeNull();
-
-    await user.press(view.getByRole('button', { name: 'Sessions' }));
-    expect(view.getByText('Scheduled')).toBeTruthy();
-    expect(view.queryByText('PT 12')).toBeNull();
-
-    await user.press(view.getByRole('button', { name: 'Notes' }));
+    expect(view.getAllByText('PT 12').length).toBeGreaterThan(0);
     expect(view.getByText('Keep the last set controlled.')).toBeTruthy();
 
-    await user.press(view.getByRole('button', { name: 'Details' }));
+    await user.press(view.getByRole('button', { name: 'Workout Plan' }));
+    expect(view.getByText('No workout plans are available for this member yet.')).toBeTruthy();
+    expect(view.queryByText('+15550001111')).toBeNull();
+
+    await user.press(view.getByRole('button', { name: 'Progress' }));
+    expect(view.getByText('No progress assessments are recorded for this member.')).toBeTruthy();
+    expect(view.queryByText('PT 12')).toBeNull();
+
+    await user.press(view.getByRole('button', { name: 'Overview' }));
     expect(view.getByText('+15550001111')).toBeTruthy();
   });
 });
