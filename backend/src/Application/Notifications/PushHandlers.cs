@@ -49,7 +49,7 @@ public sealed class PushDeviceHandler :
 
     public async Task<Result<PushDeviceResponse>> Handle(RegisterPushDeviceCommand request, CancellationToken cancellationToken)
     {
-        var scope = await Scope.Open(_guard, _actor, PermissionCodes.NotificationRead, FeatureCodes.WorkoutPlans, cancellationToken).ConfigureAwait(false);
+        var scope = await OpenAsync(cancellationToken).ConfigureAwait(false);
         if (scope.IsFailure)
         {
             return Result.Failure<PushDeviceResponse>(scope.Error);
@@ -90,7 +90,7 @@ public sealed class PushDeviceHandler :
 
     public async Task<Result> Handle(DeactivatePushDeviceCommand request, CancellationToken cancellationToken)
     {
-        var scope = await Scope.Open(_guard, _actor, PermissionCodes.NotificationRead, FeatureCodes.WorkoutPlans, cancellationToken).ConfigureAwait(false);
+        var scope = await OpenAsync(cancellationToken).ConfigureAwait(false);
         if (scope.IsFailure)
         {
             return Result.Failure(scope.Error);
@@ -109,7 +109,7 @@ public sealed class PushDeviceHandler :
 
     public async Task<Result<NotificationPreferenceResponse>> Handle(GetNotificationPreferencesQuery request, CancellationToken cancellationToken)
     {
-        var scope = await Scope.Open(_guard, _actor, PermissionCodes.NotificationRead, FeatureCodes.WorkoutPlans, cancellationToken).ConfigureAwait(false);
+        var scope = await OpenAsync(cancellationToken).ConfigureAwait(false);
         if (scope.IsFailure)
         {
             return Result.Failure<NotificationPreferenceResponse>(scope.Error);
@@ -121,7 +121,7 @@ public sealed class PushDeviceHandler :
 
     public async Task<Result<NotificationPreferenceResponse>> Handle(UpdateNotificationPreferencesCommand request, CancellationToken cancellationToken)
     {
-        var scope = await Scope.Open(_guard, _actor, PermissionCodes.NotificationRead, FeatureCodes.WorkoutPlans, cancellationToken).ConfigureAwait(false);
+        var scope = await OpenAsync(cancellationToken).ConfigureAwait(false);
         if (scope.IsFailure)
         {
             return Result.Failure<NotificationPreferenceResponse>(scope.Error);
@@ -141,7 +141,7 @@ public sealed class PushDeviceHandler :
 
     public async Task<Result> Handle(MarkAllNotificationsReadCommand request, CancellationToken cancellationToken)
     {
-        var scope = await Scope.Open(_guard, _actor, PermissionCodes.NotificationRead, FeatureCodes.WorkoutPlans, cancellationToken).ConfigureAwait(false);
+        var scope = await OpenAsync(cancellationToken).ConfigureAwait(false);
         if (scope.IsFailure)
         {
             return Result.Failure(scope.Error);
@@ -150,6 +150,26 @@ public sealed class PushDeviceHandler :
         await _devices.MarkAllReadAsync(scope.Value.TenantId, scope.Value.UserId, _clock.UtcNow, cancellationToken).ConfigureAwait(false);
         await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return Result.Success();
+    }
+
+    private async Task<Result<(Guid UserId, Guid TenantId)>> OpenAsync(CancellationToken cancellationToken)
+    {
+        var chat = await _guard.AllowAsync(PermissionCodes.NotificationRead, FeatureCodes.GymChat, cancellationToken).ConfigureAwait(false);
+        if (chat.IsFailure)
+        {
+            var plans = await _guard.AllowAsync(PermissionCodes.NotificationRead, FeatureCodes.WorkoutPlans, cancellationToken).ConfigureAwait(false);
+            if (plans.IsFailure)
+            {
+                return Result.Failure<(Guid, Guid)>(plans.Error);
+            }
+        }
+
+        if (_actor.UserId is not Guid userId || _actor.TenantId is not Guid tenantId)
+        {
+            return Result.Failure<(Guid, Guid)>(IdentityErrors.InvalidCredentials);
+        }
+
+        return Result.Success((userId, tenantId));
     }
 
     private static NotificationPreferenceResponse Map(NotificationPreference? preference) =>

@@ -1,5 +1,4 @@
 using Hangfire;
-using LifeFitAI.Application.Chat;
 using LifeFitAI.Application.Notifications;
 using LifeFitAI.Domain.Fitness;
 using LifeFitAI.Domain.Platform;
@@ -14,15 +13,13 @@ public sealed class PushDispatchJob
 {
     private readonly ApplicationDbContext _db;
     private readonly IExpoPushClient _expo;
-    private readonly IChatPresence _presence;
     private readonly IDateTimeProvider _clock;
     private readonly ILogger<PushDispatchJob> _logger;
 
-    public PushDispatchJob(ApplicationDbContext db, IExpoPushClient expo, IChatPresence presence, IDateTimeProvider clock, ILogger<PushDispatchJob> logger)
+    public PushDispatchJob(ApplicationDbContext db, IExpoPushClient expo, IDateTimeProvider clock, ILogger<PushDispatchJob> logger)
     {
         _db = db;
         _expo = expo;
-        _presence = presence;
         _clock = clock;
         _logger = logger;
     }
@@ -32,11 +29,6 @@ public sealed class PushDispatchJob
     {
         var notification = await _db.Notifications.FirstOrDefaultAsync(item => item.Id == notificationId).ConfigureAwait(false);
         if (notification is null)
-        {
-            return;
-        }
-
-        if (notification.Type == NotificationType.ChatMessage && notification.ReferenceId is Guid conversationId && _presence.IsWatching(notification.UserId, conversationId))
         {
             return;
         }

@@ -106,19 +106,39 @@ export function useChatRealtime(conversationId?: string, onTyping?: (name: strin
     connection.on('MessageReceived', refresh);
     connection.on('MessageRead', refresh);
     connection.on('ConversationUpdated', refresh);
+    const join = () => {
+      if (conversationId) {
+        void connection.invoke('JoinConversation', conversationId).catch(() => undefined);
+      }
+    };
+    const leave = () => {
+      if (conversationId) {
+        void connection.invoke('LeaveConversation', conversationId).catch(() => undefined);
+      }
+    };
     connection.on('TypingStarted', onStarted);
     connection.on('TypingStopped', onStopped);
     connection.onreconnected(() => {
       refresh();
-      if (conversationId) {
-        void connection.invoke('JoinConversation', conversationId);
+      if (AppState.currentState === 'active') {
+        join();
       }
     });
-    if (conversationId) {
-      void connection.invoke('JoinConversation', conversationId).catch(() => undefined);
+    if (AppState.currentState === 'active') {
+      join();
     }
+    const appState = AppState.addEventListener('change', (status) => {
+      if (status === 'active') {
+        join();
+        refresh();
+      } else {
+        leave();
+      }
+    });
 
     return () => {
+      appState.remove();
+      leave();
       connection.off('MessageReceived', refresh);
       connection.off('MessageRead', refresh);
       connection.off('ConversationUpdated', refresh);

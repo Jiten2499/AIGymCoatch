@@ -169,16 +169,12 @@ public sealed partial class ChatMessageService
     {
         view.Conversation.RecordLastMessage(message.Id, _clock.UtcNow, message.Body);
         await _chats.AddMessageAsync(view.Conversation, message, attachment, cancellationToken).ConfigureAwait(false);
-        var notificationId = Guid.Empty;
-        if (!_presence.IsWatching(view.Recipient.UserId, view.Conversation.Id))
-        {
-            var title = $"New message from {view.Sender.DisplayName}";
-            var preview = message.Body.Length <= 180 ? message.Body : message.Body[..180];
-            var notice = Notification.Create(Guid.NewGuid(), view.Recipient.UserId, view.TenantId, NotificationType.ChatMessage, title.Length <= 200 ? title : title[..200], preview, _clock.UtcNow);
-            notice.Bind("ChatConversation", view.Conversation.Id, $"chat.message:{message.Id:D}");
-            await _chats.AddNotificationAsync(notice, cancellationToken).ConfigureAwait(false);
-            notificationId = notice.Id;
-        }
+        var title = $"New message from {view.Sender.DisplayName}";
+        var preview = message.Body.Length <= 180 ? message.Body : message.Body[..180];
+        var notice = Notification.Create(Guid.NewGuid(), view.Recipient.UserId, view.TenantId, NotificationType.ChatMessage, title.Length <= 200 ? title : title[..200], preview, _clock.UtcNow);
+        notice.Bind("ChatConversation", view.Conversation.Id, $"chat.message:{message.Id:D}");
+        await _chats.AddNotificationAsync(notice, cancellationToken).ConfigureAwait(false);
+        var notificationId = notice.Id;
 
         var payload = $"{{\"messageId\":\"{message.Id:D}\",\"conversationId\":\"{view.Conversation.Id:D}\",\"recipientUserId\":\"{view.Recipient.UserId:D}\",\"notificationId\":\"{notificationId:D}\",\"tenantId\":\"{view.TenantId:D}\",\"senderId\":\"{view.Sender.UserId:D}\"}}";
         await _chats.AddOutboxAsync(OutboxMessage.Create(Guid.NewGuid(), view.TenantId, "Chat.Message", payload, _clock.UtcNow, null, $"Chat.Message:{message.Id:D}", _clock.UtcNow), cancellationToken).ConfigureAwait(false);
