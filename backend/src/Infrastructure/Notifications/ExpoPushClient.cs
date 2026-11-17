@@ -39,7 +39,7 @@ public sealed class ExpoPushClient : IExpoPushClient
                 ["sound"] = message.Sound,
                 ["priority"] = message.Priority,
                 ["channelId"] = message.ChannelId,
-                ["color"] = "#06130D",
+                ["color"] = "#06130d",
                 ["data"] = message.Data,
             }).ToArray();
             using var response = await PostAsync("push/send", payload, cancellationToken).ConfigureAwait(false);
@@ -74,7 +74,18 @@ public sealed class ExpoPushClient : IExpoPushClient
         }
 
         var response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
-        return response;
+        if (response.IsSuccessStatusCode)
+        {
+            return response;
+        }
+
+        var detail = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        response.Dispose();
+        if (detail.Length > 240)
+        {
+            detail = detail[..240];
+        }
+
+        throw new HttpRequestException($"Expo push was rejected ({(int)response.StatusCode}). {detail}");
     }
 }
