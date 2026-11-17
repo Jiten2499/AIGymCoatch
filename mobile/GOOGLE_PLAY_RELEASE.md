@@ -304,12 +304,18 @@ Replacement production build:
 - `versionCode`: **11**
 - Logs: https://expo.dev/accounts/growfit24/projects/growfit/builds/7b00a525-12b8-4fa1-a01a-a3b5ca315733
 
-Current production build, including the trainer loading fix (retry a dropped connection and refetch without using recent apps):
+Previous production build, including the trainer loading fix:
 
 - Build id: `e4ad5541-bff9-498d-87ee-e508d69d2343`
 - `versionCode`: **12**
-- Finished: 2026-11-16 16:56 IST
 - Artifact: https://expo.dev/artifacts/eas/tHH2rBkPKrApTvuPsdrPj2YbcuZB5b-1E4B8hxu_Lng.aab
-- Logs: https://expo.dev/accounts/growfit24/projects/growfit/builds/e4ad5541-bff9-498d-87ee-e508d69d2343
+
+Current production build. It uses `https://api.growventur.com` and the existing Play upload key. It includes the local UI fixes plus the Expo push client. Android delivery still needs the FCM v1 credential in EAS and the push schema on the production API.
+
+- Build id: `cb12cd80-de21-409a-aece-aa71caaa4522`
+- `versionCode`: **13**
+- Finished: 2026-11-17 06:30 IST
+- Artifact: https://expo.dev/artifacts/eas/UbVOc1iEcPp_XUyosJ1_gzGjA7XZnHYcx0kBDTHIefM.aab
+- Logs: https://expo.dev/accounts/growfit24/projects/growfit/builds/cb12cd80-de21-409a-aece-aa71caaa4522
 
 Upload the store images from `store/play/` in Play Console; they are not inside the AAB. This AAB was not submitted. The submit profile stays on the internal track as a draft.

@@ -18,6 +18,7 @@
     },
     "android": {
       "package": "com.growventur.growfit",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#06130D",
         "foregroundImage": "./assets/android-icon-foreground.png",
