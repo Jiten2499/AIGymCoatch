@@ -24,6 +24,13 @@ describe('destinationForPush', () => {
     });
   });
 
+  it('opens the circular that was published', () => {
+    expect(destinationForPush({ type: 'circular.published', communicationId: 'circular-1' })).toEqual({
+      name: 'CommunicationDetail',
+      params: { communicationId: 'circular-1' },
+    });
+  });
+
   it('keeps account and trainer alerts on existing screens', () => {
     expect(destinationForPush({ type: 'trainer.assigned' })?.name).toBe('Profile');
     expect(destinationForPush({ type: 'account.updated' })?.name).toBe('Notifications');

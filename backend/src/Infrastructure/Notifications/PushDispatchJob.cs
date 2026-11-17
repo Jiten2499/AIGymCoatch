@@ -110,6 +110,11 @@ public sealed class PushDispatchJob
             {
                 data["conversationId"] = referenceId.ToString("D");
             }
+
+            if (notification.Type == NotificationType.CircularPublished)
+            {
+                data["communicationId"] = referenceId.ToString("D");
+            }
         }
 
         if (notification.ReferenceType is not null)

@@ -4,6 +4,7 @@ using LifeFitAI.Application.Gym.Communications;
 using LifeFitAI.Application.Identity;
 using LifeFitAI.Application.Licensing;
 using LifeFitAI.Application.Platform.BackgroundJobs;
+using LifeFitAI.Domain.Fitness;
 using LifeFitAI.Domain.Gym;
 using LifeFitAI.Domain.Identity;
 using LifeFitAI.Domain.Platform;
@@ -124,6 +125,10 @@ public sealed class CircularRealtimeTests
             Arg.Is<IReadOnlyList<Guid>>(ids => ids.SequenceEqual(new[] { staff })),
             Arg.Any<CancellationToken>());
         (await db.OutboxMessages.CountAsync(item => item.Status == OutboxMessageStatus.Dispatched)).Should().Be(3);
+        var alerts = await db.Notifications.Where(item => item.Type == NotificationType.CircularPublished).ToListAsync();
+        alerts.Should().HaveCount(3);
+        alerts.Should().OnlyContain(item => item.Message == "Notice" && item.Title == "New circular");
+        alerts.Select(item => item.UserId).Should().BeEquivalentTo(new[] { member, trainer, staff });
     }
 
     [Fact]

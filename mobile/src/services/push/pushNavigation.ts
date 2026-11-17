@@ -11,7 +11,7 @@ export type PushNotificationPayload = {
 };
 
 export type PushDestination = {
-  name: 'ChatThread' | 'WorkoutPlan' | 'WorkoutSummary' | 'Tabs' | 'Profile' | 'Notifications' | 'Challenges';
+  name: 'ChatThread' | 'WorkoutPlan' | 'WorkoutSummary' | 'Tabs' | 'Profile' | 'Notifications' | 'Challenges' | 'CommunicationDetail';
   params?: Record<string, unknown>;
 };
 
@@ -32,6 +32,10 @@ export function destinationForPush(payload: PushNotificationPayload): PushDestin
       return { name: 'Profile' };
     case 'progress.milestone':
       return { name: 'Challenges' };
+    case 'circular.published':
+      return payload.communicationId || reference
+        ? { name: 'CommunicationDetail', params: { communicationId: payload.communicationId ?? reference } }
+        : { name: 'Notifications' };
     case 'account.updated':
       return { name: 'Notifications' };
     default:

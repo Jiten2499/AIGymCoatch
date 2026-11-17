@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="LF-0084" author="lifefit-architecture">
+        <comment>
+            Ticket: LF-0084. Allow a circular publication to be stored as a notification so the existing push dispatcher can alert recipients.
+            Index review: no new indexes. CK_Notifications_Type is replaced in place. Performance note: one check-constraint change, no table scan beyond the constraint rebuild.
+        </comment>
+        <sql><![CDATA[
+            SET QUOTED_IDENTIFIER ON;
+            IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_Notifications_Type' AND parent_object_id = OBJECT_ID(N'app.Notifications'))
+                ALTER TABLE app.Notifications DROP CONSTRAINT CK_Notifications_Type;
+            ALTER TABLE app.Notifications ADD CONSTRAINT CK_Notifications_Type CHECK (Type IN (N'WorkoutReminder', N'MembershipReminder', N'ChallengeReminder', N'AiRecommendation', N'WorkoutCompleted', N'StaffLeaveUpdate', N'ChatMessage', N'WorkoutPlanUpdated', N'TrainerAssigned', N'ProgressMilestone', N'CircularPublished'));
+        ]]></sql>
+        <rollback>
+            <sql>IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_Notifications_Type' AND parent_object_id = OBJECT_ID(N'app.Notifications')) ALTER TABLE app.Notifications DROP CONSTRAINT CK_Notifications_Type; ALTER TABLE app.Notifications ADD CONSTRAINT CK_Notifications_Type CHECK (Type IN (N'WorkoutReminder', N'MembershipReminder', N'ChallengeReminder', N'AiRecommendation', N'WorkoutCompleted', N'StaffLeaveUpdate', N'ChatMessage', N'WorkoutPlanUpdated', N'TrainerAssigned', N'ProgressMilestone'));</sql>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

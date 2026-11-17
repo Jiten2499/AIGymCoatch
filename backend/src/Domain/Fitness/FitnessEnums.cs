@@ -128,6 +128,7 @@ public enum NotificationType
     WorkoutPlanUpdated = 8,
     TrainerAssigned = 9,
     ProgressMilestone = 10,
+    CircularPublished = 11,
 }
 
 public enum AiMessageRole

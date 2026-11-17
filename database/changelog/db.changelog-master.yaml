@@ -212,5 +212,8 @@ databaseChangeLog:
   - include:
       file: changes/070-push-notifications.xml
       relativeToChangelogFile: true
+  - include:
+      file: changes/071-circular-push.xml
+      relativeToChangelogFile: true
 
 

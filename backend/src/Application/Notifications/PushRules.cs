@@ -23,7 +23,7 @@ public static class PushRules
             NotificationType.WorkoutReminder => preference.WorkoutRemindersEnabled,
             NotificationType.WorkoutCompleted or NotificationType.AiRecommendation or NotificationType.WorkoutPlanUpdated => preference.WorkoutUpdatesEnabled,
             NotificationType.ChallengeReminder or NotificationType.ProgressMilestone => preference.ProgressEnabled,
-            NotificationType.MembershipReminder or NotificationType.StaffLeaveUpdate or NotificationType.TrainerAssigned => preference.AccountEnabled,
+            NotificationType.MembershipReminder or NotificationType.StaffLeaveUpdate or NotificationType.TrainerAssigned or NotificationType.CircularPublished => preference.AccountEnabled,
             _ => preference.AccountEnabled,
         };
     }
@@ -37,7 +37,12 @@ public static class PushRules
     };
 
     public static string PushBody(NotificationType type, string storedMessage) =>
-        type == NotificationType.ChatMessage ? "You have received a new message." : storedMessage;
+        type switch
+        {
+            NotificationType.ChatMessage => "You have received a new message.",
+            NotificationType.CircularPublished => "A new circular was published.",
+            _ => storedMessage,
+        };
 
     public static string DataType(NotificationType type) => type switch
     {
@@ -46,6 +51,7 @@ public static class PushRules
         NotificationType.WorkoutReminder => "workout.reminder",
         NotificationType.WorkoutPlanUpdated or NotificationType.AiRecommendation => "workout.plan.updated",
         NotificationType.TrainerAssigned => "trainer.assigned",
+        NotificationType.CircularPublished => "circular.published",
         NotificationType.ChallengeReminder or NotificationType.ProgressMilestone => "progress.milestone",
         _ => "account.updated",
     };
