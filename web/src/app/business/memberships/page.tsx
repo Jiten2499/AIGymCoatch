@@ -10,6 +10,7 @@ import { api, ApiError } from "../../../lib/api";
 import type { BusinessConfiguration } from "../../../lib/configuration";
 import type { BranchOption, GymMember, GymMembership, MembershipPackage } from "../../../lib/gym";
 import type { Page } from "../../../lib/types";
+import { formatAmount, useWorkspaceCurrency } from "../../../lib/money";
 import { getSession, subscribeSession } from "../../../lib/session";
 import { FreezeDialog } from "./FreezeDialog";
 import { RenewDialog } from "./RenewDialog";
@@ -19,6 +20,7 @@ export default function MembershipsPage() {
   const client = useQueryClient();
   const session = useSyncExternalStore(subscribeSession, getSession, () => null);
   const tenantId = session?.currentTenant?.id ?? null;
+  const currency = useWorkspaceCurrency();
   const [adding, setAdding] = useState(false);
   const [assigning, setAssigning] = useState(false);
   const [freezing, setFreezing] = useState(false);
@@ -60,7 +62,7 @@ export default function MembershipsPage() {
           columns={[
             { header: "Name", cell: (row) => row.name },
             { header: "Type", cell: (row) => row.membershipType },
-            { header: "Price", cell: (row) => `${row.price} ${row.currency}` },
+            { header: "Price", cell: (row) => formatAmount(row.price, currency) },
             { header: "Duration", cell: (row) => `${row.durationCount} ${row.durationUnit}` },
             { header: "Included PT", cell: (row) => row.includedPtSessions > 0 ? String(row.includedPtSessions) : "None" },
             { header: "Status", cell: (row) => row.isActive ? "Active" : "Inactive" },
@@ -81,7 +83,7 @@ export default function MembershipsPage() {
             { header: "Start", cell: (row) => row.startDate },
             { header: "End", cell: (row) => row.endDate },
             { header: "Status", cell: (row) => row.status },
-            { header: "Payment", cell: (row) => `${row.totalPaid ?? 0}/${row.finalAmount ?? 0} ${row.currency ?? ""} · ${row.settlementStatus ?? "—"}` },
+            { header: "Payment", cell: (row) => `${formatAmount(row.totalPaid ?? 0, currency)} / ${formatAmount(row.finalAmount ?? 0, currency)} · ${row.settlementStatus ?? "—"}` },
           ]}
           empty="No memberships were returned."
           rowKey={(row) => row.id}
@@ -108,6 +110,7 @@ export default function MembershipsPage() {
 const paymentMethods = ["Cash", "Upi", "DebitCard", "CreditCard", "BankTransfer", "OnlinePayment", "Cheque", "Other"] as const;
 
 function AssignDialog({ tenantId, onCancel, onCreated }: { tenantId: string | null; onCancel: () => void; onCreated: () => void }) {
+  const currency = useWorkspaceCurrency();
   const members = useQuery({ queryKey: ["members", tenantId, "assign"], enabled: tenantId !== null, queryFn: () => api<Page<GymMember>>("/members?page=1&pageSize=50&sort=name") });
   const plans = useQuery({ queryKey: ["membership-plans", tenantId, "assign"], enabled: tenantId !== null, queryFn: () => api<Page<MembershipPackage>>("/membership-plans?activeOnly=true&page=1&pageSize=50") });
   const branches = useQuery({ queryKey: ["branches", tenantId], enabled: tenantId !== null, queryFn: () => api<Page<BranchOption>>("/branches?page=1&pageSize=50") });
@@ -176,7 +179,7 @@ function AssignDialog({ tenantId, onCancel, onCreated }: { tenantId: string | nu
         }}
       >
         <FormField label="Member"><select className="field" onChange={(event) => setMemberId(event.target.value)} required value={memberId}><option value="">Select</option>{(members.data?.items ?? []).map((member) => <option key={member.id} value={member.id}>{member.fullName}</option>)}</select></FormField>
-        <FormField label="Package"><select className="field" onChange={(event) => setPlanId(event.target.value)} required value={planId}><option value="">Select</option>{(plans.data?.items ?? []).map((plan) => <option key={plan.id} value={plan.id}>{plan.name} · {plan.price} {plan.currency}</option>)}</select></FormField>
+        <FormField label="Package"><select className="field" onChange={(event) => setPlanId(event.target.value)} required value={planId}><option value="">Select</option>{(plans.data?.items ?? []).map((plan) => <option key={plan.id} value={plan.id}>{plan.name} · {formatAmount(plan.price, currency)}</option>)}</select></FormField>
         <FormField label="Branch"><select className="field" onChange={(event) => setBranchId(event.target.value)} value={branchId}><option value="">None</option>{(branches.data?.items ?? []).map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></FormField>
         <FormField label="Start date"><input className="field" onChange={(event) => setStartDate(event.target.value)} required type="date" value={startDate} /></FormField>
         <FormField label="Discount (optional)">

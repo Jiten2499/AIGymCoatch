@@ -8,6 +8,7 @@ import type { BusinessConfiguration } from "../../../lib/configuration";
 import type { GymMembership, MembershipPackage } from "../../../lib/gym";
 import type { Page } from "../../../lib/types";
 import { noPtPackagesMessage, ptPackageLabel, type PtPackageOption } from "../../../lib/ptPackage";
+import { formatAmount, useWorkspaceCurrency } from "../../../lib/money";
 import { renewalStart } from "./renewal";
 
 const paymentMethods = ["Cash", "Upi", "DebitCard", "CreditCard", "BankTransfer", "OnlinePayment", "Cheque", "Other"] as const;
@@ -18,6 +19,7 @@ type MemberDetails = { assignedTrainerId: string | null; assignedTrainerName: st
 type Term = { startDate: string; endDate: string; price: number; currency: string };
 
 export function RenewDialog({ membership, tenantId, onCancel, onRenewed }: { membership: GymMembership; tenantId: string | null; onCancel: () => void; onRenewed: () => void }) {
+  const workspaceCurrency = useWorkspaceCurrency();
   const today = localToday();
   const proposed = renewalStart(membership.status, membership.endDate, today);
   const plans = useQuery({ queryKey: ["membership-plans", tenantId, "renew"], enabled: tenantId !== null, queryFn: () => api<Page<MembershipPackage>>("/membership-plans?page=1&pageSize=50") });
@@ -53,7 +55,6 @@ export function RenewDialog({ membership, tenantId, onCancel, onRenewed }: { mem
   const selectedPlan = (plans.data?.items ?? []).find((plan) => plan.id === planId);
   const activePlans = (plans.data?.items ?? []).filter((plan) => plan.isActive || plan.id === membership.membershipPlanId);
   const packagePrice = selectedPlan?.price ?? term.data?.price ?? 0;
-  const currency = selectedPlan?.currency ?? term.data?.currency ?? membership.currency ?? "";
   const discount = (config.data?.discounts ?? []).find((rule) => rule.id === discountRuleId && rule.isActive);
   const discountAmount = discount
     ? Math.min(packagePrice, discount.discountType === "Percentage" ? (packagePrice * discount.value) / 100 : discount.value)
@@ -105,11 +106,11 @@ export function RenewDialog({ membership, tenantId, onCancel, onRenewed }: { mem
           <p>{membership.memberName || "Member"} · {membership.planName || "Package"}</p>
           <p>{membership.startDate} to {membership.endDate} · {membership.status}</p>
           <p>Trainer: {member.data?.assignedTrainerName || "None"}</p>
-          <p>Outstanding balance: {membership.outstanding ?? 0} {membership.currency ?? ""} · {membership.settlementStatus ?? "Unpaid"}. This is separate from the renewal amount.</p>
+          <p>Outstanding balance: {formatAmount(membership.outstanding ?? 0, workspaceCurrency)} · {membership.settlementStatus ?? "Unpaid"}. This is separate from the renewal amount.</p>
         </section>
         <FormField label="Membership package">
           <select className="field" onChange={(event) => setPlanId(event.target.value)} value={planId}>
-            {activePlans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name} · {plan.durationCount} {plan.durationUnit} · {plan.price} {plan.currency}</option>)}
+            {activePlans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name} · {plan.durationCount} {plan.durationUnit} · {formatAmount(plan.price, workspaceCurrency)}</option>)}
           </select>
         </FormField>
         <p className="text-sm text-muted">{selectedPlan ? `${selectedPlan.durationCount} ${selectedPlan.durationUnit} · ${selectedPlan.includedPtSessions > 0 ? `${selectedPlan.includedPtSessions} included PT sessions from this membership` : "No included PT sessions"}` : "Loading package"}{term.data ? ` · ends ${term.data.endDate}` : ""}</p>
@@ -139,8 +140,8 @@ export function RenewDialog({ membership, tenantId, onCancel, onRenewed }: { mem
         </FormField>
         <section className="grid gap-1 text-sm">
           <h3 className="font-semibold">Renewal summary</h3>
-          <p>Package {packagePrice} {currency} · Discount {discountAmount} · Membership {renewalAmount} {currency}</p>
-          <p>Standalone PT {pt?.price ?? 0} {pt?.currency ?? currency} · Payable now {payable} {currency}</p>
+          <p>Package {formatAmount(packagePrice, workspaceCurrency)} · Discount {formatAmount(discountAmount, workspaceCurrency)} · Membership {formatAmount(renewalAmount, workspaceCurrency)}</p>
+          <p>Standalone PT {formatAmount(pt?.price ?? 0, workspaceCurrency)} · Payable now {formatAmount(payable, workspaceCurrency)}</p>
           <p>Payment is optional. Without one, the renewal stays unpaid. A payment records only against the membership amount.</p>
         </section>
         <FormField label="Amount paid toward the membership (optional)"><input className="field" min={0} onChange={(event) => setPaymentAmount(event.target.value)} step="0.01" type="number" value={paymentAmount} /></FormField>

@@ -10,6 +10,7 @@ import { AppButton } from '../../../components/ui/AppButton';
 import { AppText } from '../../../components/ui/AppText';
 import { AppTextInput } from '../../../components/ui/AppTextInput';
 import { featureCodes } from '../../../constants/access';
+import { apiClient } from '../../../services/api/client';
 import { errorText } from '../../../services/api/problem';
 import { usePackage, useSavePackage } from '../api/queries';
 
@@ -33,6 +34,18 @@ export function PackageForm({ packageId, onSaved }: { packageId?: string; onSave
   const [count, setCount] = useState('1');
   const [unit, setUnit] = useState('Month');
   const [category, setCategory] = useState('Standard');
+  const [currency, setCurrency] = useState('USD');
+  useEffect(() => {
+    let active = true;
+    void loadWorkspaceCurrency().then((code) => {
+      if (active) {
+        setCurrency(code);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
   useEffect(() => {
     if (!existing.data) {
       return;
@@ -49,7 +62,7 @@ export function PackageForm({ packageId, onSaved }: { packageId?: string; onSave
       <ScrollView contentContainerStyle={{ gap: theme.spacing.md, padding: theme.spacing.xl }}>
         <AppText variant="title">{packageId ? t('memberships.edit') : t('memberships.add')}</AppText>
         <Field label={t('memberships.name')} onChangeText={setName} value={name} />
-        <Field keyboardType="phone-pad" label={t('memberships.price')} onChangeText={setPrice} value={price} />
+        <Field keyboardType="phone-pad" label={`${t('memberships.price')} (${currency})`} onChangeText={setPrice} value={price} />
         <Field keyboardType="phone-pad" label={t('memberships.duration')} onChangeText={setCount} value={count} />
         <Field label={unit === 'Month' ? t('memberships.months') : t('memberships.days')} onChangeText={setUnit} value={unit} />
         <Field label={t('memberships.category')} onChangeText={setCategory} value={category} />
@@ -62,7 +75,7 @@ export function PackageForm({ packageId, onSaved }: { packageId?: string; onSave
             durationDays: Number(count) || 1,
             membershipType: unit === 'Month' ? 'Monthly' : 'Custom',
             price: Number(price) || 0,
-            currency: 'USD',
+            currency,
             category,
             durationUnit: unit,
             durationCount: Number(count) || 1,
@@ -71,6 +84,26 @@ export function PackageForm({ packageId, onSaved }: { packageId?: string; onSave
       </ScrollView>
     </ScreenState>
   );
+}
+
+async function loadWorkspaceCurrency() {
+  try {
+    const configuration = await apiClient.get<{ currency?: string }>('/configuration');
+    if (configuration.data.currency) {
+      return configuration.data.currency;
+    }
+  } catch {
+    // The business profile is the same currency when configuration is not readable.
+  }
+  try {
+    const profile = await apiClient.get<{ currency?: string }>('/business/profile');
+    if (profile.data.currency) {
+      return profile.data.currency;
+    }
+  } catch {
+    // Saving still stores the currency configured for the business.
+  }
+  return 'USD';
 }
 
 function Field(props: { label: string; value: string; onChangeText: (value: string) => void; keyboardType?: 'default' | 'phone-pad' }) {

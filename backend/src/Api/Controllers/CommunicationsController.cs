@@ -119,7 +119,7 @@ public sealed class CommunicationsController : ApiControllerBase
     [HttpPost("communications/audience-preview")]
     [RequiresPermission(PermissionCodes.CommunicationCreate)]
     public async Task<IActionResult> Preview(CommunicationRequest request, CancellationToken cancellationToken) =>
-        (await Sender.Send(new PreviewCommunicationAudienceQuery(request.AudienceType, request.AudiencePackageId, request.AudienceTrainerId, request.ExpiringWithinDays, request.SelectedMemberIds, request.SelectedTrainerIds, request.SelectedStaffIds), cancellationToken)).ToActionResult();
+        (await Sender.Send(new PreviewCommunicationAudienceQuery(request.AudienceType, request.AudiencePackageId, request.AudienceTrainerId, request.ExpiringWithinDays, request.SelectedMemberIds, request.SelectedTrainerIds, request.SelectedStaffIds, request.Type), cancellationToken)).ToActionResult();
 
     [HttpGet("communications/inbox")]
     [RequiresPermission(PermissionCodes.CommunicationRead)]

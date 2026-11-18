@@ -3,6 +3,7 @@ using LifeFitAI.Application.Gym.Communications;
 using LifeFitAI.Domain.Gym;
 using LifeFitAI.Domain.Identity;
 using LifeFitAI.Infrastructure.Persistence;
+using LifeFitAI.Infrastructure.Platform;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 
@@ -27,6 +28,29 @@ public sealed class CommunicationDeliveryTests
 
         preview.Members.Should().Be(1);
         preview.Total.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Circular_AlsoReachesActiveTrainers_AndASecondDeliveryDoesNotDuplicate()
+    {
+        await using var db = CreateDb();
+        var memberId = Guid.NewGuid();
+        var trainerId = Guid.NewGuid();
+        db.MemberProfiles.Add(Member(_tenant, memberId, "M-1"));
+        db.TrainerProfiles.Add(TrainerProfile.Create(Guid.NewGuid(), _tenant, trainerId, null));
+        var communication = Communication.Create(Guid.NewGuid(), _tenant, Guid.NewGuid(), CommunicationType.Circular, "Notice", "Body", CommunicationPriority.Normal, CommunicationAudienceType.AllMembers, null, null, null, null, null);
+        communication.Publish(_utc);
+        db.Communications.Add(communication);
+        await db.SaveChangesAsync();
+
+        var delivery = new CommunicationDelivery(db);
+        await delivery.DeliverAsync(communication, _utc, CancellationToken.None);
+        await delivery.DeliverAsync(communication, _utc, CancellationToken.None);
+        await db.SaveChangesAsync();
+
+        var recipients = await db.CommunicationRecipients.Where(item => item.CommunicationId == communication.Id).Select(item => item.UserId).ToListAsync();
+        recipients.Should().BeEquivalentTo(new[] { memberId, trainerId });
+        (await db.OutboxMessages.CountAsync(item => item.IdempotencyKey == CircularPublication.Key(communication.Id))).Should().Be(1);
     }
 
     [Fact]

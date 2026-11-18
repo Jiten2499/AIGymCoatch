@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { ScrollableGrid } from "../../../components/ScrollableGrid";
 import { api, ApiError } from "../../../lib/api";
+import { formatAmount, useWorkspaceCurrency } from "../../../lib/money";
 import type { GymMembership } from "../../../lib/gym";
 import { ptPackageLabel, type PtPackageOption } from "../../../lib/ptPackage";
 import type { Coach, Page } from "../../../lib/types";
@@ -51,6 +52,7 @@ export function MemberTraining({
   trainerId: string | null;
 }) {
   const client = useQueryClient();
+  const currency = useWorkspaceCurrency();
   const assignments = useQuery({
     queryKey: ["member-pt", tenantId, memberId],
     enabled: tenantId !== null,
@@ -87,7 +89,7 @@ export function MemberTraining({
           <article className="rounded-2xl border border-line bg-surface p-4 text-sm" key={item.id}>
             <h2 className="font-semibold">{item.packageName}</h2>
             <p className="mt-1 text-muted">Valid {item.startDate} to {item.endDate} · {item.status} · {item.paymentStatus}</p>
-            <p className="mt-1">Sessions remaining {item.sessionsRemaining} of {item.sessionCount} · {name(item.trainerId)} · {item.price} {item.currency}{item.amountPaid ? ` · Paid ${item.amountPaid}${item.paymentMethod ? ` by ${item.paymentMethod}` : ""}${item.paymentDate ? ` on ${item.paymentDate}` : ""}` : ""}</p>
+            <p className="mt-1">Sessions remaining {item.sessionsRemaining} of {item.sessionCount} · {name(item.trainerId)} · {formatAmount(item.price, currency)}{item.amountPaid ? ` · Paid ${formatAmount(item.amountPaid, currency)}${item.paymentMethod ? ` by ${item.paymentMethod}` : ""}${item.paymentDate ? ` on ${item.paymentDate}` : ""}` : ""}</p>
           </article>
         ))}
         {assignments.data && assignments.data.length === 0 ? <p className="text-muted">No personal-training package is assigned.</p> : null}

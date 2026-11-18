@@ -5,7 +5,7 @@ import { useState } from "react";
 import { FormActions, FormDialog, FormField } from "../../../components/FormDialog";
 import { ScrollableGrid } from "../../../components/ScrollableGrid";
 import { api, ApiError } from "../../../lib/api";
-import type { AttendanceConfig, CrmCatalogItem, CrmConfig, DiscountRule, FreezeConfig, MemberCategory, MembershipConfig } from "../../../lib/configuration";
+import { currencyOptions, type AttendanceConfig, type CrmCatalogItem, type CrmConfig, type CurrencyOption, type DiscountRule, type FreezeConfig, type MemberCategory, type MembershipConfig } from "../../../lib/configuration";
 import type { MembershipPackage } from "../../../lib/gym";
 import { emptyToNull } from "../../../lib/gym";
 
@@ -17,6 +17,46 @@ function useSyncedDraft<T>(value: T) {
     setDraft(value);
   }
   return [draft, setDraft] as const;
+}
+
+export function CurrencyForm({ currency, currencies, tenantId }: { currency: string; currencies: CurrencyOption[]; tenantId: string | null }) {
+  const client = useQueryClient();
+  const options = currencyOptions(currency, currencies);
+  const [draft, setDraft] = useState(currency);
+  const [source, setSource] = useState(currency);
+  if (currency !== source) {
+    setSource(currency);
+    setDraft(currency);
+  }
+  const save = useMutation({
+    mutationFn: () => api("/configuration/currency", { method: "PUT", body: JSON.stringify({ currency: draft }) }),
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: ["configuration", tenantId] });
+      await client.invalidateQueries({ queryKey: ["business-profile"] });
+      await client.invalidateQueries({ queryKey: ["membership-plans"] });
+      await client.invalidateQueries({ queryKey: ["business-dashboard"] });
+      await client.invalidateQueries({ queryKey: ["business-dashboard-board"] });
+      await client.invalidateQueries({ queryKey: ["expenses"] });
+      await client.invalidateQueries({ queryKey: ["expense-summary"] });
+      await client.invalidateQueries({ queryKey: ["ledger-summary"] });
+      await client.invalidateQueries({ queryKey: ["ledger-transactions"] });
+      await client.invalidateQueries({ queryKey: ["payroll-runs"] });
+      await client.invalidateQueries({ queryKey: ["payroll-run"] });
+      await client.invalidateQueries({ queryKey: ["payroll-compensation"] });
+    },
+  });
+  return (
+    <form className="mt-4 grid max-w-xl gap-3" onSubmit={(event) => { event.preventDefault(); save.mutate(); }}>
+      <FormField label="Currency">
+        <select aria-label="Currency" className="field" onChange={(event) => setDraft(event.target.value)} value={draft}>
+          {options.map((item) => <option key={item.code} value={item.code}>{item.code} — {item.name}</option>)}
+        </select>
+      </FormField>
+      <p className="text-sm text-muted">Prices, payments, expenses, payroll, and the dashboard use this currency. Saving updates the currency shown on existing amounts for this business. The numbers stay the same and are not converted.</p>
+      {save.error instanceof ApiError ? <p role="alert">{save.error.message}</p> : null}
+      <FormActions cancel={() => setDraft(currency)} pending={save.isPending} submitLabel="Save currency" />
+    </form>
+  );
 }
 
 export function MembershipForm({ value, tenantId }: { value: MembershipConfig; tenantId: string | null }) {

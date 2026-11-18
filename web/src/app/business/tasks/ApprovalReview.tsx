@@ -5,9 +5,11 @@ import { useState } from "react";
 import { FormActions, FormDialog, FormField } from "../../../components/FormDialog";
 import { api, ApiError } from "../../../lib/api";
 import { approvalStamp, type ApprovalRequestDetails } from "../../../lib/approvals";
+import { formatAmount, useWorkspaceCurrency } from "../../../lib/money";
 
 export function ApprovalReview({ id, tenantId, onClose }: { id: string; tenantId: string | null; onClose: () => void }) {
   const client = useQueryClient();
+  const currency = useWorkspaceCurrency();
   const [comment, setComment] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const request = useQuery({
@@ -48,7 +50,7 @@ export function ApprovalReview({ id, tenantId, onClose }: { id: string; tenantId
           {item.days ? <p>Days: {item.days}</p> : null}
           {item.originalEndDate ? <p>{isLeave ? "Start" : "Original end"}: {item.originalEndDate}</p> : null}
           {item.proposedEndDate ? <p>{isLeave ? "End" : "Proposed end"}: {item.proposedEndDate}</p> : null}
-          {item.amount != null ? <p>Amount: {item.currency} {item.amount}</p> : null}
+          {item.amount != null ? <p>Amount: {formatAmount(item.amount, currency)}</p> : null}
           <p>Reason: {item.reason || "None"}</p>
           {isLeave ? <p className="text-muted">Leave decisions do not change payroll unless a separate leave/payroll policy is configured.</p> : null}
           {item.decisionComment ? <p>Decision: {item.decisionComment}</p> : null}

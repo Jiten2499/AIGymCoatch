@@ -7,12 +7,14 @@ import { FormDialog } from "../../../components/FormDialog";
 import { api, ApiError } from "../../../lib/api";
 import { emptyToNull, type BranchOption, type LeadDetails, type MembershipPackage } from "../../../lib/gym";
 import type { Page } from "../../../lib/types";
+import { formatAmount, useWorkspaceCurrency } from "../../../lib/money";
 import { convertStepError, draftFromLead, fitnessGoals, memberGenders, splitFullName, type ConvertDraft, type MemberMatch } from "./convertWizard";
 
 type TrainerOption = { id: string; firstName: string; lastName: string; status: string };
 type MembershipTerm = { startDate: string; endDate: string; status: string; price: number; currency: string };
 
 export function ConvertLeadDialog({ lead, onCancel, onConverted }: { lead: LeadDetails; onCancel: () => void; onConverted: () => void }) {
+  const currency = useWorkspaceCurrency();
   const today = new Date().toISOString().slice(0, 10);
   const [step, setStep] = useState(1);
   const [draft, setDraft] = useState<ConvertDraft>(() => draftFromLead(lead, today));
@@ -146,7 +148,7 @@ export function ConvertLeadDialog({ lead, onCancel, onConverted }: { lead: LeadD
             <Label text="Membership package">
               <select className="field" onChange={(event) => update({ planId: event.target.value })} value={draft.planId}>
                 <option value="">No Membership</option>
-                {(packages.data?.items ?? []).map((plan) => <option key={plan.id} value={plan.id}>{plan.name} · {plan.price} {plan.currency}</option>)}
+                {(packages.data?.items ?? []).map((plan) => <option key={plan.id} value={plan.id}>{plan.name} · {formatAmount(plan.price, currency)}</option>)}
               </select>
             </Label>
             {draft.planId ? (

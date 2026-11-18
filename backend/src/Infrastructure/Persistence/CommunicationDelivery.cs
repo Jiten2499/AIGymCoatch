@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LifeFitAI.Infrastructure.Persistence;
 
-public sealed class CommunicationDelivery : ICommunicationDelivery
+public sealed partial class CommunicationDelivery : ICommunicationDelivery
 {
     private readonly ApplicationDbContext _db;
 
@@ -22,9 +22,15 @@ public sealed class CommunicationDelivery : ICommunicationDelivery
         IReadOnlyList<Guid> selectedTrainerIds,
         IReadOnlyList<Guid> selectedStaffIds,
         DateTime utcNow,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        CommunicationType type = CommunicationType.Announcement)
     {
         var people = await ResolveAsync(tenantId, audienceType, packageId, trainerId, expiringWithinDays, selectedMemberIds, selectedTrainerIds, selectedStaffIds, utcNow, cancellationToken).ConfigureAwait(false);
+        if (type == CommunicationType.Circular)
+        {
+            await AddTrainersAsync(tenantId, people, cancellationToken).ConfigureAwait(false);
+        }
+
         return new AudiencePreview(
             people.Count(item => item.Kind == CommunicationRecipientKind.Member),
             people.Count(item => item.Kind == CommunicationRecipientKind.Trainer),
@@ -40,40 +46,40 @@ public sealed class CommunicationDelivery : ICommunicationDelivery
             return;
         }
 
-        var tracked = _db.CommunicationRecipients.Local.Any(item => item.TenantId == communication.TenantId && item.CommunicationId == communication.Id && item.DeletedAt is null);
-        if (tracked || await _db.CommunicationRecipients.AnyAsync(item => item.TenantId == communication.TenantId && item.CommunicationId == communication.Id, cancellationToken).ConfigureAwait(false))
+        var people = await PeopleForAsync(communication, utcNow, cancellationToken).ConfigureAwait(false);
+        var existing = await _db.CommunicationRecipients
+            .Where(item => item.TenantId == communication.TenantId && item.CommunicationId == communication.Id && item.DeletedAt == null)
+            .Select(item => item.UserId)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        var known = existing.ToHashSet();
+        foreach (var local in _db.CommunicationRecipients.Local.Where(item => item.TenantId == communication.TenantId && item.CommunicationId == communication.Id && item.DeletedAt == null))
         {
-            return;
+            known.Add(local.UserId);
         }
 
-        var selectedMembers = await _db.CommunicationAudienceMembers.AsNoTracking()
-            .Where(item => item.TenantId == communication.TenantId && item.CommunicationId == communication.Id)
-            .Select(item => item.MemberProfileId)
-            .ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
-        var targets = await _db.CommunicationAudienceTargets.AsNoTracking()
-            .Where(item => item.TenantId == communication.TenantId && item.CommunicationId == communication.Id)
-            .ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
-        var people = await ResolveAsync(
-            communication.TenantId,
-            communication.AudienceType,
-            communication.AudiencePackageId,
-            communication.AudienceTrainerId,
-            communication.ExpiringWithinDays,
-            selectedMembers,
-            targets.Where(item => item.TargetKind == CommunicationTargetKind.Trainer).Select(item => item.EntityId).ToList(),
-            targets.Where(item => item.TargetKind == CommunicationTargetKind.Staff).Select(item => item.EntityId).ToList(),
-            utcNow,
-            cancellationToken).ConfigureAwait(false);
+        var added = 0;
         foreach (var person in people)
         {
+            if (!known.Add(person.UserId))
+            {
+                continue;
+            }
+
             await _db.CommunicationRecipients.AddAsync(
                 CommunicationRecipient.Create(Guid.NewGuid(), communication.TenantId, communication.Id, person.UserId, person.Kind, person.EntityId, utcNow),
                 cancellationToken).ConfigureAwait(false);
+            added++;
         }
 
-        await CircularPublicationOutbox.QueueAsync(_db, communication, utcNow, cancellationToken).ConfigureAwait(false);
+        if (existing.Count == 0)
+        {
+            await CircularPublicationOutbox.QueueAsync(_db, communication, utcNow, cancellationToken).ConfigureAwait(false);
+        }
+        else if (added > 0)
+        {
+            await CircularPublicationOutbox.ReopenAsync(_db, communication, utcNow, cancellationToken).ConfigureAwait(false);
+        }
     }
 
     public async Task<int> PublishDueAsync(DateTime utcNow, CancellationToken cancellationToken)

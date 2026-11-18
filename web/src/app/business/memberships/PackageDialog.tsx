@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { FormActions, FormDialog, FormField } from "../../../components/FormDialog";
@@ -16,7 +16,6 @@ const schema = z.object({
   durationUnit: z.enum(["Day", "Month"]),
   durationCount: z.string().regex(/^[1-9]\d*$/, "Enter a duration"),
   price: z.string().regex(/^\d+(\.\d{1,2})?$/, "Enter a price"),
-  currency: z.string().length(3, "Use a 3-letter currency"),
   includedPtSessions: z.string().regex(/^\d+$/, "Enter included PT sessions"),
 });
 
@@ -25,8 +24,10 @@ type Values = z.infer<typeof schema>;
 export function PackageDialog({ onCancel, onCreated }: { onCancel: () => void; onCreated: () => void }) {
   const form = useForm<Values>({
     resolver: zodResolver(schema),
-    defaultValues: { name: "", description: "", membershipType: "Monthly", category: "Standard", durationUnit: "Month", durationCount: "1", price: "0", currency: "USD", includedPtSessions: "0" },
+    defaultValues: { name: "", description: "", membershipType: "Monthly", category: "Standard", durationUnit: "Month", durationCount: "1", price: "0", includedPtSessions: "0" },
   });
+  const profile = useQuery({ queryKey: ["business-profile", "package-currency"], queryFn: () => api<{ currency: string }>("/business/profile") });
+  const currency = profile.data?.currency || "USD";
   const create = useMutation({
     mutationFn: (values: Values) => api<MembershipPackage>("/membership-plans", {
       method: "POST",
@@ -37,7 +38,7 @@ export function PackageDialog({ onCancel, onCreated }: { onCancel: () => void; o
         membershipType: values.membershipType,
         maxVisits: null,
         price: Number(values.price),
-        currency: values.currency.toUpperCase(),
+        currency,
         category: values.category,
         durationUnit: values.durationUnit,
         durationCount: Number(values.durationCount),
@@ -68,10 +69,10 @@ export function PackageDialog({ onCancel, onCreated }: { onCancel: () => void; o
             <select className="field" {...form.register("durationUnit")}><option>Month</option><option>Day</option></select>
           </span>
         </FormField>
-        <FormField label="Price" error={form.formState.errors.price?.message ?? form.formState.errors.currency?.message}>
+        <FormField label="Price" error={form.formState.errors.price?.message}>
           <span className="flex gap-2">
             <input className="field" step="0.01" type="number" {...form.register("price")} />
-            <input className="field w-24" {...form.register("currency")} />
+            <input aria-label="Currency" className="field w-28" readOnly value={currency} />
           </span>
         </FormField>
         <FormField label="Included PT sessions" error={form.formState.errors.includedPtSessions?.message}>

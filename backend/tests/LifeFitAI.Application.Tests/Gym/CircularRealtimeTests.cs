@@ -114,21 +114,21 @@ public sealed class CircularRealtimeTests
 
         await notifier.Received(1).PublishedAsync(
             Arg.Is<CircularPublishedNotice>(item => item.CommunicationId == memberNotice && item.TenantId == _tenant && item.Audience == "AllMembers"),
-            Arg.Is<IReadOnlyList<Guid>>(ids => ids.SequenceEqual(new[] { member })),
+            Arg.Is<IReadOnlyList<Guid>>(ids => ids.OrderBy(id => id).SequenceEqual(new[] { member, trainer }.OrderBy(id => id))),
             Arg.Any<CancellationToken>());
         await notifier.Received(1).PublishedAsync(
             Arg.Is<CircularPublishedNotice>(item => item.CommunicationId == trainerNotice && item.Audience == "AllTrainers"),
-            Arg.Is<IReadOnlyList<Guid>>(ids => ids.SequenceEqual(new[] { trainer })),
+            Arg.Is<IReadOnlyList<Guid>>(ids => ids.OrderBy(id => id).SequenceEqual(new[] { trainer }.OrderBy(id => id))),
             Arg.Any<CancellationToken>());
         await notifier.Received(1).PublishedAsync(
             Arg.Is<CircularPublishedNotice>(item => item.CommunicationId == staffNotice && item.Audience == "AllStaff"),
-            Arg.Is<IReadOnlyList<Guid>>(ids => ids.SequenceEqual(new[] { staff })),
+            Arg.Is<IReadOnlyList<Guid>>(ids => ids.OrderBy(id => id).SequenceEqual(new[] { staff, trainer }.OrderBy(id => id))),
             Arg.Any<CancellationToken>());
         (await db.OutboxMessages.CountAsync(item => item.Status == OutboxMessageStatus.Dispatched)).Should().Be(3);
         var alerts = await db.Notifications.Where(item => item.Type == NotificationType.CircularPublished).ToListAsync();
-        alerts.Should().HaveCount(3);
+        alerts.Should().HaveCount(5);
         alerts.Should().OnlyContain(item => item.Message == "Notice" && item.Title == "New circular");
-        alerts.Select(item => item.UserId).Should().BeEquivalentTo(new[] { member, trainer, staff });
+        alerts.Select(item => item.UserId).Should().BeEquivalentTo(new[] { member, trainer, trainer, staff, trainer });
     }
 
     [Fact]

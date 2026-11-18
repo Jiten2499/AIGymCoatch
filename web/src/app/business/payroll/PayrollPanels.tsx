@@ -23,7 +23,8 @@ export function issueText(line: PayrollLine): string {
   return "Needs review";
 }
 
-export function SummaryCards({ details, onChangePeriod }: { details: PayrollRunDetails; onChangePeriod: () => void }) {
+export function SummaryCards({ details, currency, onChangePeriod }: { details: PayrollRunDetails; currency: string; onChangePeriod: () => void }) {
+  const code = currency || details.currency;
   return (
     <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <article className="rounded-2xl border border-line bg-surface px-4 py-4 shadow-sm">
@@ -37,8 +38,8 @@ export function SummaryCards({ details, onChangePeriod }: { details: PayrollRunD
       </article>
       <article className="rounded-2xl border border-line bg-surface px-4 py-4 shadow-sm">
         <p className="text-sm text-muted">Total net payable</p>
-        <p className="mt-2 text-xl font-semibold">{money(details.netPayable, details.currency)}</p>
-        <p className="mt-1 text-xs text-muted">{money(details.grossPay, details.currency)} gross − {money(details.totalDeductions, details.currency)} deductions</p>
+        <p className="mt-2 text-xl font-semibold">{money(details.netPayable, code)}</p>
+        <p className="mt-1 text-xs text-muted">{money(details.grossPay, code)} gross − {money(details.totalDeductions, code)} deductions</p>
       </article>
       <article className={`rounded-2xl border px-4 py-4 shadow-sm ${details.issueCount > 0 ? "border-amber-500/40 bg-amber-500/10" : "border-line bg-surface"}`}>
         <p className="text-sm text-muted">Needs review</p>
@@ -145,7 +146,7 @@ export function DetailPanel({ line, currency, canEdit, canPay, details, onChange
   );
 }
 
-export function CompensationPanel({ rows, onSaved }: { rows: Awaited<ReturnType<typeof listCompensation>>; onSaved: () => void }) {
+export function CompensationPanel({ rows, currency, onSaved }: { rows: Awaited<ReturnType<typeof listCompensation>>; currency: string; onSaved: () => void }) {
   const [staffId, setStaffId] = useState("");
   const [base, setBase] = useState("");
   const [allowances, setAllowances] = useState("");
@@ -160,7 +161,7 @@ export function CompensationPanel({ rows, onSaved }: { rows: Awaited<ReturnType<
       <form className="mt-3 grid gap-2 md:grid-cols-4" onSubmit={(event) => { event.preventDefault(); save.mutate(); }}>
         <select aria-label="Staff" className="field" onChange={(event) => setStaffId(event.target.value)} required value={staffId}>
           <option value="">Select staff</option>
-          {rows.map((row) => <option key={row.staffProfileId} value={row.staffProfileId}>{row.employeeName} · {money(row.baseSalary, row.currency)}</option>)}
+          {rows.map((row) => <option key={row.staffProfileId} value={row.staffProfileId}>{row.employeeName} · {money(row.baseSalary, currency || row.currency)}</option>)}
         </select>
         <input aria-label="Base salary" className="field" onChange={(event) => setBase(event.target.value)} placeholder="Base salary" required value={base} />
         <input aria-label="Allowances" className="field" onChange={(event) => setAllowances(event.target.value)} placeholder="Allowances" required value={allowances} />

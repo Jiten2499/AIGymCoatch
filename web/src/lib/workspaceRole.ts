@@ -2,6 +2,7 @@ const businessStaff = ["GymOwner", "BusinessAdmin", "GymManager", "Receptionist"
 const personal = new Set(["PersonalOwner", "PersonalMember", "Member"]);
 
 const labels: Record<string, string> = {
+  SuperAdmin: "Super Admin",
   GymOwner: "Business Owner",
   BusinessAdmin: "Business Admin",
   GymManager: "Manager",

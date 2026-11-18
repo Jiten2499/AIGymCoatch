@@ -135,6 +135,16 @@ public sealed class BusinessConfigRepository : IBusinessConfigRepository
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
+    private async Task<string> CurrentCurrencyAsync(Guid tenantId, CancellationToken cancellationToken)
+    {
+        var currency = await _db.BusinessProfiles.AsNoTracking()
+            .Where(profile => profile.TenantId == tenantId)
+            .Select(profile => profile.Currency)
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+        return string.IsNullOrWhiteSpace(currency) ? "USD" : currency;
+    }
+
     public async Task<BusinessConfigurationResponse> ReadAsync(Guid tenantId, CancellationToken cancellationToken)
     {
         var config = await GetConfigAsync(tenantId, cancellationToken).ConfigureAwait(false)
@@ -147,6 +157,8 @@ public sealed class BusinessConfigRepository : IBusinessConfigRepository
             await ListCategoriesAsync(tenantId, false, cancellationToken).ConfigureAwait(false),
             await ListDiscountsAsync(tenantId, null, cancellationToken).ConfigureAwait(false),
             await ListLeadSourcesAsync(tenantId, cancellationToken).ConfigureAwait(false),
-            await ListLostReasonsAsync(tenantId, cancellationToken).ConfigureAwait(false));
+            await ListLostReasonsAsync(tenantId, cancellationToken).ConfigureAwait(false),
+            await CurrentCurrencyAsync(tenantId, cancellationToken).ConfigureAwait(false),
+            CurrencyCodes.Options);
     }
 }

@@ -2,11 +2,12 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { AppFrame } from "./AppFrame";
 import { adminGroups } from "../lib/adminNav";
 import { api } from "../lib/api";
-import { getSession, isSessionReady, setSession, subscribeSession } from "../lib/session";
+import { getSession, isSessionReady, setSession, subscribeSession, type WorkspaceSummary } from "../lib/session";
+import { displayWorkspaceRole, workspaceRoleLabel } from "../lib/workspaceRole";
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -14,7 +15,6 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const sessionReady = useSyncExternalStore(subscribeSession, isSessionReady, () => false);
   const userId = session?.user.id ?? null;
   const tenantType = session?.currentTenant?.type ?? null;
-  const [platform, setPlatform] = useState<string>("");
   const jobs = useQuery({
     queryKey: ["background-jobs", "access"],
     enabled: session !== null && session.currentTenant?.type === "Platform",
@@ -22,6 +22,13 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     queryFn: () => api("/background-jobs/summary"),
   });
   const canMonitorJobs = jobs.isSuccess;
+  const workspaces = useQuery({
+    queryKey: ["workspaces"],
+    enabled: session !== null && tenantType === "Platform",
+    queryFn: () => api<WorkspaceSummary[]>("/tenants/me"),
+  });
+  const roleName = displayWorkspaceRole(workspaces.data?.find((workspace) => workspace.type === "Platform")?.roles ?? []);
+  const role = roleName ? workspaceRoleLabel(roleName) : "";
 
   useEffect(() => {
     if (!sessionReady) {
@@ -38,38 +45,17 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     }
   }, [router, sessionReady, tenantType, userId]);
 
-  useEffect(() => {
-    if (!userId || tenantType !== "Platform") {
-      return;
-    }
-    let cancelled = false;
-    void api<{ name: string; version: string; status: string }>("/platform")
-      .then((info) => {
-        if (!cancelled) {
-          setPlatform(`${info.name} ${info.version}`);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setPlatform("");
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [tenantType, userId]);
-
   if (!session) {
     return <p className="p-8 text-muted">Checking your session.</p>;
   }
 
   return (
     <AppFrame
-      brand="Platform"
+      brand="Growventur"
+      role={role}
       groups={adminGroups(canMonitorJobs)}
       onLogout={() => { setSession(null); router.replace("/login"); }}
       profileHref="/admin/profile"
-      subtitle={platform}
       user={session.user}
     >
       {children}

@@ -14,7 +14,7 @@ const storageKey = "lifefit.sidebar";
 
 export function AppFrame({
   brand,
-  subtitle,
+  role,
   groups,
   user,
   profileHref,
@@ -22,7 +22,7 @@ export function AppFrame({
   children,
 }: {
   brand: string;
-  subtitle?: string;
+  role?: string;
   groups: readonly NavGroup[];
   user: { id: string; firstName: string; lastName: string; hasPhoto?: boolean };
   profileHref: string;
@@ -54,8 +54,7 @@ export function AppFrame({
         <div className={`flex shrink-0 items-center gap-2 border-b border-line ${collapsed ? "justify-center px-2 py-4" : "px-4 py-4"}`}>
           {collapsed ? null : (
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold tracking-[0.16em] text-accent uppercase">{brand}</p>
-              {subtitle ? <p className="mt-1 truncate text-sm">{subtitle}</p> : null}
+              <p className="truncate text-sm font-semibold text-accent" title={brand}>{brand}</p>
             </div>
           )}
           <button aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"} className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-line" onClick={toggle} type="button">
@@ -75,7 +74,7 @@ export function AppFrame({
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-line bg-background px-6">
-          <p className="truncate text-sm text-muted">{subtitle || brand}</p>
+          <p className="truncate text-sm text-muted">{role}</p>
           <div className="flex items-center gap-4">
             <Link className="flex min-h-11 items-center gap-2" href={profileHref}>
               <UserAvatar firstName={user.firstName} hasPhoto={user.hasPhoto} lastName={user.lastName} userId={user.id} />

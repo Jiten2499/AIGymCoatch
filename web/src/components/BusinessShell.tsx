@@ -35,6 +35,13 @@ export function BusinessShell({ children }: { children: React.ReactNode }) {
     refetchOnMount: "always",
     queryFn: () => api<{ permissions: string[] }>("/users/me/access"),
   });
+  const workspaces = useQuery({
+    queryKey: ["workspaces"],
+    enabled: tenantId !== null,
+    queryFn: () => api<WorkspaceSummary[]>("/tenants/me"),
+  });
+  const roleName = displayWorkspaceRole(workspaces.data?.find((workspace) => workspace.id === tenantId)?.roles ?? []);
+  const role = roleName ? workspaceRoleLabel(roleName) : "";
   const unread = useQuery({
     queryKey: ["communication-unread", tenantId],
     enabled: tenantId !== null,
@@ -46,12 +53,6 @@ export function BusinessShell({ children }: { children: React.ReactNode }) {
     enabled: tenantId !== null,
     retry: false,
     queryFn: () => api<{ pendingCount: number }>("/approval-requests/pending-count"),
-  });
-  const workspaces = useQuery({
-    queryKey: ["workspaces", session?.user.id],
-    enabled: session !== null,
-    staleTime: 60_000,
-    queryFn: () => api<WorkspaceSummary[]>("/tenants/me"),
   });
   const permissions = useMemo(() => {
     const payload = access.data as { permissions?: string[]; Permissions?: string[] } | undefined;
@@ -110,16 +111,13 @@ export function BusinessShell({ children }: { children: React.ReactNode }) {
     return <p className="p-8 text-muted">Opening your workspace.</p>;
   }
 
-  const currentRoles = workspaces.data?.find((workspace) => workspace.id === tenantId)?.roles ?? [];
-  const role = workspaceRoleLabel(displayWorkspaceRole(currentRoles)) || "Staff";
-
   return (
     <AppFrame
-      brand="Business"
+      brand={session.currentTenant?.name?.trim() || "Business"}
+      role={role}
       groups={groups}
       onLogout={() => { setSession(null); router.replace("/login"); }}
       profileHref="/business/profile"
-      subtitle={role}
       user={session.user}
     >
       {children}

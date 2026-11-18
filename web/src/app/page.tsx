@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 const pillars = [
   {
     title: "Tenants",
@@ -20,9 +22,14 @@ export default function Home() {
         <span className="text-sm font-semibold tracking-[0.18em] text-accent uppercase">
           LifeFit AI
         </span>
-        <a className="text-sm text-accent" href="/login">
-          Platform admin
-        </a>
+        <nav className="flex gap-4 text-sm">
+          <Link className="text-accent" href="/docs">
+            Documentation
+          </Link>
+          <Link className="text-accent" href="/login">
+            Platform admin
+          </Link>
+        </nav>
       </header>
 
       <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-6 pb-20">
@@ -50,7 +57,18 @@ export default function Home() {
       </main>
 
       <footer className="border-t border-line px-6 py-6 text-sm text-muted">
-        <div className="mx-auto w-full max-w-6xl">LifeFit AI</div>
+        <div className="mx-auto flex w-full max-w-6xl flex-wrap gap-4">
+          <span>LifeFit AI</span>
+          <Link className="text-accent" href="/docs">
+            Documentation
+          </Link>
+          <Link className="text-accent" href="/docs/growventur">
+            Growventur
+          </Link>
+          <Link className="text-accent" href="/docs/growfit">
+            GrowFit
+          </Link>
+        </div>
       </footer>
     </div>
   );

@@ -101,6 +101,7 @@ public static class DependencyInjection
         services.AddScoped<IPasswordResetRepository, PasswordResetRepository>();
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();
         services.AddScoped<IBusinessProfileRepository, BusinessProfileRepository>();
+        services.AddScoped<LifeFitAI.Application.Gym.Configuration.ITenantCurrencyStore, TenantCurrencyStore>();
         services.AddScoped<IBranchRepository, BranchRepository>();
         services.AddScoped<IPeopleRepository, PeopleRepository>();
         services.AddScoped<IBusinessProfileSoftDelete, BusinessProfileSoftDelete>();

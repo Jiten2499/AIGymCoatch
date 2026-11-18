@@ -16,7 +16,10 @@ public interface ICommunicationDelivery
         IReadOnlyList<Guid> selectedTrainerIds,
         IReadOnlyList<Guid> selectedStaffIds,
         DateTime utcNow,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        CommunicationType type = CommunicationType.Announcement);
+
+    Task<int> IncludeMissingCircularTrainersAsync(DateTime utcNow, CancellationToken cancellationToken);
 
     Task DeliverAsync(Communication communication, DateTime utcNow, CancellationToken cancellationToken);
 

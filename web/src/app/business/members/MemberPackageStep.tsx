@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { memberPaymentMethods, availablePtSessions, type MemberDraft } from "./memberWizard";
 import type { BranchOption, MembershipPackage } from "../../../lib/gym";
+import { formatAmount, useWorkspaceCurrency } from "../../../lib/money";
 import { noPtPackagesMessage, ptPackageLabel, type PtPackageOption } from "../../../lib/ptPackage";
 
 export type MembershipTerm = { startDate: string; endDate: string; status: string; price: number; currency: string };
@@ -25,6 +26,7 @@ export function MembershipPackageStep({
   update: (patch: Partial<MemberDraft>) => void;
   readOnly?: boolean;
 }) {
+  const currency = useWorkspaceCurrency();
   const [query, setQuery] = useState("");
   const selected = plans.find((plan) => plan.id === draft.planId);
   const selectedPt = ptPackages.find((item) => item.id === draft.ptPackageId);
@@ -41,12 +43,12 @@ export function MembershipPackageStep({
         <label className="mt-3 grid gap-2 text-sm">Membership package
           <select aria-label="Membership package" className="field" disabled={readOnly} onChange={(event) => update({ planId: event.target.value })} value={draft.planId}>
             <option value="">No membership</option>
-            {visible.map((plan) => <option key={plan.id} value={plan.id}>{plan.name} · {plan.price} {plan.currency}</option>)}
+            {visible.map((plan) => <option key={plan.id} value={plan.id}>{plan.name} · {formatAmount(plan.price, currency)}</option>)}
           </select>
         </label>
         {selected ? (
           <div className="mt-3 grid gap-2 text-sm">
-            <p>{selected.name} · {selected.durationCount} {selected.durationUnit} · {selected.price} {selected.currency}</p>
+            <p>{selected.name} · {selected.durationCount} {selected.durationUnit} · {formatAmount(selected.price, currency)}</p>
             <p className="text-muted">{selected.description || "No additional benefits listed."}</p>
             <p>{included > 0 ? `Includes ${included} personal-training sessions with this membership.` : "No membership-included personal-training sessions."}</p>
             <label className="grid gap-2">Branch
@@ -90,7 +92,7 @@ export function MembershipPackageStep({
         </label>
         {ptPackages.length === 0 ? <p className="mt-3 text-sm text-muted">{noPtPackagesMessage}</p> : null}
         {selectedPt ? (
-          <p className="mt-3 text-sm">{selectedPt.name} · {selectedPt.sessionCount} sessions · valid {selectedPt.validityDays} days · {selectedPt.price} {selectedPt.currency}{readOnly ? "" : " · Unpaid"}</p>
+          <p className="mt-3 text-sm">{selectedPt.name} · {selectedPt.sessionCount} sessions · valid {selectedPt.validityDays} days · {formatAmount(selectedPt.price, currency)}{readOnly ? "" : " · Unpaid"}</p>
         ) : <p className="mt-3 text-sm text-muted">No standalone personal-training package selected.</p>}
       </section>
     </div>
@@ -112,6 +114,7 @@ export function MemberReview({
   trainerName: string;
   editing?: boolean;
 }) {
+  const currency = useWorkspaceCurrency();
   const sessions = availablePtSessions(plan?.includedPtSessions ?? 0, ptPackage?.sessionCount ?? null);
   return (
     <div className="grid gap-2 text-sm">
@@ -119,9 +122,9 @@ export function MemberReview({
       <p>{draft.phone}{draft.email ? ` · ${draft.email}` : ""}</p>
       <p>Joined {draft.joinDate} · {draft.status}</p>
       <p>Assigned trainer: {trainerName || "None"}</p>
-      {plan && term ? <p>{plan.name} · {term.startDate} to {term.endDate} · {term.status} · {term.price} {term.currency}</p> : <p>No membership selected.</p>}
+      {plan && term ? <p>{plan.name} · {term.startDate} to {term.endDate} · {term.status} · {formatAmount(term.price, currency)}</p> : <p>No membership selected.</p>}
       <p>{sessions.included > 0 ? `Membership-included PT sessions: ${sessions.included}` : "No membership-included personal-training sessions."}</p>
-      {ptPackage ? <p>Standalone PT package: {ptPackage.name} · {ptPackage.sessionCount} sessions · {ptPackage.validityDays} days · {ptPackage.price} {ptPackage.currency}{editing ? "" : " · Unpaid"}</p> : <p>No standalone personal-training package.</p>}
+      {ptPackage ? <p>Standalone PT package: {ptPackage.name} · {ptPackage.sessionCount} sessions · {ptPackage.validityDays} days · {formatAmount(ptPackage.price, currency)}{editing ? "" : " · Unpaid"}</p> : <p>No standalone personal-training package.</p>}
       <p>Total available PT sessions: {sessions.total}</p>
       {draft.planId && draft.paymentAmount.trim() ? <p>Paid {draft.paymentAmount} by {draft.paymentMethod} on {draft.paymentDate}</p> : null}
       {editing ? <p>Saving updates the profile, photo, trainer, and status. The membership and PT package stay as shown.</p> : (

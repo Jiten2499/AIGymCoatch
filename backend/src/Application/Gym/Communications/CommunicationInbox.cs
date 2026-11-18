@@ -14,7 +14,8 @@ public sealed record PreviewCommunicationAudienceQuery(
     int? ExpiringWithinDays,
     IReadOnlyList<Guid>? SelectedMemberIds,
     IReadOnlyList<Guid>? SelectedTrainerIds,
-    IReadOnlyList<Guid>? SelectedStaffIds) : IRequest<Result<AudiencePreview>>;
+    IReadOnlyList<Guid>? SelectedStaffIds,
+    CommunicationType Type = CommunicationType.Announcement) : IRequest<Result<AudiencePreview>>;
 
 public sealed record ListInboxCommunicationsQuery(CommunicationType? Type, bool UnreadOnly, int Page, int PageSize) : IRequest<Result<PageResult<MemberCommunicationItem>>>;
 
@@ -81,7 +82,8 @@ public sealed class CommunicationInboxHandler :
             request.SelectedTrainerIds ?? [],
             request.SelectedStaffIds ?? [],
             _clock.UtcNow,
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken,
+            request.Type).ConfigureAwait(false);
         return Result.Success(preview);
     }
 

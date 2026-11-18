@@ -8,6 +8,7 @@ import {
   quickActions,
   type DashboardBoard,
 } from "../../../lib/dashboardBoard";
+import { useWorkspaceCurrency } from "../../../lib/money";
 import { count, moneyOrDash, RangeFilter, Skeleton, timeLabel } from "./DashboardParts";
 import { RevenueChart, revenueEmpty } from "./RevenueChart";
 
@@ -36,7 +37,7 @@ export function BusinessDashboardHome(props: {
   onCustom: (from: string, to: string) => void;
 }) {
   const board = props.board.data;
-  const currency = board?.currency ?? "USD";
+  const currency = useWorkspaceCurrency() || board?.currency || "USD";
   return (
     <div className="grid gap-5">
       <header className="flex flex-wrap items-end justify-between gap-4">

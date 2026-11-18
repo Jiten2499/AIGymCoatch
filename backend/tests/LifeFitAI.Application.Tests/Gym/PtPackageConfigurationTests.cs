@@ -35,7 +35,7 @@ public sealed class PtPackageConfigurationTests
     }
 
     [Fact]
-    public async Task UpdateAndStatus_KeepThePackageAndRejectAnotherTenantsCurrency()
+    public async Task UpdateAndStatus_KeepThePackageAndUseTheWorkspaceCurrency()
     {
         var package = PtPackage.Create(Guid.NewGuid(), _tenantId, "Starter", null, 8, 30, 100m, "INR");
         var assignment = MemberPtAssignment.Open(Guid.NewGuid(), package, Guid.NewGuid(), null, new DateOnly(2026, 10, 1));
@@ -54,7 +54,8 @@ public sealed class PtPackageConfigurationTests
         edited.Value.SessionCount.Should().Be(10);
         assignment.PackageName.Should().Be("Starter");
         assignment.SessionCount.Should().Be(8);
-        wrongCurrency.Error.Code.Should().Be("gym.invalid_state");
+        wrongCurrency.IsSuccess.Should().BeTrue();
+        package.Currency.Should().Be("INR");
         inactive.Value.Status.Should().Be("Inactive");
         inactive.Value.IsActive.Should().BeFalse();
     }

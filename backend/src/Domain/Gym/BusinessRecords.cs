@@ -76,6 +76,17 @@ public sealed class BusinessProfile : BaseEntity
         TimeZone = timeZone;
         Currency = currency;
     }
+
+    public void SetCurrency(string currency)
+    {
+        var code = currency.Trim().ToUpperInvariant();
+        if (code.Length != 3)
+        {
+            throw new ArgumentOutOfRangeException(nameof(currency), "Currency must be a three-letter code.");
+        }
+
+        Currency = code;
+    }
 }
 
 public sealed class Branch : BaseEntity

@@ -10,6 +10,7 @@ import { FormActions, FormDialog, FormField } from "../../../components/FormDial
 import { api, ApiError } from "../../../lib/api";
 import type { FinancialAccount, LedgerSummary, LedgerTransaction } from "../../../lib/gym";
 import type { Page } from "../../../lib/types";
+import { formatAmount, useWorkspaceCurrency } from "../../../lib/money";
 import { getSession, subscribeSession } from "../../../lib/session";
 
 type RangeKey = "today" | "week" | "month" | "custom";
@@ -30,6 +31,7 @@ export default function LedgerPage() {
   const client = useQueryClient();
   const session = useSyncExternalStore(subscribeSession, getSession, () => null);
   const tenantId = session?.currentTenant?.id ?? null;
+  const currency = useWorkspaceCurrency();
   const today = useMemo(() => new Date(), []);
   const [range, setRange] = useState<RangeKey>("month");
   const [from, setFrom] = useState(iso(new Date(today.getFullYear(), today.getMonth(), 1)));
@@ -115,7 +117,7 @@ export default function LedgerPage() {
           <h1 className="text-3xl font-semibold">Ledger</h1>
           <p className="mt-2 text-muted">
             {summary.data
-              ? `Money in ${summary.data.moneyIn} · Money out ${summary.data.moneyOut} · Net ${summary.data.netCashFlow} ${summary.data.currency}`
+              ? `Money in ${formatAmount(summary.data.moneyIn, currency)} · Money out ${formatAmount(summary.data.moneyOut, currency)} · Net ${formatAmount(summary.data.netCashFlow, currency)}`
               : "Cash movement posted from payments, expenses, and transfers."}
           </p>
         </div>
@@ -128,10 +130,10 @@ export default function LedgerPage() {
       </div>
 
       <div className="mt-6 grid gap-3 sm:grid-cols-4">
-        <Metric label="Money in" value={summary.data?.moneyIn} currency={summary.data?.currency} />
-        <Metric label="Money out" value={summary.data?.moneyOut} currency={summary.data?.currency} />
-        <Metric label="Net cash flow" value={summary.data?.netCashFlow} currency={summary.data?.currency} />
-        <Metric label="Account balance" value={totalBalance} currency={summary.data?.currency ?? accounts.data?.[0]?.currency} />
+        <Metric label="Money in" value={summary.data?.moneyIn} currency={currency} />
+        <Metric label="Money out" value={summary.data?.moneyOut} currency={currency} />
+        <Metric label="Net cash flow" value={summary.data?.netCashFlow} currency={currency} />
+        <Metric label="Account balance" value={totalBalance} currency={currency} />
       </div>
 
       <div className="mt-6 flex flex-wrap gap-2">
@@ -172,7 +174,7 @@ export default function LedgerPage() {
         <ul className="mt-6 flex flex-wrap gap-3">
           {summary.data!.accounts.map((account) => (
             <li className="rounded-2xl border border-line px-4 py-3" key={account.accountId}>
-              {account.accountName}: in {account.moneyIn} / out {account.moneyOut} / bal {account.balance}
+              {account.accountName}: in {formatAmount(account.moneyIn, currency)} / out {formatAmount(account.moneyOut, currency)} / bal {formatAmount(account.balance, currency)}
             </li>
           ))}
         </ul>
@@ -186,7 +188,7 @@ export default function LedgerPage() {
             { header: "Type", cell: (row) => row.entryType },
             { header: "Account", cell: (row) => row.accountName || "—" },
             { header: "Category", cell: (row) => row.category || "—" },
-            { header: "Amount", cell: (row) => `${row.amount} ${row.currency}` },
+            { header: "Amount", cell: (row) => formatAmount(row.amount, currency) },
             { header: "Status", cell: (row) => row.status },
             { header: "Recorded by", cell: (row) => row.recordedBy || "—" },
           ]}
@@ -232,7 +234,7 @@ function Metric({ label, value, currency }: { label: string; value?: number; cur
   return (
     <div className="rounded-2xl border border-line px-4 py-3">
       <p className="text-sm text-muted">{label}</p>
-      <p className="mt-1 text-xl font-semibold">{value ?? "—"}{currency ? ` ${currency}` : ""}</p>
+      <p className="mt-1 text-xl font-semibold">{value == null ? "—" : formatAmount(value, currency)}</p>
     </div>
   );
 }
@@ -277,6 +279,7 @@ function TransferDialog({ accounts, onCancel, onCreated }: { accounts: Financial
 }
 
 function AccountsDialog({ accounts, onClose, onChanged }: { accounts: FinancialAccount[]; onClose: () => void; onChanged: () => Promise<void> }) {
+  const currency = useWorkspaceCurrency();
   const [name, setName] = useState("");
   const [kind, setKind] = useState("Cash");
   const [message, setMessage] = useState<string | null>(null);
@@ -298,7 +301,7 @@ function AccountsDialog({ accounts, onClose, onChanged }: { accounts: FinancialA
         <ul className="grid w-max min-w-full gap-2">
           {accounts.map((account) => (
             <li className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line px-3 py-2" key={account.id}>
-              <span>{account.name} · {account.accountKind} · {account.balance} {account.currency} · {account.isActive ? "Active" : "Inactive"}</span>
+              <span>{account.name} · {account.accountKind} · {formatAmount(account.balance, currency)} · {account.isActive ? "Active" : "Inactive"}</span>
               <button className="min-h-11 rounded-full border border-line px-3" onClick={() => toggle.mutate(account)} type="button">{account.isActive ? "Deactivate" : "Activate"}</button>
             </li>
           ))}

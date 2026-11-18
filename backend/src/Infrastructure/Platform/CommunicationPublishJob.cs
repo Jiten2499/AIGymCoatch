@@ -40,6 +40,7 @@ public sealed class CommunicationPublishJob : BackgroundService, IBackgroundJob
             var clock = scope.ServiceProvider.GetRequiredService<IDateTimeProvider>();
             var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
             var published = await delivery.DeliverPublishedWithoutRecipientsAsync(clock.UtcNow, cancellationToken).ConfigureAwait(false);
+            published += await delivery.IncludeMissingCircularTrainersAsync(clock.UtcNow, cancellationToken).ConfigureAwait(false);
             if (published > 0)
             {
                 await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);

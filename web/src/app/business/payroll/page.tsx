@@ -19,6 +19,7 @@ import {
   type PayrollRunDetails,
   type PayrollStep,
 } from "../../../lib/payroll";
+import { useWorkspaceCurrency } from "../../../lib/money";
 import { getSession, subscribeSession } from "../../../lib/session";
 import { ActionBar, CompensationPanel, DetailPanel, issueText, SummaryCards } from "./PayrollPanels";
 import { PayrollSteps } from "./PayrollSteps";
@@ -30,6 +31,7 @@ export default function PayrollPage() {
   const client = useQueryClient();
   const session = useSyncExternalStore(subscribeSession, getSession, () => null);
   const tenantId = session?.currentTenant?.id ?? null;
+  const currency = useWorkspaceCurrency();
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -118,18 +120,18 @@ export default function PayrollPage() {
                   <li key={item.id}>
                     <button className="flex w-full items-center justify-between rounded-xl border border-line px-4 py-3 text-left hover:border-accent" onClick={() => { setRunId(item.id); setYear(item.periodYear); setMonth(item.periodMonth); setStep(stepFromStatus(item.status)); setPage(1); }} type="button">
                       <span>{periodLabel(item.periodYear, item.periodMonth)} · {item.status}</span>
-                      <span className="text-sm text-muted">{item.staffCount} staff · {money(item.netPayable, item.currency)}</span>
+                      <span className="text-sm text-muted">{item.staffCount} staff · {money(item.netPayable, currency)}</span>
                     </button>
                   </li>
                 ))}
               </ul>
             )}
-            <CompensationPanel rows={compensation.data ?? []} onSaved={() => void client.invalidateQueries({ queryKey: ["payroll-compensation", tenantId] })} />
+            <CompensationPanel currency={currency} rows={compensation.data ?? []} onSaved={() => void client.invalidateQueries({ queryKey: ["payroll-compensation", tenantId] })} />
           </section>
         ) : (
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(18rem,1fr)]">
             <section className="grid gap-4">
-              <SummaryCards details={details} onChangePeriod={() => setRunId(null)} />
+              <SummaryCards currency={currency} details={details} onChangePeriod={() => setRunId(null)} />
               <div className="rounded-2xl border border-line bg-surface p-4 shadow-sm">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                   <h2 className="text-lg font-semibold">Staff salary review</h2>
@@ -143,7 +145,7 @@ export default function PayrollPage() {
                   </div>
                 </div>
                 {run.isLoading ? <p role="status">Loading payroll lines.</p> : (
-                  <PayrollTable currency={details.currency} lines={pageLines} onPage={setPage} onSelect={setSelected} page={page} pageSize={PAGE_SIZE} selectedId={selectedLine?.id ?? null} total={filtered.length} />
+                  <PayrollTable currency={currency} lines={pageLines} onPage={setPage} onSelect={setSelected} page={page} pageSize={PAGE_SIZE} selectedId={selectedLine?.id ?? null} total={filtered.length} />
                 )}
               </div>
               {issues.length > 0 ? (
@@ -161,7 +163,7 @@ export default function PayrollPage() {
               ) : null}
               <ActionBar details={details} onApprove={() => approve.mutate()} onBulk={() => payBulk.mutate()} onDraft={() => toDraft.mutate()} onSubmit={() => submit.mutate()} pending={submit.isPending || approve.isPending || payBulk.isPending || toDraft.isPending} step={step} />
             </section>
-            <DetailPanel canEdit={details.canEdit} canPay={details.canPay} currency={details.currency} details={details} line={selectedLine} onChanged={async () => { await client.invalidateQueries({ queryKey: ["payroll-run", tenantId, details.id] }); }} />
+            <DetailPanel canEdit={details.canEdit} canPay={details.canPay} currency={currency} details={details} line={selectedLine} onChanged={async () => { await client.invalidateQueries({ queryKey: ["payroll-run", tenantId, details.id] }); }} />
           </div>
         )}
       </div>

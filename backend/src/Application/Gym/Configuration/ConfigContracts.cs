@@ -33,6 +33,8 @@ public sealed record DiscountRuleItem(
 
 public sealed record CrmCatalogItem(Guid Id, string Name, string? Code, bool IsSystem, bool IsActive);
 
+public sealed record CurrencyOption(string Code, string Name);
+
 public sealed record BusinessConfigurationResponse(
     MembershipConfigDto Membership,
     FreezeConfigDto Freeze,
@@ -41,4 +43,6 @@ public sealed record BusinessConfigurationResponse(
     IReadOnlyList<MemberCategoryItem> MemberCategories,
     IReadOnlyList<DiscountRuleItem> Discounts,
     IReadOnlyList<CrmCatalogItem> LeadSources,
-    IReadOnlyList<CrmCatalogItem> LostReasons);
+    IReadOnlyList<CrmCatalogItem> LostReasons,
+    string Currency = "USD",
+    IReadOnlyList<CurrencyOption>? Currencies = null);

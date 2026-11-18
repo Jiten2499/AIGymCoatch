@@ -264,49 +264,6 @@ public sealed class UpdatePlanCommandValidator : AbstractValidator<UpdatePlanCom
     }
 }
 
-public sealed class UpdatePlanCommandHandler : IRequestHandler<UpdatePlanCommand, Result<PlanResponse>>
-{
-    private readonly IOperationGuard _guard;
-    private readonly ICurrentActor _actor;
-    private readonly IMembershipRepository _plans;
-    private readonly IAuditLogRepository _audit;
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly IDateTimeProvider _clock;
-    private readonly IClientContext _client;
-
-    public UpdatePlanCommandHandler(IOperationGuard guard, ICurrentActor actor, IMembershipRepository plans, IAuditLogRepository audit, IUnitOfWork unitOfWork, IDateTimeProvider clock, IClientContext client)
-    {
-        _guard = guard;
-        _actor = actor;
-        _plans = plans;
-        _audit = audit;
-        _unitOfWork = unitOfWork;
-        _clock = clock;
-        _client = client;
-    }
-
-    public async Task<Result<PlanResponse>> Handle(UpdatePlanCommand request, CancellationToken cancellationToken)
-    {
-        var gate = await _guard.AllowAsync(PermissionCodes.MembershipPlanManage, FeatureCodes.MembershipManagement, cancellationToken).ConfigureAwait(false);
-        if (gate.IsFailure || _actor.TenantId is not Guid tenantId)
-        {
-            return Result.Failure<PlanResponse>(gate.Error);
-        }
-
-        var plan = await _plans.GetPlanAsync(tenantId, request.Id, cancellationToken).ConfigureAwait(false);
-        if (plan is null)
-        {
-            return Result.Failure<PlanResponse>(GymErrors.NotFound);
-        }
-
-        var duration = MembershipCalendar.Resolve(request.MembershipType, request.DurationDays, request.DurationUnit, request.DurationCount);
-        plan.Update(request.Name.Trim(), request.Description, request.DurationDays, request.MembershipType, request.MaxVisits, request.Price, request.Currency.ToUpperInvariant(), request.Category, duration.Unit, duration.Count, request.IncludedPtSessions);
-        await _audit.AddAsync(AuditLog.Create(Guid.NewGuid(), tenantId, _actor.UserId, "PackageUpdated", "MembershipPlan", plan.Id, null, plan.Name, _client.IpAddress, _client.UserAgent, _clock.UtcNow), cancellationToken).ConfigureAwait(false);
-        await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        return Result.Success(CreatePlanCommandHandler.Map(plan));
-    }
-}
-
 public sealed record GetMembershipQuery(Guid Id) : IRequest<Result<GymMembershipResponse>>;
 
 public sealed class GetMembershipQueryHandler : IRequestHandler<GetMembershipQuery, Result<GymMembershipResponse>>

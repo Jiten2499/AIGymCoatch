@@ -51,6 +51,28 @@ export type DiscountRule = {
   isActive: boolean;
 };
 
+export type CurrencyOption = { code: string; name: string };
+
+export const currencyChoices: CurrencyOption[] = [
+  { code: "USD", name: "US Dollar" },
+  { code: "INR", name: "Indian Rupee" },
+];
+
+export function currencyOptions(currency: string, currencies: CurrencyOption[] = []): CurrencyOption[] {
+  const merged = [...currencyChoices, ...currencies];
+  if (currency.length === 3 && !merged.some((item) => item.code === currency)) {
+    merged.unshift({ code: currency, name: currency });
+  }
+  const seen = new Set<string>();
+  return merged.filter((item) => {
+    if (seen.has(item.code)) {
+      return false;
+    }
+    seen.add(item.code);
+    return true;
+  });
+}
+
 export type BusinessConfiguration = {
   membership: MembershipConfig;
   freeze: FreezeConfig;
@@ -60,7 +82,9 @@ export type BusinessConfiguration = {
   discounts: DiscountRule[];
   leadSources: CrmCatalogItem[];
   lostReasons: CrmCatalogItem[];
+  currency?: string;
+  currencies?: CurrencyOption[];
 };
 
-export const configTabs = ["Membership", "Discounts", "Member Categories", "PT Packages", "Coach Rewards", "Freeze & Extensions", "Attendance", "CRM", "Chat", "Roles & Permissions"] as const;
+export const configTabs = ["General", "Membership", "Discounts", "Member Categories", "PT Packages", "Coach Rewards", "Freeze & Extensions", "Attendance", "CRM", "Chat", "Roles & Permissions"] as const;
 export type ConfigTab = (typeof configTabs)[number];

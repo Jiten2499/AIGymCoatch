@@ -9,7 +9,7 @@ import { configTabs, type BusinessConfiguration, type ConfigTab, type DiscountRu
 import type { MembershipPackage } from "../../../lib/gym";
 import type { Page } from "../../../lib/types";
 import { getSession, subscribeSession } from "../../../lib/session";
-import { AttendanceForm, CatalogAddDialog, CatalogList, CategoryDialog, CrmDefaultsForm, DiscountDialog, FreezeForm, MembershipForm } from "./ConfigForms";
+import { AttendanceForm, CatalogAddDialog, CatalogList, CategoryDialog, CrmDefaultsForm, CurrencyForm, DiscountDialog, FreezeForm, MembershipForm } from "./ConfigForms";
 import { CoachRewardsSection } from "./CoachRewardsSection";
 import { ChatPermissionsSection } from "./ChatPermissionsSection";
 import { PtPackagesSection } from "./PtPackagesSection";
@@ -19,7 +19,7 @@ export default function ConfigurationPage() {
   const client = useQueryClient();
   const session = useSyncExternalStore(subscribeSession, getSession, () => null);
   const tenantId = session?.currentTenant?.id ?? null;
-  const [tab, setTab] = useState<ConfigTab>("Membership");
+  const [tab, setTab] = useState<ConfigTab>("General");
   const features = useQuery({
     queryKey: ["features", tenantId],
     enabled: tenantId !== null,
@@ -56,7 +56,7 @@ export default function ConfigurationPage() {
     <PageState error={configuration.error instanceof ApiError ? configuration.error.message : null} loading={configuration.isLoading} onRetry={() => void configuration.refetch()}>
       <div>
         <h1 className="text-3xl font-semibold">Configuration</h1>
-        <p className="mt-2 max-w-3xl text-muted">Operational rules for memberships, discounts, member categories, personal-training packages, coach recognition rewards, freezes, attendance, and CRM for this gym.</p>
+        <p className="mt-2 max-w-3xl text-muted">Currency and operational rules for memberships, discounts, member categories, personal-training packages, coach recognition rewards, freezes, attendance, and CRM for this gym.</p>
       </div>
       <div className="mt-6 flex flex-wrap gap-2" role="tablist" aria-label="Configuration sections">
         {tabs.map((item) => (
@@ -72,6 +72,7 @@ export default function ConfigurationPage() {
           </button>
         ))}
       </div>
+      {data && tab === "General" ? <CurrencyForm currencies={data.currencies ?? []} currency={data.currency ?? "USD"} tenantId={tenantId} /> : null}
       {data && tab === "Membership" ? <MembershipForm tenantId={tenantId} value={data.membership} /> : null}
       {data && tab === "Freeze & Extensions" ? <FreezeForm tenantId={tenantId} value={data.freeze} /> : null}
       {data && tab === "Attendance" ? <AttendanceForm tenantId={tenantId} value={data.attendance} /> : null}

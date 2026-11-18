@@ -10,6 +10,7 @@ public static class GymErrors
     public static readonly Error NotFound = new("gym.not_found", "The requested record was not found in this workspace.");
     public static readonly Error Conflict = new("gym.conflict", "The record conflicts with an existing business record.");
     public static readonly Error InvalidState = new("gym.invalid_state", "The membership cannot change to that state.");
+    public static readonly Error UnknownCurrency = new("gym.unknown_currency", "Choose a valid currency.");
     public static readonly Error FreezeNotAllowed = new("gym.freeze_not_allowed", "This gym does not allow a membership freeze.");
     public static readonly Error FreezeOutsideLimits = new("gym.freeze_outside_limits", "The freeze length is outside the gym's freeze rules.");
     public static readonly Error FreezeLimitReached = new("gym.freeze_limit", "This membership has used its allowed freezes.");

@@ -8,6 +8,7 @@ describe("workspaceRole", () => {
 
   it("falls back to standard staff roles with labels", () => {
     expect(displayWorkspaceRole(["Member", "GymOwner"])).toBe("GymOwner");
+    expect(workspaceRoleLabel("SuperAdmin")).toBe("Super Admin");
     expect(workspaceRoleLabel("GymOwner")).toBe("Business Owner");
     expect(workspaceRoleLabel("GymManager")).toBe("Manager");
   });

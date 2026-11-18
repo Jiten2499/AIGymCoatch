@@ -7,6 +7,7 @@ import { DataTable } from "../../../components/DataTable";
 import { api, ApiError } from "../../../lib/api";
 import type { ExpenseRow, ExpenseSummary } from "../../../lib/gym";
 import type { Page } from "../../../lib/types";
+import { formatAmount, useWorkspaceCurrency } from "../../../lib/money";
 import { getSession, subscribeSession } from "../../../lib/session";
 import { CategoryDialog, ExpenseDialog } from "./ExpenseDialogs";
 
@@ -14,6 +15,7 @@ export default function ExpensesPage() {
   const client = useQueryClient();
   const session = useSyncExternalStore(subscribeSession, getSession, () => null);
   const tenantId = session?.currentTenant?.id ?? null;
+  const currency = useWorkspaceCurrency();
   const [term, setTerm] = useState("");
   const [adding, setAdding] = useState(false);
   const [category, setCategory] = useState(false);
@@ -46,7 +48,7 @@ export default function ExpensesPage() {
         <div>
           <h1 className="text-3xl font-semibold">Expenses</h1>
           <p className="mt-2 text-muted">
-            {summary.data ? `Today ${summary.data.todayAmount} ${summary.data.currency} · This month ${summary.data.monthAmount} ${summary.data.currency} · ${summary.data.totalCount} recorded` : "Operating costs recorded for this gym."}
+            {summary.data ? `Today ${formatAmount(summary.data.todayAmount, currency)} · This month ${formatAmount(summary.data.monthAmount, currency)} · ${summary.data.totalCount} recorded` : "Operating costs recorded for this gym."}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -56,7 +58,7 @@ export default function ExpensesPage() {
       </div>
       {summary.data && summary.data.categories.length > 0 ? (
         <ul className="mt-6 flex flex-wrap gap-3">
-          {summary.data.categories.map((item) => <li className="rounded-2xl border border-line px-4 py-3" key={item.categoryId}>{item.name} {item.amount}</li>)}
+          {summary.data.categories.map((item) => <li className="rounded-2xl border border-line px-4 py-3" key={item.categoryId}>{item.name} {formatAmount(item.amount, currency)}</li>)}
         </ul>
       ) : null}
       <input aria-label="Search expenses" className="field mt-6 max-w-sm" onChange={(event) => setTerm(event.target.value)} placeholder="Search description" value={term} />
@@ -67,7 +69,7 @@ export default function ExpensesPage() {
             { header: "Date", cell: (row) => row.expenseDate },
             { header: "Category", cell: (row) => row.category },
             { header: "Description", cell: (row) => row.description },
-            { header: "Amount", cell: (row) => `${row.amount} ${row.currency}` },
+            { header: "Amount", cell: (row) => formatAmount(row.amount, currency) },
             { header: "Method", cell: (row) => row.paymentMethod },
             { header: "Recorded by", cell: (row) => row.recordedBy || "—" },
             { header: "Status", cell: (row) => row.status },

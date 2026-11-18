@@ -107,6 +107,25 @@ public sealed class ConfigurationFoundationTests
     }
 
     [Fact]
+    public async Task CurrencyUpdate_AppliesTheWorkspaceCode_AndRejectsUnknownCodes()
+    {
+        var store = Substitute.For<ITenantCurrencyStore>();
+        var unit = Unit();
+        unit.ExecuteInTransactionAsync(Arg.Any<Func<CancellationToken, Task>>(), Arg.Any<CancellationToken>())
+            .Returns(call => call.Arg<Func<CancellationToken, Task>>()(CancellationToken.None));
+        var handler = new UpdateBusinessCurrencyCommandHandler(Guard(null), Actor(), store, Audit(), unit, Clock(), Client());
+
+        var saved = await handler.Handle(new UpdateBusinessCurrencyCommand("inr"), CancellationToken.None);
+        var unknown = await handler.Handle(new UpdateBusinessCurrencyCommand("ZZZ"), CancellationToken.None);
+
+        saved.IsSuccess.Should().BeTrue();
+        saved.Value.Should().Be("INR");
+        await store.Received(1).ApplyAsync(_tenantA, "INR", Arg.Any<CancellationToken>());
+        unknown.Error.Should().Be(GymErrors.UnknownCurrency);
+        CurrencyCodes.IsKnown("USD").Should().BeTrue();
+    }
+
+    [Fact]
     public void DomainDefaults_MatchOperationalExpectations()
     {
         var config = TenantBusinessConfig.CreateDefault(Guid.NewGuid(), _tenantA);

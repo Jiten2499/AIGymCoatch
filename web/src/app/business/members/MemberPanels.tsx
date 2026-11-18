@@ -6,6 +6,7 @@ import { ScrollableGrid } from "../../../components/ScrollableGrid";
 import { api, ApiError } from "../../../lib/api";
 import type { GymMemberDetails, GymMembership } from "../../../lib/gym";
 import type { Page } from "../../../lib/types";
+import { formatAmount, useWorkspaceCurrency } from "../../../lib/money";
 import { memberPaymentMethods } from "./memberWizard";
 
 type Attendance = { id: string; checkInTime: string; checkOutTime: string | null; checkInMethod: string };
@@ -63,6 +64,7 @@ function Overview({ canUpdate, member, memberId, tenantId }: { canUpdate: boolea
 }
 
 function Memberships({ memberId, tenantId }: { memberId: string; tenantId: string | null }) {
+  const currency = useWorkspaceCurrency();
   const memberships = useQuery({
     queryKey: ["memberships", tenantId, memberId],
     enabled: tenantId !== null,
@@ -77,7 +79,7 @@ function Memberships({ memberId, tenantId }: { memberId: string; tenantId: strin
         <article className="rounded-2xl border border-line bg-surface p-4 text-sm" key={item.id}>
           <h2 className="font-semibold">{item.planName || item.membershipNumber}</h2>
           <p className="mt-1 text-muted">{item.startDate} to {item.endDate} · {item.status}</p>
-          <p className="mt-1">{item.finalAmount ?? item.packagePrice ?? 0} {item.currency ?? ""} · Paid {item.totalPaid ?? 0} · Outstanding {item.outstanding ?? 0}</p>
+          <p className="mt-1">{formatAmount(item.finalAmount ?? item.packagePrice ?? 0, currency)} · Paid {formatAmount(item.totalPaid ?? 0, currency)} · Outstanding {formatAmount(item.outstanding ?? 0, currency)}</p>
           <p className="mt-1">Included PT sessions {item.ptSessionsRemaining ?? 0} of {item.includedPtSessions ?? 0} remaining</p>
         </article>
       ))}
@@ -108,6 +110,7 @@ function pendingPt(item: PtBalance) {
 
 function Payments({ canPay, memberId, tenantId }: { canPay: boolean; memberId: string; tenantId: string | null }) {
   const client = useQueryClient();
+  const currency = useWorkspaceCurrency();
   const memberships = useQuery({
     queryKey: ["memberships", tenantId, memberId],
     enabled: tenantId !== null,
@@ -122,7 +125,7 @@ function Payments({ canPay, memberId, tenantId }: { canPay: boolean; memberId: s
     ...(memberships.data?.items ?? []).map((item) => ({ key: `membership:${item.id}`, label: membershipLabel(item) })),
     ...(packages.data ?? []).flatMap((item) => {
       const due = pendingPt(item);
-      return due > 0 ? [{ key: `pt:${item.id}`, label: `PT · ${item.packageName} · pending ${due} ${item.currency}` }] : [];
+      return due > 0 ? [{ key: `pt:${item.id}`, label: `PT · ${item.packageName} · pending ${formatAmount(due, currency)}` }] : [];
     }),
   ];
   const [target, setTarget] = useState("");
@@ -183,12 +186,12 @@ function Payments({ canPay, memberId, tenantId }: { canPay: boolean; memberId: s
           </select>
         </div>
       ) : null}
-      {summary.data ? <p className="text-sm">Balance {summary.data.outstanding} {summary.data.currency} · {summary.data.settlementStatus} · Paid {summary.data.totalPaid} of {summary.data.finalAmount}</p> : null}
-      {pt ? <p className="text-sm">Balance {ptDue} {pt.currency} · Paid {pt.amountPaid ?? 0} of {pt.price}</p> : null}
+      {summary.data ? <p className="text-sm">Balance {formatAmount(summary.data.outstanding, currency)} · {summary.data.settlementStatus} · Paid {formatAmount(summary.data.totalPaid, currency)} of {formatAmount(summary.data.finalAmount, currency)}</p> : null}
+      {pt ? <p className="text-sm">Balance {formatAmount(ptDue, currency)} · Paid {formatAmount(pt.amountPaid ?? 0, currency)} of {formatAmount(pt.price, currency)}</p> : null}
       {payments.error instanceof ApiError ? <p role="alert">{payments.error.message}</p> : null}
       {ptPayments.error instanceof ApiError ? <p role="alert">{ptPayments.error.message}</p> : null}
       <ScrollableGrid><ul className="grid w-max min-w-full gap-2 text-sm">
-        {paymentRows.map((item) => <li className="rounded-2xl border border-line bg-surface p-3" key={item.id}>{item.paymentDate} · {item.amount} {item.currency} · {paymentMethodLabels[item.paymentMethod as (typeof memberPaymentMethods)[number]] ?? item.paymentMethod} · {item.status}{item.referenceNumber ? ` · ${item.referenceNumber}` : ""}</li>)}
+        {paymentRows.map((item) => <li className="rounded-2xl border border-line bg-surface p-3" key={item.id}>{item.paymentDate} · {formatAmount(item.amount, currency)} · {paymentMethodLabels[item.paymentMethod as (typeof memberPaymentMethods)[number]] ?? item.paymentMethod} · {item.status}{item.referenceNumber ? ` · ${item.referenceNumber}` : ""}</li>)}
         {(membershipId ? payments.data : ptPayments.data) && paymentRows.length === 0 ? <li className="text-muted">No payments recorded.</li> : null}
       </ul></ScrollableGrid>
       {canPay && selected ? (

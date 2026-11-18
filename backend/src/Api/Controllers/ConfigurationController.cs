@@ -19,6 +19,11 @@ public sealed class ConfigurationController : ApiControllerBase
     public async Task<IActionResult> Get(CancellationToken cancellationToken) =>
         (await Sender.Send(new GetBusinessConfigurationQuery(), cancellationToken)).ToActionResult();
 
+    [HttpPut("configuration/currency")]
+    [RequiresPermission(PermissionCodes.ConfigurationManage)]
+    public async Task<IActionResult> Currency(CurrencyConfigRequest request, CancellationToken cancellationToken) =>
+        (await Sender.Send(new UpdateBusinessCurrencyCommand(request.Currency), cancellationToken)).ToActionResult();
+
     [HttpPut("configuration/membership")]
     [RequiresPermission(PermissionCodes.ConfigurationManage)]
     public async Task<IActionResult> Membership(MembershipConfigRequest request, CancellationToken cancellationToken) =>
@@ -90,6 +95,7 @@ public sealed class ConfigurationController : ApiControllerBase
         (await Sender.Send(new ChangeCrmLostReasonStatusCommand(id, request.Active), cancellationToken)).ToActionResult();
 }
 
+public sealed record CurrencyConfigRequest(string Currency);
 public sealed record MembershipConfigRequest(bool AllowOverlappingMemberships, bool AllowEarlyRenewal, bool DefaultStartOnJoinDate, int GracePeriodDays, bool AutoExpireEnabled);
 public sealed record FreezeConfigRequest(int MaxFreezeDays, int MinFreezeDays, int MaxFreezeOccurrences, bool FreezeRequiresApproval, int MaxExtensionDays, bool ExtensionRequiresApproval);
 public sealed record AttendanceConfigRequest(int DuplicateCheckInMinutes, string? OpeningTime, string? ClosingTime, int CheckInGraceMinutes, CheckInMethod DefaultCheckInMethod);
