@@ -8,6 +8,7 @@ export type DocSearchItem = {
   title: string;
   summary: string;
   product: string;
+  category: string;
   text: string;
 };
 

@@ -234,7 +234,7 @@ function Metric({ label, value, currency }: { label: string; value?: number; cur
   return (
     <div className="rounded-2xl border border-line px-4 py-3">
       <p className="text-sm text-muted">{label}</p>
-      <p className="mt-1 text-xl font-semibold">{value == null ? "—" : formatAmount(value, currency)}</p>
+      <p className="mt-1 text-xl font-semibold">{value == null ? "—" : formatAmount(value, currency ?? "")}</p>
     </div>
   );
 }
