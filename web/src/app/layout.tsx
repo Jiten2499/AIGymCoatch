@@ -14,8 +14,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "LifeFit AI",
+  title: "Growventur",
   description: "The operating system for modern fitness businesses.",
+  icons: {
+    icon: [{ url: "/growventur-mark.png", type: "image/png" }],
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
