@@ -101,6 +101,9 @@ export default function GrowFitTermsPage() {
           <Link className="text-accent" href="/growfit/terms">
             GrowFit Terms of Service
           </Link>
+          <Link className="text-accent" href="/growfit/privacy">
+            GrowFit Privacy Policy
+          </Link>
         </div>
       </footer>
     </div>
@@ -110,7 +113,11 @@ export default function GrowFitTermsPage() {
 function PrivacyNotice() {
   return (
     <p>
-      A public GrowFit Privacy Policy page has not been published yet. It still needs to be created. This page does not link to a privacy policy until that page exists.
+      The GrowFit Privacy Policy is published at{" "}
+      <Link className="text-accent underline-offset-4 hover:underline" href="/growfit/privacy">
+        growventur.com/growfit/privacy
+      </Link>
+      .
     </p>
   );
 }

@@ -9,5 +9,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
   return [
     ...pages.map((path) => ({ url: new URL(path, origin).toString(), lastModified: now })),
     { url: new URL("/growfit/terms", origin).toString(), lastModified: new Date("2026-11-21") },
+    { url: new URL("/growfit/privacy", origin).toString(), lastModified: new Date("2026-11-21") },
   ];
 }

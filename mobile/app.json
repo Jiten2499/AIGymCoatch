@@ -78,7 +78,8 @@
           "resizeMode": "contain",
           "backgroundColor": "#06130D"
         }
-      ]
+      ],
+      "./plugins/withOptionalPortraitFeature"
     ],
     "extra": {
       "eas": {
